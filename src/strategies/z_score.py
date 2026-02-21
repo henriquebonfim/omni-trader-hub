@@ -31,11 +31,11 @@ class ZScoreStrategy(BaseStrategy):
 
         # Parameters
         if hasattr(config.strategy, "z_score"):
-             self.window = getattr(config.strategy.z_score, "window", 20)
-             self.threshold = getattr(config.strategy.z_score, "threshold", 2.0)
+            self.window = getattr(config.strategy.z_score, "window", 20)
+            self.threshold = getattr(config.strategy.z_score, "threshold", 2.0)
         else:
-             self.window = getattr(config.strategy, "z_score_window", 20)
-             self.threshold = getattr(config.strategy, "z_score_threshold", 2.0)
+            self.window = getattr(config.strategy, "z_score_window", 20)
+            self.threshold = getattr(config.strategy, "z_score_threshold", 2.0)
 
         # State
         self.z_score = 0.0

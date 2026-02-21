@@ -31,9 +31,9 @@ class BreakoutStrategy(BaseStrategy):
 
         # Parameters
         if hasattr(config.strategy, "breakout"):
-             self.donchian_period = getattr(config.strategy.breakout, "period", 20)
+            self.donchian_period = getattr(config.strategy.breakout, "period", 20)
         else:
-             self.donchian_period = getattr(config.strategy, "donchian_period", 20)
+            self.donchian_period = getattr(config.strategy, "donchian_period", 20)
 
         # State
         self.upper_channel = 0.0

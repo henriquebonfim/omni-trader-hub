@@ -31,18 +31,18 @@ class BollingerBandsStrategy(BaseStrategy):
 
         # Parameters
         if hasattr(config.strategy, "bollinger_bands"):
-             self.bb_length = getattr(config.strategy.bollinger_bands, "length", 20)
-             self.bb_std = getattr(config.strategy.bollinger_bands, "std", 2.0)
-             self.rsi_length = getattr(config.strategy.bollinger_bands, "rsi_length", 14)
-             self.rsi_lower = getattr(config.strategy.bollinger_bands, "rsi_lower", 30)
-             self.rsi_upper = getattr(config.strategy.bollinger_bands, "rsi_upper", 70)
+            self.bb_length = getattr(config.strategy.bollinger_bands, "length", 20)
+            self.bb_std = getattr(config.strategy.bollinger_bands, "std", 2.0)
+            self.rsi_length = getattr(config.strategy.bollinger_bands, "rsi_length", 14)
+            self.rsi_lower = getattr(config.strategy.bollinger_bands, "rsi_lower", 30)
+            self.rsi_upper = getattr(config.strategy.bollinger_bands, "rsi_upper", 70)
         else:
-             # Fallback to simple attributes if nested config not used
-             self.bb_length = getattr(config.strategy, "bb_length", 20)
-             self.bb_std = getattr(config.strategy, "bb_std", 2.0)
-             self.rsi_length = getattr(config.strategy, "rsi_length", 14)
-             self.rsi_lower = getattr(config.strategy, "rsi_lower", 30)
-             self.rsi_upper = getattr(config.strategy, "rsi_upper", 70)
+            # Fallback to simple attributes if nested config not used
+            self.bb_length = getattr(config.strategy, "bb_length", 20)
+            self.bb_std = getattr(config.strategy, "bb_std", 2.0)
+            self.rsi_length = getattr(config.strategy, "rsi_length", 14)
+            self.rsi_lower = getattr(config.strategy, "rsi_lower", 30)
+            self.rsi_upper = getattr(config.strategy, "rsi_upper", 70)
 
         # State
         self.upper_band = 0.0

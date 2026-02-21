@@ -33,11 +33,11 @@ class ADXTrendStrategy(BaseStrategy):
         # Expecting config to have strategy.adx section or just strategy fields
         # Trying both for flexibility
         if hasattr(config.strategy, "adx"):
-             self.adx_period = getattr(config.strategy.adx, "period", 14)
-             self.adx_threshold = getattr(config.strategy.adx, "threshold", 25)
+            self.adx_period = getattr(config.strategy.adx, "period", 14)
+            self.adx_threshold = getattr(config.strategy.adx, "threshold", 25)
         else:
-             self.adx_period = getattr(config.strategy, "adx_period", 14)
-             self.adx_threshold = getattr(config.strategy, "adx_threshold", 25)
+            self.adx_period = getattr(config.strategy, "adx_period", 14)
+            self.adx_threshold = getattr(config.strategy, "adx_threshold", 25)
 
         self.adx = 0.0
         self.plus_di = 0.0
