@@ -8,7 +8,7 @@ from .base import BaseStrategy, Signal, StrategyResult
 from .registry import get_strategy, list_strategies, register_strategy
 
 # Import strategies to ensure registration
-from . import adx_trend, ema_volume, z_score
+from . import adx_trend, ema_volume, z_score, bollinger_bands, breakout
 
 __all__ = [
     "BaseStrategy",

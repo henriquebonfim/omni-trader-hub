@@ -82,6 +82,7 @@ class Exchange:
         # Paper trading state
         self._paper_balance = 10000.0  # $10k simulated
         self._paper_position: dict | None = None
+        self._paper_orders: list = []  # Track paper orders
 
         self.client = ccxt.binance(exchange_config)
         self.config = config
@@ -211,6 +212,14 @@ class Exchange:
                 return Position(pos)
 
         return Position()  # Empty position
+
+    async def fetch_open_orders(self, symbol: str | None = None) -> list:
+        """Get all open orders for symbol."""
+        symbol = symbol or self.config.trading.symbol
+        if self.paper_mode:
+            return [o for o in self._paper_orders if o["status"] == "open" and o["symbol"] == symbol]
+
+        return await self.client.fetch_open_orders(symbol)
 
     async def market_long(
         self, symbol: str | None = None, amount: float = None
@@ -366,6 +375,7 @@ class Exchange:
             }
 
             self._paper_position = None
+            self._paper_orders = [] # Cancel all paper orders
             logger.info(
                 "paper_position_closed",
                 symbol=symbol,
@@ -422,18 +432,27 @@ class Exchange:
         side = "sell" if position.side == "long" else "buy"
 
         if self.paper_mode:
-            # In paper mode, just log it (actual SL tracking in main loop)
-            import time
+            # Cancel existing SL orders
+            self._paper_orders = [o for o in self._paper_orders if o["type"] != "stop_market"]
 
+            import time
             order = {
                 "id": f"paper_sl_{int(time.time() * 1000)}",
                 "symbol": symbol,
                 "type": "stop_market",
-                "stop_price": stop_price,
+                "side": side,
+                "stopPrice": stop_price,
                 "status": "open",
             }
+            self._paper_orders.append(order)
             logger.info("paper_stop_loss_set", symbol=symbol, stop_price=stop_price)
             return order
+
+        # Cancel existing open STOP_MARKET orders to replace them
+        open_orders = await self.client.fetch_open_orders(symbol)
+        for o in open_orders:
+             if o['type'] == 'STOP_MARKET':
+                  await self.client.cancel_order(o['id'], symbol)
 
         order = await self.client.create_order(
             symbol,
@@ -477,20 +496,30 @@ class Exchange:
         side = "sell" if position.side == "long" else "buy"
 
         if self.paper_mode:
-            # In paper mode, just log it (actual TP tracking in main loop)
+             # Cancel existing TP orders
+            self._paper_orders = [o for o in self._paper_orders if o["type"] != "take_profit_market"]
+
             import time
 
             order = {
                 "id": f"paper_tp_{int(time.time() * 1000)}",
                 "symbol": symbol,
                 "type": "take_profit_market",
+                "side": side,
                 "take_profit_price": take_profit_price,
                 "status": "open",
             }
+            self._paper_orders.append(order)
             logger.info(
                 "paper_take_profit_set", symbol=symbol, tp_price=take_profit_price
             )
             return order
+
+        # Cancel existing open TAKE_PROFIT_MARKET orders
+        open_orders = await self.client.fetch_open_orders(symbol)
+        for o in open_orders:
+             if o['type'] == 'TAKE_PROFIT_MARKET':
+                  await self.client.cancel_order(o['id'], symbol)
 
         order = await self.client.create_order(
             symbol,
@@ -510,6 +539,11 @@ class Exchange:
     async def cancel_all_orders(self, symbol: str | None = None) -> list:
         """Cancel all open orders for symbol."""
         symbol = symbol or self.config.trading.symbol
+        if self.paper_mode:
+            self._paper_orders = []
+            logger.info("orders_cancelled", symbol=symbol, count=0)
+            return []
+
         orders = await self.client.cancel_all_orders(symbol)
         logger.info("orders_cancelled", symbol=symbol, count=len(orders))
         return orders

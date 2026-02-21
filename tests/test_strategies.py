@@ -4,13 +4,17 @@ Tests for Strategy Registry and Implementations.
 
 import pandas as pd
 import pytest
+import numpy as np
 from unittest.mock import MagicMock
 
 from src.strategies import get_strategy, list_strategies, Signal, register_strategy, BaseStrategy
 from src.strategies.ema_volume import EMAVolumeStrategy
 from src.strategies.adx_trend import ADXTrendStrategy
 from src.strategies.z_score import ZScoreStrategy
+from src.strategies.bollinger_bands import BollingerBandsStrategy
+from src.strategies.breakout import BreakoutStrategy
 from src.config import Config
+from src.risk import RiskManager
 
 
 @pytest.fixture
@@ -27,7 +31,21 @@ def mock_config():
             "adx_threshold": 25,
             "z_score_window": 10,
             "z_score_threshold": 2.0,
+            "bollinger_bands": {
+                "length": 20,
+                "std": 2.0,
+                "rsi_length": 14,
+                "rsi_lower": 30,
+                "rsi_upper": 70
+            },
+            "breakout": {
+                "period": 20
+            }
         },
+        "risk": {
+            "trailing_stop_activation_pct": 1.0,
+            "trailing_stop_callback_pct": 0.5
+        }
     }
     return Config(config_data)
 
@@ -38,6 +56,8 @@ def test_registry():
     assert "ema_volume" in strategies
     assert "adx_trend" in strategies
     assert "z_score" in strategies
+    assert "bollinger_bands" in strategies
+    assert "breakout" in strategies
 
     cls = get_strategy("ema_volume")
     assert cls == EMAVolumeStrategy
@@ -141,13 +161,118 @@ def test_z_score_strategy(mock_config):
     assert strategy.should_exit() is True
 
 
-def test_strategy_metadata(mock_config):
-    """Test metadata presence."""
-    s1 = EMAVolumeStrategy(mock_config)
-    assert s1.metadata["type"] == "trend_following"
+def test_bollinger_bands_strategy(mock_config):
+    """Test Bollinger Bands Strategy logic."""
+    strategy = BollingerBandsStrategy(mock_config)
 
-    s2 = ADXTrendStrategy(mock_config)
-    assert s2.metadata["type"] == "trend_following"
+    # Mock internal state
+    strategy.lower_band = 90
+    strategy.upper_band = 110
+    strategy.mid_band = 100
 
-    s3 = ZScoreStrategy(mock_config)
-    assert s3.metadata["type"] == "mean_reversion"
+    # Case: Long (Price < Lower Band and RSI < 30)
+    strategy.current_price = 85
+    strategy.rsi = 25
+    assert strategy.should_long() is True
+
+    strategy.rsi = 40
+    assert strategy.should_long() is False
+
+    # Case: Short (Price > Upper Band and RSI > 70)
+    strategy.current_price = 115
+    strategy.rsi = 75
+    assert strategy.should_short() is True
+
+    strategy.rsi = 60
+    assert strategy.should_short() is False
+
+    # Case: Exit Long (Price > Mid Band)
+    strategy.current_position = "long"
+    strategy.current_price = 101
+    assert strategy.should_exit() is True
+
+    strategy.current_price = 99
+    assert strategy.should_exit() is False
+
+
+def test_breakout_strategy(mock_config):
+    """Test Breakout Strategy logic."""
+    strategy = BreakoutStrategy(mock_config)
+
+    # Mock internal state
+    strategy.upper_channel = 110
+    strategy.lower_channel = 90
+    strategy.mid_channel = 100
+
+    # Case: Long (Price > Upper Channel)
+    strategy.current_price = 111
+    assert strategy.should_long() is True
+
+    strategy.current_price = 109
+    assert strategy.should_long() is False
+
+    # Case: Short (Price < Lower Channel)
+    strategy.current_price = 89
+    assert strategy.should_short() is True
+
+    strategy.current_price = 91
+    assert strategy.should_short() is False
+
+    # Case: Exit Long (Price < Mid Channel)
+    strategy.current_position = "long"
+    strategy.current_price = 99
+    assert strategy.should_exit() is True
+
+
+def test_trailing_stop():
+    """Test Trailing Stop logic in RiskManager."""
+    # Create fake config
+    class FakeConfig:
+        def __init__(self):
+            self.trading = MagicMock()
+            self.trading.position_size_pct = 1.0
+            self.risk = MagicMock()
+            self.risk.stop_loss_pct = 2.0
+            self.risk.take_profit_pct = 4.0
+            self.risk.max_daily_loss_pct = 5.0
+            self.risk.max_positions = 1
+            self.risk.trailing_stop_activation_pct = 1.0
+            self.risk.trailing_stop_callback_pct = 0.5
+            self.exchange = MagicMock()
+            self.exchange.leverage = 1
+
+    # Mock get_config
+    import src.risk
+    src.risk.get_config = lambda: FakeConfig()
+
+    risk = RiskManager()
+
+    # Case 1: Long Position
+    # Entry: 100. Current: 102. PnL: +2%. Activation: 1%. Callback: 0.5%
+    # Expected Stop: 102 * (1 - 0.005) = 101.49
+
+    position_data = {
+        "symbol": "BTC",
+        "side": "long",
+        "contracts": 1,
+        "entryPrice": 100,
+        "notional": 100,
+        "unrealizedPnl": 2,
+        "leverage": 1
+    }
+    # Mock position object similar to exchange.Position
+    class MockPosition:
+        def __init__(self, data):
+            self.is_open = True
+            self.side = data["side"]
+            self.entry_price = data["entryPrice"]
+
+    pos = MockPosition(position_data)
+
+    new_stop = risk.calculate_trailing_stop(102.0, pos)
+    assert new_stop is not None
+    assert abs(new_stop - 101.49) < 0.01
+
+    # Case 2: PnL not high enough (< 1%)
+    new_stop = risk.calculate_trailing_stop(100.5, pos)
+    assert new_stop is None

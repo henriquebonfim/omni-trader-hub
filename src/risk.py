@@ -6,10 +6,12 @@ Handles:
 - Stop loss / Take profit calculation
 - Daily loss tracking
 - Circuit breaker (pause trading if daily loss exceeded)
+- Trailing Stop Logic
 """
 
 from dataclasses import dataclass, field
 from datetime import date
+from typing import Optional
 
 import structlog
 
@@ -73,6 +75,10 @@ class RiskManager:
         self.max_daily_loss_pct = config.risk.max_daily_loss_pct
         self.max_positions = config.risk.max_positions
         self.leverage = config.exchange.leverage
+
+        # Trailing Stop Config
+        self.trailing_stop_activation_pct = getattr(config.risk, "trailing_stop_activation_pct", 1.0)
+        self.trailing_stop_callback_pct = getattr(config.risk, "trailing_stop_callback_pct", 0.5)
 
         # Daily tracking
         self.daily_stats = DailyStats()
@@ -214,6 +220,40 @@ class RiskManager:
             stop_loss_price=stop_loss,
             take_profit_price=take_profit,
         )
+
+    def calculate_trailing_stop(self, current_price: float, position) -> Optional[float]:
+        """
+        Calculate potential new stop loss price based on trailing rules.
+
+        Note: This does not check against existing stop loss (ratcheting).
+        That check must be performed by the caller who has access to open orders.
+
+        Args:
+            current_price: Current market price
+            position: Position object (entry_price, side, etc.)
+
+        Returns:
+            Potential new stop price if activation threshold met, else None
+        """
+        if not position.is_open:
+            return None
+
+        # Calculate Unrealized PnL %
+        if position.side == "long":
+            pnl_pct = ((current_price - position.entry_price) / position.entry_price) * 100
+
+            # Check Activation
+            if pnl_pct >= self.trailing_stop_activation_pct:
+                return current_price * (1 - self.trailing_stop_callback_pct / 100)
+
+        else: # Short
+            pnl_pct = ((position.entry_price - current_price) / position.entry_price) * 100
+
+            # Check Activation
+            if pnl_pct >= self.trailing_stop_activation_pct:
+                return current_price * (1 + self.trailing_stop_callback_pct / 100)
+
+        return None
 
     def record_trade(self, pnl: float):
         """

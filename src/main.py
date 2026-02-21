@@ -176,7 +176,41 @@ class OmniTrader:
                 **result.indicators,
             )
 
-            # 6. Execute based on signal
+            # 6. Manage Trailing Stop (if in position)
+            if position.is_open:
+                # Get existing stop loss
+                open_orders = await self.exchange.fetch_open_orders(symbol)
+                current_stop_price = None
+                for order in open_orders:
+                    if order.get("type") == "stop_market" or order.get("type") == "STOP_MARKET":
+                        # ccxt unifies "stopPrice" or "triggerPrice" usually
+                        current_stop_price = float(order.get("stopPrice") or order.get("triggerPrice") or 0)
+                        break
+
+                new_stop = self.risk.calculate_trailing_stop(current_price, position)
+
+                if new_stop:
+                    should_update = False
+                    if current_stop_price is None:
+                        # No stop exists? Should create one
+                        should_update = True
+                    else:
+                        # Ratchet Logic: Only update if better
+                        if position.side == "long":
+                            if new_stop > current_stop_price:
+                                should_update = True
+                        elif position.side == "short":
+                            if new_stop < current_stop_price:
+                                should_update = True
+
+                    if should_update:
+                        logger.info("trailing_stop_update", symbol=symbol, current_stop=current_stop_price, new_stop=new_stop)
+                        try:
+                            await self.exchange.set_stop_loss(symbol, new_stop, position.side)
+                        except Exception as e:
+                            logger.error("trailing_stop_update_failed", error=str(e))
+
+            # 7. Execute based on signal
             if result.signal == Signal.LONG:
                 await self._open_position("long", current_price, balance_info["free"], result.reason)
 

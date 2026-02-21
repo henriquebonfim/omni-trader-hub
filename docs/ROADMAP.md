@@ -17,12 +17,13 @@ A simple BTC/USDT Futures bot with:
 
 ## Phase 2: Strategy Enhancement (Weeks 5-8)
 
-**Status**: 🔜 Planned
+**Status**: 🚧 In Progress
 
 ### Features
-- [ ] **Regime Detection**: ADX indicator to filter trades (only trade in trends)
+- [x] **Regime Detection**: ADX indicator to filter trades (only trade in trends)
+- [x] **Strategy Book**: Modular "Book of Strategies" architecture
+- [ ] **Trailing Stop**: Dynamic stop that follows price up (Next Priority)
 - [ ] **Multi-timeframe**: Confirm 15m signals with 1h trend direction
-- [ ] **Trailing Stop**: Dynamic stop that follows price up
 - [ ] **DCA Logic**: Add to position at better prices (max 2x)
 - [ ] **Multiple Pairs**: Support ETH, SOL (one at a time)
 
@@ -52,6 +53,8 @@ A simple BTC/USDT Futures bot with:
 **Status**: 🔮 Future
 
 ### Features
+- [ ] **Backtesting Engine**: Build custom backtester for Strategy Book (Next Priority)
+- [ ] **Monte Carlo Simulations**: Stress test strategies against randomized market conditions
 - [ ] Web dashboard (status page)
 - [ ] Multiple pairs simultaneously
 - [ ] Kelly Criterion position sizing
@@ -104,3 +107,4 @@ The original vision from research:
 | 2026-02-20 | Binance Futures testnet | Zero risk while learning |
 | 2026-02-20 | No LLM in MVP | Not needed for technical strategy |
 | 2026-02-20 | Discord for alerts | Already in use, simple setup |
+| 2026-02-21 | Strategy Pattern Architecture | Enable plug-and-play strategies for backtesting |
