@@ -1,0 +1,12 @@
+__pycache__/
+*.pyc
+.env
+.DS_Store
+data/history/
+data/vector_db/
+models/
+logs/
+omnitrader.log
+venv/
+.idea/
+.vscode/

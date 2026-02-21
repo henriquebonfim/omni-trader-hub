@@ -1,0 +1,32 @@
+# OmniTrader MVP Configuration
+# ==============================
+
+exchange:
+  name: binance
+  testnet: false # Binance futures testnet deprecated
+  paper_mode: true # Paper trading (no real money)
+  leverage: 3 # 3x leverage
+  margin_type: isolated # isolated margin (safer)
+
+trading:
+  symbol: BTC/USDT:USDT # CCXT futures symbol format
+  timeframe: 15m # 15-minute candles
+  position_size_pct: 2.0 # 2% of wallet per trade
+  cycle_seconds: 60 # Check every 60 seconds
+
+strategy:
+  name: ema_volume
+  ema_fast: 9 # Fast EMA period
+  ema_slow: 21 # Slow EMA period
+  volume_sma: 20 # Volume SMA period
+  volume_threshold: 1.5 # Volume must be > 1.5x average
+
+risk:
+  stop_loss_pct: 2.0 # 2% stop loss
+  take_profit_pct: 4.0 # 4% take profit (2:1 R:R)
+  max_daily_loss_pct: 5.0 # Circuit breaker: pause if daily loss > 5%
+  max_positions: 1 # Only one position at a time
+
+notifications:
+  enabled: true
+  discord_webhook: ${DISCORD_WEBHOOK_URL}
