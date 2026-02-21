@@ -19,7 +19,7 @@ from .database import Database
 from .exchange import Exchange
 from .notifier import Notifier
 from .risk import RiskManager
-from .strategy import EMAVolumeStrategy, Signal
+from src.strategies import get_strategy, Signal
 
 # Configure structured logging
 structlog.configure(
@@ -64,10 +64,21 @@ class OmniTrader:
     def __init__(self):
         self.config = get_config()
         self.exchange = Exchange()
-        self.strategy = EMAVolumeStrategy()
         self.risk = RiskManager()
         self.notifier = Notifier()
         self.database = Database()
+
+        # Load strategy dynamically
+        strategy_name = getattr(self.config.strategy, "name", "ema_volume")
+        logger.info("loading_strategy", name=strategy_name)
+
+        try:
+            strategy_class = get_strategy(strategy_name)
+            self.strategy = strategy_class(self.config)
+            logger.info("strategy_loaded", metadata=self.strategy.metadata)
+        except Exception as e:
+            logger.critical("strategy_load_failed", error=str(e))
+            raise
 
         self._running = False
         self._shutdown_event = asyncio.Event()
@@ -161,17 +172,16 @@ class OmniTrader:
                 price=f"${current_price:,.2f}",
                 signal=result.signal.value,
                 position=current_side or "none",
-                ema_fast=f"{result.ema_fast:.2f}",
-                ema_slow=f"{result.ema_slow:.2f}",
-                volume_ratio=f"{result.volume_ratio:.2f}x",
+                reason=result.reason,
+                **result.indicators,
             )
 
             # 6. Execute based on signal
             if result.signal == Signal.LONG:
-                await self._open_position("long", current_price, balance_info["free"])
+                await self._open_position("long", current_price, balance_info["free"], result.reason)
 
             elif result.signal == Signal.SHORT:
-                await self._open_position("short", current_price, balance_info["free"])
+                await self._open_position("short", current_price, balance_info["free"], result.reason)
 
             elif result.signal in (Signal.EXIT_LONG, Signal.EXIT_SHORT):
                 await self._close_position(position, current_price, result.reason)
@@ -180,7 +190,7 @@ class OmniTrader:
             logger.error("cycle_error", error=str(e))
             await self.notifier.error(str(e), "run_cycle")
 
-    async def _open_position(self, side: str, current_price: float, balance: float):
+    async def _open_position(self, side: str, current_price: float, balance: float, reason: str = "signal"):
         """Open a new position."""
         symbol = self.config.trading.symbol
 
@@ -236,7 +246,7 @@ class OmniTrader:
                 notional=notional,
                 stop_loss=stop_loss,
                 take_profit=take_profit,
-                reason="ema_crossover",
+                reason=reason,
             )
 
             # Send notification

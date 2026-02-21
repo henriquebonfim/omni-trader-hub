@@ -15,11 +15,21 @@ trading:
   cycle_seconds: 60 # Check every 60 seconds
 
 strategy:
-  name: ema_volume
+  name: ema_volume  # Active strategy: ema_volume, adx_trend, z_score
+
+  # EMA Volume Strategy Parameters
   ema_fast: 9 # Fast EMA period
   ema_slow: 21 # Slow EMA period
   volume_sma: 20 # Volume SMA period
   volume_threshold: 1.5 # Volume must be > 1.5x average
+
+  # ADX Trend Strategy Parameters
+  adx_period: 14       # ADX calculation period
+  adx_threshold: 25    # Minimum ADX for trend confirmation
+
+  # Z-Score Strategy Parameters
+  z_score_window: 20      # Rolling window for Z-Score
+  z_score_threshold: 2.0  # Std deviations for overbought/oversold
 
 risk:
   stop_loss_pct: 2.0 # 2% stop loss
