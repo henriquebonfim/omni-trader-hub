@@ -195,7 +195,7 @@ class Database:
         )
         rows = await cursor.fetchall()
         columns = [description[0] for description in cursor.description]
-        return [dict(zip(columns, row)) for row in rows]
+        return [dict(zip(columns, row, strict=False)) for row in rows]
 
     async def get_daily_summary(self, date: str) -> dict | None:
         """Get daily summary for a specific date."""
@@ -205,5 +205,5 @@ class Database:
         row = await cursor.fetchone()
         if row:
             columns = [description[0] for description in cursor.description]
-            return dict(zip(columns, row))
+            return dict(zip(columns, row, strict=False))
         return None

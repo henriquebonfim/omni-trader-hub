@@ -14,6 +14,7 @@ import pandas as pd
 import structlog
 
 from src.config import Config
+
 from .base import BaseStrategy
 from .registry import register_strategy
 

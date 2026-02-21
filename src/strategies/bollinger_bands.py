@@ -14,6 +14,7 @@ import pandas_ta as ta
 import structlog
 
 from src.config import Config
+
 from .base import BaseStrategy
 from .registry import register_strategy
 
@@ -57,7 +58,7 @@ class BollingerBandsStrategy(BaseStrategy):
             "type": "mean_reversion",
             "risk": "medium",
             "timeframe": "15m",
-            "description": "Mean reversion using BB and RSI"
+            "description": "Mean reversion using BB and RSI",
         }
 
     def update(self, ohlcv: pd.DataFrame, current_position: str | None = None):
@@ -92,9 +93,12 @@ class BollingerBandsStrategy(BaseStrategy):
                     # Fallback: try to find columns starting with BBL, BBM, BBU
                     cols = bb.columns
                     for col in cols:
-                        if col.startswith("BBL"): self.lower_band = bb[col].iloc[-1]
-                        if col.startswith("BBM"): self.mid_band = bb[col].iloc[-1]
-                        if col.startswith("BBU"): self.upper_band = bb[col].iloc[-1]
+                        if col.startswith("BBL"):
+                            self.lower_band = bb[col].iloc[-1]
+                        if col.startswith("BBM"):
+                            self.mid_band = bb[col].iloc[-1]
+                        if col.startswith("BBU"):
+                            self.upper_band = bb[col].iloc[-1]
 
             # Calculate RSI
             rsi_series = ta.rsi(ohlcv["close"], length=self.rsi_length)
@@ -106,12 +110,14 @@ class BollingerBandsStrategy(BaseStrategy):
 
     def should_long(self) -> bool:
         """Long if price < Lower Band AND RSI < Lower Threshold (Oversold)."""
-        if self.lower_band == 0: return False
+        if self.lower_band == 0:
+            return False
         return (self.current_price < self.lower_band) and (self.rsi < self.rsi_lower)
 
     def should_short(self) -> bool:
         """Short if price > Upper Band AND RSI > Upper Threshold (Overbought)."""
-        if self.upper_band == 0: return False
+        if self.upper_band == 0:
+            return False
         return (self.current_price > self.upper_band) and (self.rsi > self.rsi_upper)
 
     def should_exit(self) -> bool:
@@ -120,7 +126,8 @@ class BollingerBandsStrategy(BaseStrategy):
         Long: Price crosses above Mid Band
         Short: Price crosses below Mid Band
         """
-        if self.mid_band == 0: return False
+        if self.mid_band == 0:
+            return False
 
         if self.current_position == "long":
             return self.current_price > self.mid_band

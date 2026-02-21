@@ -77,8 +77,12 @@ class RiskManager:
         self.leverage = config.exchange.leverage
 
         # Trailing Stop Config
-        self.trailing_stop_activation_pct = getattr(config.risk, "trailing_stop_activation_pct", 1.0)
-        self.trailing_stop_callback_pct = getattr(config.risk, "trailing_stop_callback_pct", 0.5)
+        self.trailing_stop_activation_pct = getattr(
+            config.risk, "trailing_stop_activation_pct", 1.0
+        )
+        self.trailing_stop_callback_pct = getattr(
+            config.risk, "trailing_stop_callback_pct", 0.5
+        )
 
         # Daily tracking
         self.daily_stats = DailyStats()
@@ -221,7 +225,9 @@ class RiskManager:
             take_profit_price=take_profit,
         )
 
-    def calculate_trailing_stop(self, current_price: float, position) -> Optional[float]:
+    def calculate_trailing_stop(
+        self, current_price: float, position
+    ) -> Optional[float]:
         """
         Calculate potential new stop loss price based on trailing rules.
 
@@ -240,14 +246,18 @@ class RiskManager:
 
         # Calculate Unrealized PnL %
         if position.side == "long":
-            pnl_pct = ((current_price - position.entry_price) / position.entry_price) * 100
+            pnl_pct = (
+                (current_price - position.entry_price) / position.entry_price
+            ) * 100
 
             # Check Activation
             if pnl_pct >= self.trailing_stop_activation_pct:
                 return current_price * (1 - self.trailing_stop_callback_pct / 100)
 
-        else: # Short
-            pnl_pct = ((position.entry_price - current_price) / position.entry_price) * 100
+        else:  # Short
+            pnl_pct = (
+                (position.entry_price - current_price) / position.entry_price
+            ) * 100
 
             # Check Activation
             if pnl_pct >= self.trailing_stop_activation_pct:

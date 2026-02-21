@@ -8,18 +8,20 @@ Usage:
 """
 
 import asyncio
+import logging
 import signal
 import sys
 from datetime import datetime
 
 import structlog
 
+from src.strategies import Signal, get_strategy
+
 from .config import get_config
 from .database import Database
 from .exchange import Exchange
 from .notifier import Notifier
 from .risk import RiskManager
-from src.strategies import get_strategy, Signal
 
 # Configure structured logging
 structlog.configure(
@@ -38,7 +40,6 @@ structlog.configure(
     cache_logger_on_first_use=True,
 )
 
-import logging
 
 logging.basicConfig(
     format="%(message)s",
@@ -182,9 +183,14 @@ class OmniTrader:
                 open_orders = await self.exchange.fetch_open_orders(symbol)
                 current_stop_price = None
                 for order in open_orders:
-                    if order.get("type") == "stop_market" or order.get("type") == "STOP_MARKET":
+                    if (
+                        order.get("type") == "stop_market"
+                        or order.get("type") == "STOP_MARKET"
+                    ):
                         # ccxt unifies "stopPrice" or "triggerPrice" usually
-                        current_stop_price = float(order.get("stopPrice") or order.get("triggerPrice") or 0)
+                        current_stop_price = float(
+                            order.get("stopPrice") or order.get("triggerPrice") or 0
+                        )
                         break
 
                 new_stop = self.risk.calculate_trailing_stop(current_price, position)
@@ -204,18 +210,29 @@ class OmniTrader:
                                 should_update = True
 
                     if should_update:
-                        logger.info("trailing_stop_update", symbol=symbol, current_stop=current_stop_price, new_stop=new_stop)
+                        logger.info(
+                            "trailing_stop_update",
+                            symbol=symbol,
+                            current_stop=current_stop_price,
+                            new_stop=new_stop,
+                        )
                         try:
-                            await self.exchange.set_stop_loss(symbol, new_stop, position.side)
+                            await self.exchange.set_stop_loss(
+                                symbol, new_stop, position.side
+                            )
                         except Exception as e:
                             logger.error("trailing_stop_update_failed", error=str(e))
 
             # 7. Execute based on signal
             if result.signal == Signal.LONG:
-                await self._open_position("long", current_price, balance_info["free"], result.reason)
+                await self._open_position(
+                    "long", current_price, balance_info["free"], result.reason
+                )
 
             elif result.signal == Signal.SHORT:
-                await self._open_position("short", current_price, balance_info["free"], result.reason)
+                await self._open_position(
+                    "short", current_price, balance_info["free"], result.reason
+                )
 
             elif result.signal in (Signal.EXIT_LONG, Signal.EXIT_SHORT):
                 await self._close_position(position, current_price, result.reason)
@@ -224,7 +241,9 @@ class OmniTrader:
             logger.error("cycle_error", error=str(e))
             await self.notifier.error(str(e), "run_cycle")
 
-    async def _open_position(self, side: str, current_price: float, balance: float, reason: str = "signal"):
+    async def _open_position(
+        self, side: str, current_price: float, balance: float, reason: str = "signal"
+    ):
         """Open a new position."""
         symbol = self.config.trading.symbol
 

@@ -14,6 +14,7 @@ import pandas_ta as ta
 import structlog
 
 from src.config import Config
+
 from .base import BaseStrategy
 from .registry import register_strategy
 
@@ -47,7 +48,7 @@ class BreakoutStrategy(BaseStrategy):
             "type": "trend_following",
             "risk": "high",
             "timeframe": "1h",
-            "description": "Donchian Channel Breakout"
+            "description": "Donchian Channel Breakout",
         }
 
     def update(self, ohlcv: pd.DataFrame, current_position: str | None = None):
@@ -62,7 +63,12 @@ class BreakoutStrategy(BaseStrategy):
 
         try:
             # Calculate Donchian Channels
-            donchian = ta.donchian(ohlcv["high"], ohlcv["low"], lower_length=self.donchian_period, upper_length=self.donchian_period)
+            donchian = ta.donchian(
+                ohlcv["high"],
+                ohlcv["low"],
+                lower_length=self.donchian_period,
+                upper_length=self.donchian_period,
+            )
 
             if donchian is not None and not donchian.empty:
                 # Find columns dynamically or by construction
@@ -79,21 +85,26 @@ class BreakoutStrategy(BaseStrategy):
                 else:
                     # Fallback check
                     for col in donchian.columns:
-                        if col.startswith("DCL"): self.lower_channel = donchian[col].iloc[-1]
-                        if col.startswith("DCM"): self.mid_channel = donchian[col].iloc[-1]
-                        if col.startswith("DCU"): self.upper_channel = donchian[col].iloc[-1]
+                        if col.startswith("DCL"):
+                            self.lower_channel = donchian[col].iloc[-1]
+                        if col.startswith("DCM"):
+                            self.mid_channel = donchian[col].iloc[-1]
+                        if col.startswith("DCU"):
+                            self.upper_channel = donchian[col].iloc[-1]
 
         except Exception as e:
             logger.error("breakout_strategy_error", error=str(e))
 
     def should_long(self) -> bool:
         """Long if price breaks above the Upper Channel."""
-        if self.upper_channel == 0: return False
+        if self.upper_channel == 0:
+            return False
         return self.current_price > self.upper_channel
 
     def should_short(self) -> bool:
         """Short if price breaks below the Lower Channel."""
-        if self.lower_channel == 0: return False
+        if self.lower_channel == 0:
+            return False
         return self.current_price < self.lower_channel
 
     def should_exit(self) -> bool:
@@ -102,7 +113,8 @@ class BreakoutStrategy(BaseStrategy):
         Long: Price < Mid Channel
         Short: Price > Mid Channel
         """
-        if self.mid_channel == 0: return False
+        if self.mid_channel == 0:
+            return False
 
         if self.current_position == "long":
             return self.current_price < self.mid_channel

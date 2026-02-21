@@ -2,19 +2,22 @@
 Tests for Strategy Registry and Implementations.
 """
 
-import pandas as pd
-import pytest
-import numpy as np
 from unittest.mock import MagicMock
 
-from src.strategies import get_strategy, list_strategies, Signal, register_strategy, BaseStrategy
-from src.strategies.ema_volume import EMAVolumeStrategy
-from src.strategies.adx_trend import ADXTrendStrategy
-from src.strategies.z_score import ZScoreStrategy
-from src.strategies.bollinger_bands import BollingerBandsStrategy
-from src.strategies.breakout import BreakoutStrategy
+import pandas as pd
+import pytest
+
 from src.config import Config
 from src.risk import RiskManager
+from src.strategies import (
+    get_strategy,
+    list_strategies,
+)
+from src.strategies.adx_trend import ADXTrendStrategy
+from src.strategies.bollinger_bands import BollingerBandsStrategy
+from src.strategies.breakout import BreakoutStrategy
+from src.strategies.ema_volume import EMAVolumeStrategy
+from src.strategies.z_score import ZScoreStrategy
 
 
 @pytest.fixture
@@ -36,16 +39,14 @@ def mock_config():
                 "std": 2.0,
                 "rsi_length": 14,
                 "rsi_lower": 30,
-                "rsi_upper": 70
+                "rsi_upper": 70,
             },
-            "breakout": {
-                "period": 20
-            }
+            "breakout": {"period": 20},
         },
         "risk": {
             "trailing_stop_activation_pct": 1.0,
-            "trailing_stop_callback_pct": 0.5
-        }
+            "trailing_stop_callback_pct": 0.5,
+        },
     }
     return Config(config_data)
 
@@ -76,13 +77,13 @@ def test_ema_volume_strategy(mock_config):
     # Volume > 1.5x SMA(10)
 
     data = {
-        "close": [100] * 20, # Flat
-        "volume": [1000] * 20
+        "close": [100] * 20,  # Flat
+        "volume": [1000] * 20,
     }
     # Last 2 candles create cross
     data["close"][-2] = 100
-    data["close"][-1] = 110 # Jump up
-    data["volume"][-1] = 2000 # High volume
+    data["close"][-1] = 110  # Jump up
+    data["volume"][-1] = 2000  # High volume
 
     df = pd.DataFrame(data)
     df["high"] = df["close"]
@@ -95,7 +96,7 @@ def test_ema_volume_strategy(mock_config):
     assert bool(strategy.should_short()) is False
 
     # Test Short scenario
-    data["close"][-1] = 90 # Jump down
+    data["close"][-1] = 90  # Jump down
     df = pd.DataFrame(data)
     strategy.update(df)
 
@@ -113,11 +114,11 @@ def test_adx_trend_strategy(mock_config):
     # Mock update to set internal state directly
     # This bypasses calculation but tests logic
 
-    strategy.adx = 30 # > 25
+    strategy.adx = 30  # > 25
     strategy.plus_di = 20
     strategy.minus_di = 10
 
-    assert strategy.should_long() is True # 30 > 25 and 20 > 10
+    assert strategy.should_long() is True  # 30 > 25 and 20 > 10
     assert strategy.should_short() is False
 
     strategy.plus_di = 10
@@ -126,7 +127,7 @@ def test_adx_trend_strategy(mock_config):
     assert strategy.should_long() is False
     assert strategy.should_short() is True
 
-    strategy.adx = 20 # < 25
+    strategy.adx = 20  # < 25
     assert strategy.should_long() is False
     assert strategy.should_short() is False
 
@@ -136,11 +137,11 @@ def test_z_score_strategy(mock_config):
     strategy = ZScoreStrategy(mock_config)
 
     # Mock internal state for simplicity
-    strategy.z_score = -2.5 # < -2.0
+    strategy.z_score = -2.5  # < -2.0
     assert strategy.should_long() is True
     assert strategy.should_short() is False
 
-    strategy.z_score = 2.5 # > 2.0
+    strategy.z_score = 2.5  # > 2.0
     assert strategy.should_long() is False
     assert strategy.should_short() is True
 
@@ -150,14 +151,14 @@ def test_z_score_strategy(mock_config):
 
     # Test Exit logic
     strategy.current_position = "long"
-    strategy.z_score = 0.1 # > 0
+    strategy.z_score = 0.1  # > 0
     assert strategy.should_exit() is True
 
     strategy.z_score = -0.1
     assert strategy.should_exit() is False
 
     strategy.current_position = "short"
-    strategy.z_score = -0.1 # < 0
+    strategy.z_score = -0.1  # < 0
     assert strategy.should_exit() is True
 
 
@@ -226,6 +227,7 @@ def test_breakout_strategy(mock_config):
 
 def test_trailing_stop():
     """Test Trailing Stop logic in RiskManager."""
+
     # Create fake config
     class FakeConfig:
         def __init__(self):
@@ -243,6 +245,7 @@ def test_trailing_stop():
 
     # Mock get_config
     import src.risk
+
     src.risk.get_config = lambda: FakeConfig()
 
     risk = RiskManager()
@@ -258,8 +261,9 @@ def test_trailing_stop():
         "entryPrice": 100,
         "notional": 100,
         "unrealizedPnl": 2,
-        "leverage": 1
+        "leverage": 1,
     }
+
     # Mock position object similar to exchange.Position
     class MockPosition:
         def __init__(self, data):

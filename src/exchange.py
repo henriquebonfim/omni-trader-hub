@@ -217,7 +217,11 @@ class Exchange:
         """Get all open orders for symbol."""
         symbol = symbol or self.config.trading.symbol
         if self.paper_mode:
-            return [o for o in self._paper_orders if o["status"] == "open" and o["symbol"] == symbol]
+            return [
+                o
+                for o in self._paper_orders
+                if o["status"] == "open" and o["symbol"] == symbol
+            ]
 
         return await self.client.fetch_open_orders(symbol)
 
@@ -375,7 +379,7 @@ class Exchange:
             }
 
             self._paper_position = None
-            self._paper_orders = [] # Cancel all paper orders
+            self._paper_orders = []  # Cancel all paper orders
             logger.info(
                 "paper_position_closed",
                 symbol=symbol,
@@ -433,9 +437,12 @@ class Exchange:
 
         if self.paper_mode:
             # Cancel existing SL orders
-            self._paper_orders = [o for o in self._paper_orders if o["type"] != "stop_market"]
+            self._paper_orders = [
+                o for o in self._paper_orders if o["type"] != "stop_market"
+            ]
 
             import time
+
             order = {
                 "id": f"paper_sl_{int(time.time() * 1000)}",
                 "symbol": symbol,
@@ -451,8 +458,8 @@ class Exchange:
         # Cancel existing open STOP_MARKET orders to replace them
         open_orders = await self.client.fetch_open_orders(symbol)
         for o in open_orders:
-             if o['type'] == 'STOP_MARKET':
-                  await self.client.cancel_order(o['id'], symbol)
+            if o["type"] == "STOP_MARKET":
+                await self.client.cancel_order(o["id"], symbol)
 
         order = await self.client.create_order(
             symbol,
@@ -496,8 +503,10 @@ class Exchange:
         side = "sell" if position.side == "long" else "buy"
 
         if self.paper_mode:
-             # Cancel existing TP orders
-            self._paper_orders = [o for o in self._paper_orders if o["type"] != "take_profit_market"]
+            # Cancel existing TP orders
+            self._paper_orders = [
+                o for o in self._paper_orders if o["type"] != "take_profit_market"
+            ]
 
             import time
 
@@ -518,8 +527,8 @@ class Exchange:
         # Cancel existing open TAKE_PROFIT_MARKET orders
         open_orders = await self.client.fetch_open_orders(symbol)
         for o in open_orders:
-             if o['type'] == 'TAKE_PROFIT_MARKET':
-                  await self.client.cancel_order(o['id'], symbol)
+            if o["type"] == "TAKE_PROFIT_MARKET":
+                await self.client.cancel_order(o["id"], symbol)
 
         order = await self.client.create_order(
             symbol,

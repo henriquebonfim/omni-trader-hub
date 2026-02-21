@@ -14,6 +14,7 @@ import pandas_ta as ta
 import structlog
 
 from src.config import Config
+
 from .base import BaseStrategy
 from .registry import register_strategy
 
@@ -61,7 +62,9 @@ class ADXTrendStrategy(BaseStrategy):
 
         try:
             # Calculate ADX
-            adx_df = ta.adx(ohlcv["high"], ohlcv["low"], ohlcv["close"], length=self.adx_period)
+            adx_df = ta.adx(
+                ohlcv["high"], ohlcv["low"], ohlcv["close"], length=self.adx_period
+            )
 
             if adx_df is None or adx_df.empty:
                 return

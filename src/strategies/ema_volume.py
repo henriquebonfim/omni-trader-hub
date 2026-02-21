@@ -14,6 +14,7 @@ import pandas_ta as ta
 import structlog
 
 from src.config import Config
+
 from .base import BaseStrategy
 from .registry import register_strategy
 
@@ -67,7 +68,9 @@ class EMAVolumeStrategy(BaseStrategy):
         self.ema_slow = ema_slow_series.iloc[-1]
 
         curr_volume = ohlcv["volume"].iloc[-1]
-        avg_volume = volume_sma_series.iloc[-1] if volume_sma_series.iloc[-1] > 0 else 1.0
+        avg_volume = (
+            volume_sma_series.iloc[-1] if volume_sma_series.iloc[-1] > 0 else 1.0
+        )
         self.volume_ratio = curr_volume / avg_volume
 
         # Detect crossovers (using previous values)
