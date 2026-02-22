@@ -9,7 +9,13 @@ from fastapi import APIRouter, HTTPException, Request
 
 router = APIRouter(tags=["config"])
 
-_CONFIG_PATH = Path(__file__).parent.parent.parent.parent / "config" / "config.yaml"
+# Resolves to project root/config/config.yaml
+# __file__ = backend/src/api/routes/config.py
+# parents[0] = backend/src/api/routes
+# parents[1] = backend/src/api
+# parents[2] = backend/src
+# parents[3] = backend
+_CONFIG_PATH = Path(__file__).parents[3] / "config" / "config.yaml"
 
 
 @router.get("/config")
