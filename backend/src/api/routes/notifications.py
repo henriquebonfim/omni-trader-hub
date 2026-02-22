@@ -34,10 +34,6 @@ async def update_discord_config(payload: DiscordWebhookPayload, request: Request
     """Update Discord webhook URL and persist to config.yaml."""
     bot = request.app.state.bot
 
-    # Update runtime
-    bot.notifier.webhook_url = payload.webhook_url
-    bot.notifier.enabled = payload.enabled
-
     # Persist to file
     try:
         with open(_CONFIG_PATH) as f:

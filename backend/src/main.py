@@ -107,32 +107,33 @@ class OmniTrader:
                 logger.info(
                     "strategy_switching", old=old_strategy_name, new=new_strategy_name
                 )
-                try:
-                    strategy_class = get_strategy(new_strategy_name)
-                    self.strategy = strategy_class(self.config)
-                    logger.info(
-                        "strategy_switched", metadata=self.strategy.metadata
-                    )
-                except Exception as e:
-                    logger.error(
-                        "strategy_switch_failed",
-                        error=str(e),
-                        keeping=old_strategy_name,
-                    )
-                    # Rollback
-                    self.config = old_config
-                    await self.exchange.update_config(old_config)
-                    self.risk.update_config(old_config)
-                    self.notifier.update_config(old_config)
-                    # No need to revert strategy instance as it wasn't replaced
-                    return
+                strategy_class = get_strategy(new_strategy_name)
+                self.strategy = strategy_class(self.config)
+                logger.info(
+                    "strategy_switched", metadata=self.strategy.metadata
+                )
             else:
                 self.strategy.update_config(self.config)
 
             logger.info("configuration_reloaded")
+
         except Exception as e:
             logger.error("config_reload_failed", error=str(e))
+            # Full rollback of all components
+            logger.info("rolling_back_configuration")
             self.config = old_config
+            try:
+                await self.exchange.update_config(old_config)
+                self.risk.update_config(old_config)
+                self.notifier.update_config(old_config)
+                # If strategy was switched, we might need to revert it?
+                # But here we rely on the fact that if strategy init failed, self.strategy is untouched.
+                # If strategy init succeeded but something else failed later (unlikely here), we keep new strategy?
+                # Actually, if strategy init fails, exception is raised, self.strategy is NOT updated.
+                # So we just update config on the old strategy instance.
+                self.strategy.update_config(old_config)
+            except Exception as rollback_error:
+                logger.critical("rollback_failed", error=str(rollback_error))
 
     async def start(self):
         """Initialize and start the trading bot."""
