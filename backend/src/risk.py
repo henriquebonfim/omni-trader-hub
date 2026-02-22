@@ -86,7 +86,32 @@ class RiskManager:
 
         # Daily tracking
         self.daily_stats = DailyStats()
+        self.consecutive_losses = 0  # Track consecutive losses for drawdown sizing
         self._circuit_breaker_active = False
+
+    def update_config(self, config):
+        """Update risk parameters from new configuration."""
+        self.position_size_pct = config.trading.position_size_pct
+        self.stop_loss_pct = config.risk.stop_loss_pct
+        self.take_profit_pct = config.risk.take_profit_pct
+        self.max_daily_loss_pct = config.risk.max_daily_loss_pct
+        self.max_positions = config.risk.max_positions
+        self.leverage = config.exchange.leverage
+
+        self.trailing_stop_activation_pct = getattr(
+            config.risk, "trailing_stop_activation_pct", 1.0
+        )
+        self.trailing_stop_callback_pct = getattr(
+            config.risk, "trailing_stop_callback_pct", 0.5
+        )
+
+        logger.info(
+            "risk_config_updated",
+            position_size_pct=self.position_size_pct,
+            stop_loss_pct=self.stop_loss_pct,
+            take_profit_pct=self.take_profit_pct,
+            max_daily_loss_pct=self.max_daily_loss_pct,
+        )
 
     def initialize_daily_stats(self, current_balance: float):
         """Initialize or reset daily statistics."""
@@ -100,6 +125,7 @@ class RiskManager:
                 previous_pnl=self.daily_stats.realized_pnl,
             )
             self.daily_stats = DailyStats(date=today, starting_balance=current_balance)
+            self.consecutive_losses = 0  # Reset streak for new day
             self._circuit_breaker_active = False
         elif self.daily_stats.starting_balance == 0:
             # First run of the day
@@ -125,6 +151,17 @@ class RiskManager:
         # Convert to base currency
         position_size = notional_value / entry_price
 
+        # Drawdown sizing: Reduce size by 50% if 3+ consecutive losses
+        if self.consecutive_losses >= 3:
+            original_size = position_size
+            position_size *= 0.5
+            logger.warning(
+                "drawdown_sizing_active",
+                consecutive_losses=self.consecutive_losses,
+                original_size=original_size,
+                new_size=position_size,
+            )
+
         logger.debug(
             "position_size_calculated",
             balance=balance,
@@ -132,6 +169,7 @@ class RiskManager:
             leverage=self.leverage,
             notional=notional_value,
             size=position_size,
+            consecutive_losses=self.consecutive_losses,
         )
 
         return position_size
@@ -277,12 +315,15 @@ class RiskManager:
 
         if pnl >= 0:
             self.daily_stats.wins += 1
+            self.consecutive_losses = 0  # Reset streak
         else:
             self.daily_stats.losses += 1
+            self.consecutive_losses += 1  # Increment streak
 
         logger.info(
             "trade_recorded",
             pnl=pnl,
+            consecutive_losses=self.consecutive_losses,
             daily_pnl=self.daily_stats.realized_pnl,
             daily_pnl_pct=f"{self.daily_stats.pnl_pct:.2f}%",
         )

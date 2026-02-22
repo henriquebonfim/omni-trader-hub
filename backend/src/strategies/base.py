@@ -96,6 +96,15 @@ class BaseStrategy(ABC):
         """Check if exit conditions are met for current position."""
         pass
 
+    def update_config(self, config: Config):
+        """
+        Update strategy configuration.
+
+        Args:
+            config: New configuration object
+        """
+        self.config = config
+
     def analyze(
         self, ohlcv: pd.DataFrame, current_position: str | None = None
     ) -> StrategyResult:

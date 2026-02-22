@@ -162,6 +162,16 @@ Status:     Trading PAUSED until tomorrow
 
         await self.send(message)
 
+    def update_config(self, config):
+        """Update notifier configuration."""
+        self.webhook_url = config.notifications.discord_webhook
+        self.enabled = config.notifications.enabled
+        logger.info(
+            "notifier_config_updated",
+            enabled=self.enabled,
+            webhook_configured=bool(self.webhook_url),
+        )
+
     async def bot_started(self, symbol: str, testnet: bool):
         """Send bot started notification."""
         mode = "TESTNET" if testnet else "MAINNET"

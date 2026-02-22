@@ -1,20 +1,32 @@
 services:
-  ollama:
-    image: ollama/ollama:0.15.2
-    container_name: omnitrader-ollama
-    environment:
-      - OLLAMA_DEBUG=1
+  omnitrader:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: omnitrader
     ports:
-      - "11434:11434"
+      - "8000:8000"
     volumes:
-      - ollama_data:/root/.ollama
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: 1
-              capabilities: [gpu]
+      - ./backend/config:/app/config
+      - ./backend/data:/app/data
+    env_file:
+      - .env
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
 
-volumes:
-  ollama_data:
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: omnitrader-frontend
+    ports:
+      - "3000:80"
+    depends_on:
+      omnitrader:
+        condition: service_healthy
+    restart: unless-stopped
