@@ -98,6 +98,7 @@ class OmniTrader:
             # Update components
             await self.exchange.update_config(self.config)
             self.risk.update_config(self.config)
+            self.notifier.update_config(self.config)
 
             # Switch strategy if name changed
             if new_strategy_name != old_strategy_name:
@@ -215,6 +216,8 @@ class OmniTrader:
                 notional=position.notional,
                 stop_loss=None,  # Unknown
                 take_profit=None,  # Unknown
+                expected_price=None, # Unknown
+                slippage=None, # Unknown
                 reason="reconciliation_detected_open",
             )
 

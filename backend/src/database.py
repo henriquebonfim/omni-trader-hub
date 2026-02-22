@@ -133,8 +133,8 @@ class Database:
         stop_loss: float | None,
         take_profit: float | None,
         reason: str = "signal",
-        expected_price: float = 0.0,
-        slippage: float = 0.0,
+        expected_price: float | None = None,
+        slippage: float | None = None,
     ) -> int:
         """
         Log a trade open event.

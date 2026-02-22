@@ -38,7 +38,9 @@ export function useLiveFeed() {
       ws.onclose = () => {
         if (!cancelled) {
           setStatus('closed')
-          reconnectTimer.current = setTimeout(connect, 3000)
+          reconnectTimer.current = setTimeout(() => {
+            if (!cancelled) connect()
+          }, 3000)
         }
       }
 
