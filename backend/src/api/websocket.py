@@ -64,6 +64,7 @@ class ConnectionManager:
                 self._connections = [ws for ws in self._connections if ws not in dead]
 
     async def get_client_count(self) -> int:
+        """Get the number of connected clients thread-safely."""
         async with self._lock:
             return len(self._connections)
 
