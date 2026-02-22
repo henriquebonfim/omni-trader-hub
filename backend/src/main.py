@@ -18,7 +18,7 @@ import uvicorn
 
 from src.strategies import Signal, get_strategy
 
-from .config import get_config
+from .config import get_config, reload_config
 from .database import Database
 from .exchange import Exchange
 from .notifier import Notifier
@@ -86,6 +86,21 @@ class OmniTrader:
         self._shutdown_event = asyncio.Event()
         self.ws_manager = None  # Set by main() after API creation
 
+    async def reload_config(self):
+        """Reload configuration and update all components."""
+        logger.info("reloading_configuration")
+        try:
+            self.config = reload_config()
+
+            # Update components
+            await self.exchange.update_config(self.config)
+            self.risk.update_config(self.config)
+            self.strategy.update_config(self.config)
+
+            logger.info("configuration_reloaded")
+        except Exception as e:
+            logger.error("config_reload_failed", error=str(e))
+
     async def start(self):
         """Initialize and start the trading bot."""
         paper_mode = getattr(self.config.exchange, "paper_mode", False)
@@ -108,6 +123,82 @@ class OmniTrader:
 
         self._running = True
         logger.info("omnitrader_started")
+
+    async def _reconcile_positions(self, symbol, position):
+        """
+        Check for discrepancies between exchange position and database state.
+        Fixes missed updates (e.g. SL hit while offline).
+        """
+        last_trade = await self.database.get_last_trade(symbol)
+
+        # Case 1: DB says OPEN, Exchange says FLAT -> Missed CLOSE
+        if last_trade and last_trade["action"] == "OPEN" and not position.is_open:
+            logger.warning(
+                "reconciliation_mismatch_closed",
+                db_action="OPEN",
+                exchange_status="FLAT",
+                last_trade_id=last_trade["id"],
+            )
+
+            # We don't know the exact exit price, so use current market price (approx)
+            ticker = await self.exchange.get_ticker(symbol)
+            exit_price = float(ticker["last"])
+
+            entry_price = float(last_trade["price"])
+            size = float(last_trade["size"])
+            side = last_trade["side"].lower()
+
+            # Calculate PnL
+            if side == "long":
+                pnl = (exit_price - entry_price) * size
+                pnl_pct = ((exit_price - entry_price) / entry_price) * 100
+            else:
+                pnl = (entry_price - exit_price) * size
+                pnl_pct = ((entry_price - exit_price) / entry_price) * 100
+
+            # Record in risk manager
+            self.risk.record_trade(pnl)
+
+            # Log to database
+            await self.database.log_trade_close(
+                symbol=symbol,
+                side=side,
+                price=exit_price,
+                size=size,
+                notional=size * exit_price,
+                pnl=pnl,
+                pnl_pct=pnl_pct,
+                reason="reconciliation_detected_close",
+            )
+
+            await self.notifier.send(
+                f"⚠️ **Reconciliation Alert**: Detected closed position for {symbol}. Database updated."
+            )
+
+        # Case 2: DB says CLOSE (or None), Exchange says OPEN -> Missed OPEN
+        elif (not last_trade or last_trade["action"] == "CLOSE") and position.is_open:
+            logger.warning(
+                "reconciliation_mismatch_opened",
+                db_action=last_trade["action"] if last_trade else "NONE",
+                exchange_status="OPEN",
+                size=position.size,
+            )
+
+            # Log the missing open
+            await self.database.log_trade_open(
+                symbol=symbol,
+                side=position.side,
+                price=position.entry_price,
+                size=position.size,
+                notional=position.notional,
+                stop_loss=0.0,  # Unknown
+                take_profit=0.0,  # Unknown
+                reason="reconciliation_detected_open",
+            )
+
+            await self.notifier.send(
+                f"⚠️ **Reconciliation Alert**: Detected open position for {symbol}. Database updated."
+            )
 
     async def stop(self, reason: str = "Manual stop"):
         """Gracefully stop the trading bot."""
@@ -158,6 +249,9 @@ class OmniTrader:
             # 2. Get current position
             position = await self.exchange.get_position(symbol)
             current_side = position.side if position.is_open else None
+
+            # 2b. Reconcile state with database
+            await self._reconcile_positions(symbol, position)
 
             # 3. Update daily stats with current balance
             balance_info = await self.exchange.get_balance()
@@ -305,6 +399,13 @@ class OmniTrader:
             entry_price = float(order.get("average", current_price))
             notional = risk_check.position_size * entry_price
 
+            # Calculate slippage
+            slippage = 0.0
+            if side == "long":
+                slippage = entry_price - current_price
+            else:
+                slippage = current_price - entry_price
+
             # Recalculate SL/TP with actual entry
             stop_loss = self.risk.calculate_stop_loss(entry_price, side)
             take_profit = self.risk.calculate_take_profit(entry_price, side)
@@ -331,6 +432,8 @@ class OmniTrader:
                 stop_loss=stop_loss,
                 take_profit=take_profit,
                 reason=reason,
+                expected_price=current_price,
+                slippage=slippage,
             )
 
             # Send notification

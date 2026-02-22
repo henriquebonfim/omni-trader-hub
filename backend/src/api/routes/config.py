@@ -7,8 +7,6 @@ from pathlib import Path
 import yaml
 from fastapi import APIRouter, HTTPException, Request
 
-from src.config import reload_config
-
 router = APIRouter(tags=["config"])
 
 _CONFIG_PATH = Path(__file__).parent.parent.parent.parent / "config" / "config.yaml"
@@ -59,8 +57,7 @@ async def update_config(updates: dict, request: Request):
     with open(_CONFIG_PATH, "w") as f:
         yaml.dump(merged, f, default_flow_style=False, allow_unicode=True)
 
-    # Reload singleton
-    new_cfg = reload_config()
-    bot.config = new_cfg
+    # Reload bot configuration
+    await bot.reload_config()
 
     return {"ok": True, "message": "Config updated and reloaded"}

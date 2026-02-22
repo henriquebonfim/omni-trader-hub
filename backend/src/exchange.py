@@ -88,6 +88,21 @@ class Exchange:
         self.config = config
         self._markets_loaded = False
 
+    async def update_config(self, config):
+        """Update exchange configuration."""
+        self.config = config
+        self.paper_mode = getattr(config.exchange, "paper_mode", False)
+
+        # Attempt to update leverage if live
+        if not self.paper_mode and self._markets_loaded:
+            symbol = self.config.trading.symbol
+            leverage = self.config.exchange.leverage
+            try:
+                await self.client.set_leverage(leverage, symbol)
+                logger.info("leverage_updated", symbol=symbol, leverage=leverage)
+            except Exception as e:
+                logger.warning("leverage_update_failed", error=str(e))
+
     async def connect(self) -> bool:
         """
         Initialize connection to exchange.
