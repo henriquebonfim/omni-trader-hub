@@ -2,10 +2,9 @@
 Discord notification config routes.
 """
 
+import yaml
 from fastapi import APIRouter, Request
 from pydantic import BaseModel
-from pathlib import Path
-import yaml
 
 from .config import _CONFIG_PATH
 

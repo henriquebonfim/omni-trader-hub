@@ -1,6 +1,7 @@
-import pytest
-from src.risk import RiskManager, DailyStats
 import datetime
+
+from src.risk import RiskManager
+
 
 def test_drawdown_sizing():
     risk = RiskManager()

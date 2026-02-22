@@ -213,8 +213,8 @@ class OmniTrader:
                 price=position.entry_price,
                 size=position.size,
                 notional=position.notional,
-                stop_loss=0.0,  # Unknown
-                take_profit=0.0,  # Unknown
+                stop_loss=None,  # Unknown
+                take_profit=None,  # Unknown
                 reason="reconciliation_detected_open",
             )
 
