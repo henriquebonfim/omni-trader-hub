@@ -284,10 +284,20 @@ class OmniTrader:
 
             # 4. Fetch market data
             ohlcv = await self.exchange.fetch_ohlcv(symbol, limit=100)
-            current_price = ohlcv["close"].iloc[-1]
+            current_price = float(ohlcv["close"].iloc[-1])
 
             # 5. Analyze with strategy
             result = self.strategy.analyze(ohlcv, current_side)
+
+            # Sanitize indicators for JSON serialization (handle numpy types)
+            def _sanitize(v):
+                if hasattr(v, "item"):  # Numpy scalar
+                    return v.item()
+                if isinstance(v, dict):
+                    return {k: _sanitize(val) for k, val in v.items()}
+                return v
+
+            sanitized_indicators = _sanitize(result.indicators)
 
             logger.info(
                 "cycle_analyzed",
@@ -295,7 +305,7 @@ class OmniTrader:
                 signal=result.signal.value,
                 position=current_side or "none",
                 reason=result.reason,
-                **result.indicators,
+                **sanitized_indicators,
             )
 
             # 5b. Persist cycle data for the dashboard
@@ -305,7 +315,7 @@ class OmniTrader:
                 price=current_price,
                 signal=result.signal.value,
                 reason=result.reason,
-                indicators=result.indicators,
+                indicators=sanitized_indicators,
             )
 
             # 5c. Broadcast to connected WebSocket clients
@@ -318,7 +328,7 @@ class OmniTrader:
                         "price": current_price,
                         "signal": result.signal.value,
                         "reason": result.reason,
-                        "indicators": result.indicators,
+                        "indicators": sanitized_indicators,
                         "position": current_side,
                         "balance": balance_info["total"],
                         "daily_pnl": self.risk.daily_stats.realized_pnl,

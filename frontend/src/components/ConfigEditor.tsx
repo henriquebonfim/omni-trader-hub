@@ -55,19 +55,24 @@ export default function ConfigEditor() {
   }, [cfg])
 
   const mutation = useMutation({
-    mutationFn: () => updateConfig({
-      trading: {
-        symbol: trading.symbol,
-        cycle_seconds: Number(trading.cycle_seconds),
-        position_size_pct: Number(trading.position_size_pct),
-      },
-      risk: {
-        stop_loss_pct: Number(risk.stop_loss_pct),
-        take_profit_pct: Number(risk.take_profit_pct),
-        max_daily_loss_pct: Number(risk.max_daily_loss_pct),
-        max_positions: Number(risk.max_positions),
-      },
-    }),
+    mutationFn: () => {
+      // Helper to convert string to number, but keep empty string as undefined (so it doesn't overwrite)
+      const num = (v: string | undefined) => (v === '' || v === undefined ? undefined : Number(v))
+
+      return updateConfig({
+        trading: {
+          symbol: trading.symbol || undefined,
+          cycle_seconds: num(trading.cycle_seconds),
+          position_size_pct: num(trading.position_size_pct),
+        },
+        risk: {
+          stop_loss_pct: num(risk.stop_loss_pct),
+          take_profit_pct: num(risk.take_profit_pct),
+          max_daily_loss_pct: num(risk.max_daily_loss_pct),
+          max_positions: num(risk.max_positions),
+        },
+      })
+    },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['config'] }),
   })
 

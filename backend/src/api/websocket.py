@@ -39,7 +39,8 @@ class ConnectionManager:
         if not self._connections:
             return
 
-        message = json.dumps(data, default=str)
+        # Data should be pre-sanitized in main.py to native types
+        message = json.dumps(data)
         dead: list[WebSocket] = []
 
         async with self._lock:

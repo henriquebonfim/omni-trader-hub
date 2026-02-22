@@ -37,12 +37,11 @@ async def update_config(updates: dict, request: Request):
     """
     Deep-merge `updates` into config.yaml and reload.
 
-    Only top-level section keys are merged (e.g. {"trading": {"symbol": "ETH/USDT:USDT"}}).
-    Missing sections are preserved unchanged.
+    Note: This operation rewrites the YAML file, so comments and formatting
+    may be lost.
     """
     bot = request.app.state.bot
 
-    # Load raw YAML to preserve comments / env-var placeholders
     if not _CONFIG_PATH.exists():
         raise HTTPException(status_code=500, detail="config.yaml not found on server")
 

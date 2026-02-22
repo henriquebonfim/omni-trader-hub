@@ -20,7 +20,7 @@ async def get_status(request: Request):
     return {
         "running": bot._running,
         "symbol": bot.config.trading.symbol,
-        "paper_mode": getattr(bot.config.exchange, "paper_mode", True),
+        "paper_mode": bot.exchange.paper_mode,
         "strategy": getattr(bot.config.strategy, "name", "ema_volume"),
         "uptime_seconds": int(uptime_seconds),
         "circuit_breaker_active": bot.risk.check_circuit_breaker(),
