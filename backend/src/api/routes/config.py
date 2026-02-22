@@ -29,6 +29,12 @@ async def get_config(request: Request):
         cfg["exchange"].pop("api_key", None)
         cfg["exchange"].pop("api_secret", None)
 
+    if "notifications" in cfg:
+        # Mask webhook if present
+        url = cfg["notifications"].get("discord_webhook", "")
+        if url and len(url) > 10:
+            cfg["notifications"]["discord_webhook"] = f"{url[:10]}...[REDACTED]"
+
     return cfg
 
 

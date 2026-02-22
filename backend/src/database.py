@@ -110,13 +110,13 @@ class Database:
             if "expected_price" not in columns:
                 logger.info("migrating_trades_table_add_expected_price")
                 await self._connection.execute(
-                    "ALTER TABLE trades ADD COLUMN expected_price REAL DEFAULT 0.0"
+                    "ALTER TABLE trades ADD COLUMN expected_price REAL DEFAULT NULL"
                 )
 
             if "slippage" not in columns:
                 logger.info("migrating_trades_table_add_slippage")
                 await self._connection.execute(
-                    "ALTER TABLE trades ADD COLUMN slippage REAL DEFAULT 0.0"
+                    "ALTER TABLE trades ADD COLUMN slippage REAL DEFAULT NULL"
                 )
 
             await self._connection.commit()

@@ -31,6 +31,46 @@ async def test_slippage_calculation_long():
     assert kwargs['slippage'] == 100.0
 
 @pytest.mark.asyncio
+async def test_slippage_favorable():
+    bot = OmniTrader()
+    bot.exchange = AsyncMock()
+    bot.risk = MagicMock()
+    bot.database = AsyncMock()
+    bot.notifier = AsyncMock()
+    bot.config = MagicMock()
+
+    bot.config.trading.symbol = "BTC/USDT"
+    bot.risk.validate_trade.return_value = MagicMock(approved=True, position_size=1.0)
+
+    # Market Long - Favorable
+    # Signal: 50000, Fill: 49900
+    # Slippage: 49900 - 50000 = -100
+
+    bot.exchange.market_long.return_value = {"average": 49900.0}
+    await bot._open_position("long", 50000.0, 1000.0)
+
+    kwargs = bot.database.log_trade_open.call_args[1]
+    assert kwargs['slippage'] == -100.0
+
+@pytest.mark.asyncio
+async def test_slippage_zero():
+    bot = OmniTrader()
+    bot.exchange = AsyncMock()
+    bot.risk = MagicMock()
+    bot.database = AsyncMock()
+    bot.notifier = AsyncMock()
+    bot.config = MagicMock()
+
+    bot.config.trading.symbol = "BTC/USDT"
+    bot.risk.validate_trade.return_value = MagicMock(approved=True, position_size=1.0)
+
+    bot.exchange.market_long.return_value = {"average": 50000.0}
+    await bot._open_position("long", 50000.0, 1000.0)
+
+    kwargs = bot.database.log_trade_open.call_args[1]
+    assert kwargs['slippage'] == 0.0
+
+@pytest.mark.asyncio
 async def test_slippage_calculation_short():
     bot = OmniTrader()
     bot.exchange = AsyncMock()

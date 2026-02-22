@@ -90,9 +90,11 @@ class OmniTrader:
     async def reload_config(self):
         """Reload configuration and update all components."""
         logger.info("reloading_configuration")
+        old_config = self.config
         try:
             old_strategy_name = getattr(self.config.strategy, "name", "ema_volume")
-            self.config = reload_config()
+            new_config = reload_config()
+            self.config = new_config
             new_strategy_name = getattr(self.config.strategy, "name", "ema_volume")
 
             # Update components
@@ -117,12 +119,20 @@ class OmniTrader:
                         error=str(e),
                         keeping=old_strategy_name,
                     )
+                    # Rollback
+                    self.config = old_config
+                    await self.exchange.update_config(old_config)
+                    self.risk.update_config(old_config)
+                    self.notifier.update_config(old_config)
+                    # No need to revert strategy instance as it wasn't replaced
+                    return
             else:
                 self.strategy.update_config(self.config)
 
             logger.info("configuration_reloaded")
         except Exception as e:
             logger.error("config_reload_failed", error=str(e))
+            self.config = old_config
 
     async def start(self):
         """Initialize and start the trading bot."""
@@ -164,8 +174,21 @@ class OmniTrader:
             )
 
             # We don't know the exact exit price, so use current market price (approx)
+            # or try to fetch last user trade from exchange (better)
+            # For MVP, use ticker price as approximation, or SL if reasonable
             ticker = await self.exchange.get_ticker(symbol)
-            exit_price = float(ticker["last"])
+            current_price = float(ticker["last"])
+            exit_price = current_price
+
+            if last_trade.get("stop_loss"):
+                sl = float(last_trade["stop_loss"])
+                # If current price is below SL (long) or above SL (short),
+                # it's likely the SL was hit. Use SL as exit price.
+                side = last_trade["side"].lower()
+                if side == "long" and current_price < sl:
+                    exit_price = sl
+                elif side == "short" and current_price > sl:
+                    exit_price = sl
 
             entry_price = float(last_trade["price"])
             size = float(last_trade["size"])

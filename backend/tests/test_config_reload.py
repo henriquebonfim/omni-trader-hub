@@ -41,6 +41,9 @@ async def test_reload_config_switches_strategy(monkeypatch):
 
     # Mock get_strategy
     NewStrategyClass = MagicMock()
+    # Ensure instantiation returns a unique mock
+    NewStrategyInstance = MagicMock()
+    NewStrategyClass.return_value = NewStrategyInstance
 
     monkeypatch.setattr("src.main.reload_config", lambda: new_config)
     monkeypatch.setattr("src.main.get_strategy", lambda name: NewStrategyClass)
@@ -48,4 +51,5 @@ async def test_reload_config_switches_strategy(monkeypatch):
     await bot.reload_config()
 
     # Verify strategy re-instantiated
-    assert isinstance(bot.strategy, MagicMock) # NewStrategyClass instance
+    NewStrategyClass.assert_called_once_with(new_config)
+    assert bot.strategy is NewStrategyInstance
