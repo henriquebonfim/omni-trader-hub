@@ -122,6 +122,22 @@ class Exchange:
             await self.client.load_markets()
             logger.info("switched_to_live_trading")
 
+        # If switching from Live -> Paper, reset client
+        elif not old_paper_mode and self.paper_mode:
+            exchange_config = {
+                "apiKey": None,
+                "secret": None,
+                "enableRateLimit": True,
+                "options": {
+                    "defaultType": "swap",
+                    "adjustForTimeDifference": True,
+                },
+            }
+            await self.client.close()
+            self.client = ccxt.binance(exchange_config)
+            await self.client.load_markets()
+            logger.info("switched_to_paper_trading")
+
         # Attempt to update leverage if live
         if not self.paper_mode and self._markets_loaded:
             symbol = self.config.trading.symbol

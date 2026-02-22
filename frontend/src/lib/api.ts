@@ -20,7 +20,11 @@ class ApiClient {
       throw new Error(`API Error: ${response.statusText}`)
     }
 
-    return response.json()
+    const contentType = response.headers.get('content-type')
+    if (contentType && contentType.includes('application/json')) {
+      return response.json()
+    }
+    return response.text()
   }
 
   get(endpoint: string, params?: Record<string, any>) {
