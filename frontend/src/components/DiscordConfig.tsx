@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { fetchDiscordConfig, updateDiscordConfig, testDiscord } from '../lib/api'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useEffect, useState } from 'react'
+import { fetchDiscordConfig, testDiscord, updateDiscordConfig } from '../lib/api'
 
 export default function DiscordConfig() {
   const qc = useQueryClient()
@@ -20,8 +20,14 @@ export default function DiscordConfig() {
   }, [data])
 
   const saveMut = useMutation({
-    mutationFn: () => updateDiscordConfig({ webhook_url: webhookUrl, enabled }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['discordConfig'] }),
+    mutationFn: () => updateDiscordConfig({
+      ...(webhookUrl ? { webhook_url: webhookUrl } : {}),
+      enabled
+    }),
+    onSuccess: () => {
+      setWebhookUrl('')
+      qc.invalidateQueries({ queryKey: ['discordConfig'] })
+    },
   })
 
   const testMut = useMutation({
@@ -68,7 +74,7 @@ export default function DiscordConfig() {
       <div className="form-actions">
         <button
           className="btn primary"
-          disabled={!webhookUrl || saveMut.isPending}
+          disabled={saveMut.isPending || (!webhookUrl && enabled === data?.enabled)}
           onClick={() => saveMut.mutate()}
         >
           {saveMut.isPending ? 'Saving…' : 'Save'}

@@ -11,8 +11,10 @@ from .config import _CONFIG_PATH
 router = APIRouter(prefix="/notifications", tags=["notifications"])
 
 
+from typing import Optional
+
 class DiscordWebhookPayload(BaseModel):
-    webhook_url: str
+    webhook_url: Optional[str] = None
     enabled: bool = True
 
 
@@ -42,7 +44,8 @@ async def update_discord_config(payload: DiscordWebhookPayload, request: Request
         if "notifications" not in current:
             current["notifications"] = {}
 
-        current["notifications"]["discord_webhook"] = payload.webhook_url
+        if payload.webhook_url is not None:
+            current["notifications"]["discord_webhook"] = payload.webhook_url
         current["notifications"]["enabled"] = payload.enabled
 
         with open(_CONFIG_PATH, "w") as f:
@@ -51,11 +54,11 @@ async def update_discord_config(payload: DiscordWebhookPayload, request: Request
         await bot.reload_config()
 
     except Exception as e:
-        # Don't fail the request if persistence fails, but log it
         import structlog
+        from fastapi import HTTPException
         logger = structlog.get_logger()
         logger.error("discord_config_persist_failed", error=str(e))
-        return {"ok": True, "message": "Updated in-memory (persistence failed)"}
+        raise HTTPException(status_code=500, detail="Failed to persist discord config")
 
     return {"ok": True, "message": "Discord config updated and saved"}
 
