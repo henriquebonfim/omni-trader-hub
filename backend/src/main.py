@@ -15,6 +15,7 @@ from datetime import datetime
 
 import structlog
 import uvicorn
+
 from src.strategies import Signal, get_strategy
 
 from .config import get_config
