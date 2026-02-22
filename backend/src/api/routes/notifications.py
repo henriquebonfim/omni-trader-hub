@@ -2,16 +2,16 @@
 Discord notification config routes.
 """
 
+from typing import Optional
+
 import yaml
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 
 from .config import _CONFIG_PATH
 
 router = APIRouter(prefix="/notifications", tags=["notifications"])
 
-
-from typing import Optional
 
 class DiscordWebhookPayload(BaseModel):
     webhook_url: Optional[str] = None
@@ -55,10 +55,10 @@ async def update_discord_config(payload: DiscordWebhookPayload, request: Request
 
     except Exception as e:
         import structlog
-        from fastapi import HTTPException
+
         logger = structlog.get_logger()
         logger.error("discord_config_persist_failed", error=str(e))
-        raise HTTPException(status_code=500, detail="Failed to persist discord config")
+        raise HTTPException(status_code=500, detail="Failed to persist config")
 
     return {"ok": True, "message": "Discord config updated and saved"}
 

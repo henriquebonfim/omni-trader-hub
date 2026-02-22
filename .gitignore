@@ -10,4 +10,3 @@ omnitrader.log
 venv/
 .idea/
 .vscode/
-node_modules/

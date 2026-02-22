@@ -28,7 +28,7 @@ async def get_status(request: Request):
         "strategy": getattr(bot.config.strategy, "name", "ema_volume"),
         "uptime_seconds": int(uptime_seconds),
         "circuit_breaker_active": bot.risk.check_circuit_breaker(),
-        "ws_clients": ws_clients,
+        "ws_clients": bot.ws_manager.client_count if bot.ws_manager else 0,
     }
 
 

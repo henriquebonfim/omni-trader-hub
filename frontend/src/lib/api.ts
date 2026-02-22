@@ -83,7 +83,7 @@ export const fetchBotState = () => api.get('/bot/state')
 
 // Notifications
 export const fetchDiscordConfig = () => api.get('/notifications/discord')
-export const updateDiscordConfig = (payload: { webhook_url?: string; enabled: boolean }) =>
+export const updateDiscordConfig = (payload: { webhook_url: string; enabled: boolean }) =>
   api.put('/notifications/discord', payload)
 export const testDiscord = () => api.post('/notifications/discord/test')
 
