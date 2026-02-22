@@ -14,6 +14,7 @@ import sys
 from datetime import datetime
 
 import structlog
+import uvicorn
 
 from src.strategies import Signal, get_strategy
 
@@ -83,6 +84,7 @@ class OmniTrader:
 
         self._running = False
         self._shutdown_event = asyncio.Event()
+        self.ws_manager = None  # Set by main() after API creation
 
     async def start(self):
         """Initialize and start the trading bot."""
@@ -176,6 +178,35 @@ class OmniTrader:
                 reason=result.reason,
                 **result.indicators,
             )
+
+            # 5b. Persist cycle data for the dashboard
+            await self.database.log_equity_snapshot(balance_info["total"])
+            await self.database.log_signal(
+                symbol=symbol,
+                price=current_price,
+                signal=result.signal.value,
+                reason=result.reason,
+                indicators=result.indicators,
+            )
+
+            # 5c. Broadcast to connected WebSocket clients
+            if self.ws_manager:
+                await self.ws_manager.broadcast(
+                    {
+                        "type": "cycle",
+                        "timestamp": datetime.utcnow().isoformat(),
+                        "symbol": symbol,
+                        "price": current_price,
+                        "signal": result.signal.value,
+                        "reason": result.reason,
+                        "indicators": result.indicators,
+                        "position": current_side,
+                        "balance": balance_info["total"],
+                        "daily_pnl": self.risk.daily_stats.realized_pnl,
+                        "daily_pnl_pct": self.risk.daily_stats.pnl_pct,
+                        "circuit_breaker": self.risk.check_circuit_breaker(),
+                    }
+                )
 
             # 6. Manage Trailing Stop (if in position)
             if position.is_open:
@@ -437,8 +468,23 @@ class OmniTrader:
 
 
 async def main():
-    """Main entry point."""
+    """Main entry point — runs trading loop + API server concurrently."""
+    from .api import create_api
+    from .api.websocket import manager as _ws_manager
+
     bot = OmniTrader()
+    bot.ws_manager = _ws_manager
+
+    app = create_api(bot)
+
+    api_config = uvicorn.Config(
+        app,
+        host="0.0.0.0",
+        port=8000,
+        log_level="warning",
+        access_log=False,
+    )
+    server = uvicorn.Server(api_config)
 
     # Setup signal handlers for graceful shutdown
     loop = asyncio.get_event_loop()
@@ -447,12 +493,15 @@ async def main():
         logger.info("shutdown_signal_received")
         bot._running = False
         bot._shutdown_event.set()
+        server.should_exit = True
 
     for sig in (signal.SIGINT, signal.SIGTERM):
         loop.add_signal_handler(sig, signal_handler)
 
+    logger.info("api_server_starting", host="0.0.0.0", port=8000)
+
     try:
-        await bot.run()
+        await asyncio.gather(bot.run(), server.serve())
     except KeyboardInterrupt:
         logger.info("keyboard_interrupt")
     except Exception as e:

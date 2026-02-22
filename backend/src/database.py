@@ -31,6 +31,8 @@ class Database:
     async def connect(self):
         """Initialize database connection and create tables."""
         self._connection = await aiosqlite.connect(self.db_path)
+        # Enable WAL mode for concurrent reads while bot writes
+        await self._connection.execute("PRAGMA journal_mode=WAL")
         await self._create_tables()
         logger.info("database_connected", path=str(self.db_path))
 
@@ -71,8 +73,26 @@ class Database:
                 losses INTEGER NOT NULL
             );
 
+            CREATE TABLE IF NOT EXISTS equity_snapshots (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                timestamp TEXT NOT NULL,
+                balance REAL NOT NULL
+            );
+
+            CREATE TABLE IF NOT EXISTS signals_log (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                timestamp TEXT NOT NULL,
+                symbol TEXT NOT NULL,
+                price REAL NOT NULL,
+                signal TEXT NOT NULL,
+                reason TEXT,
+                indicators TEXT
+            );
+
             CREATE INDEX IF NOT EXISTS idx_trades_timestamp ON trades(timestamp);
             CREATE INDEX IF NOT EXISTS idx_trades_symbol ON trades(symbol);
+            CREATE INDEX IF NOT EXISTS idx_equity_timestamp ON equity_snapshots(timestamp);
+            CREATE INDEX IF NOT EXISTS idx_signals_timestamp ON signals_log(timestamp);
         """
         )
         await self._connection.commit()
@@ -207,3 +227,47 @@ class Database:
             columns = [description[0] for description in cursor.description]
             return dict(zip(columns, row, strict=False))
         return None
+
+    async def log_equity_snapshot(self, balance: float) -> None:
+        """Log current balance as an equity snapshot."""
+        await self._connection.execute(
+            "INSERT INTO equity_snapshots (timestamp, balance) VALUES (?, ?)",
+            (datetime.utcnow().isoformat(), balance),
+        )
+        await self._connection.commit()
+
+    async def get_equity_snapshots(self, limit: int = 200) -> list:
+        """Get recent equity snapshots for charting."""
+        cursor = await self._connection.execute(
+            "SELECT * FROM equity_snapshots ORDER BY timestamp DESC LIMIT ?", (limit,)
+        )
+        rows = await cursor.fetchall()
+        columns = [description[0] for description in cursor.description]
+        return [dict(zip(columns, row, strict=False)) for row in rows]
+
+    async def log_signal(
+        self,
+        symbol: str,
+        price: float,
+        signal: str,
+        reason: str,
+        indicators: dict,
+    ) -> None:
+        """Log a strategy signal with indicator snapshot."""
+        import json
+
+        await self._connection.execute(
+            """
+            INSERT INTO signals_log (timestamp, symbol, price, signal, reason, indicators)
+            VALUES (?, ?, ?, ?, ?, ?)
+            """,
+            (
+                datetime.utcnow().isoformat(),
+                symbol,
+                price,
+                signal,
+                reason,
+                json.dumps(indicators),
+            ),
+        )
+        await self._connection.commit()

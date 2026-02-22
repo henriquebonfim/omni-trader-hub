@@ -27,46 +27,46 @@ Maps to the 13-module System Architecture spec.
 
 ### Phase B — Backend API
 
-*New `src/api/` module — FastAPI runs alongside the async trading loop via `asyncio.gather()`*
+*New `backend/src/api/` module — FastAPI runs alongside the async trading loop via `asyncio.gather()`*
 
 | # | Task | Track | Status | Description |
 |---|------|-------|--------|-------------|
-| 9 | FastAPI app factory | BE | ⬜ | `create_api(bot)` receives OmniTrader instance, mounts routes |
-| 10 | REST: status & balance | BE | ⬜ | `GET /api/status`, `/api/balance`, `/api/position` |
-| 11 | REST: trades & history | BE | ⬜ | `GET /api/trades`, `/api/daily-summary/{date}`, `/api/equity` |
-| 12 | REST: strategies | BE | ⬜ | `GET /api/strategies` — list registered + metadata |
-| 13 | REST: config CRUD | BE | ⬜ | `GET/PUT /api/config` — read/write config.yaml from UI |
-| 14 | REST: bot control | BE | ⬜ | `POST /api/bot/start`, `/stop`, `/restart` — lifecycle mgmt |
-| 15 | REST: notifications | BE | ⬜ | `GET/PUT /api/notifications/discord` — webhook config |
-| 16 | WebSocket: live feed | BE | ⬜ | `/ws/live` — streams cycle results (price, signal, indicators, PnL) |
-| 17 | SQLite WAL mode | BE | ⬜ | Enable WAL for concurrent API reads while bot writes |
-| 18 | Equity snapshots table | BE | ⬜ | Log balance every cycle → `equity_snapshots` table for charting |
-| 19 | Signals log table | BE | ⬜ | Log every cycle's signal + indicators → `signals_log` table |
-| 20 | API auth | BE | ⬜ | Bearer token (`API_AUTH_TOKEN` in .env), CORS for localhost:5173 |
+| 9 | FastAPI app factory | BE | ✅ | `create_api(bot)` receives OmniTrader instance, mounts routes |
+| 10 | REST: status & balance | BE | ✅ | `GET /api/status`, `/api/balance`, `/api/position` |
+| 11 | REST: trades & history | BE | ✅ | `GET /api/trades`, `/api/daily-summary/{date}`, `/api/equity` |
+| 12 | REST: strategies | BE | ✅ | `GET /api/strategies` — list registered + metadata |
+| 13 | REST: config CRUD | BE | ✅ | `GET/PUT /api/config` — read/write config.yaml from UI |
+| 14 | REST: bot control | BE | ✅ | `POST /api/bot/start`, `/stop`, `/restart` — lifecycle mgmt |
+| 15 | REST: notifications | BE | ✅ | `GET/PUT /api/notifications/discord` — webhook config |
+| 16 | WebSocket: live feed | BE | ✅ | `/ws/live` — streams cycle results (price, signal, indicators, PnL) |
+| 17 | SQLite WAL mode | BE | ✅ | Enable WAL for concurrent API reads while bot writes |
+| 18 | Equity snapshots table | BE | ✅ | Log balance every cycle → `equity_snapshots` table for charting |
+| 19 | Signals log table | BE | ✅ | Log every cycle's signal + indicators → `signals_log` table |
+| 20 | API auth | BE | — | Deferred — CORS localhost-only; add Bearer token when deploying remotely |
 
 ### Phase C — Frontend Dashboard
 
-*New `frontend/` directory — Vite + React + TypeScript SPA*
+*`frontend/` directory — Vite + React + TypeScript SPA*
 
 | # | Task | Track | Status | Description |
 |---|------|-------|--------|-------------|
-| 21 | Vite + React scaffold | FE | ⬜ | Project init, TypeScript, dark theme, sidebar layout |
-| 22 | API client + hooks | FE | ⬜ | Typed fetch wrapper, React Query, WebSocket hook |
-| 23 | Live status panel | FE | ⬜ | Price, signal, position, balance — all via WebSocket |
-| 24 | Trade history table | FE | ⬜ | Paginated, sortable, PnL coloring (green/red) |
-| 25 | Equity curve chart | FE | ⬜ | Line chart from balance snapshots (recharts or lightweight-charts) |
-| 26 | Strategy selector | FE | ⬜ | Dropdown + parameter form from strategy metadata, saves via API |
-| 27 | Config editor | FE | ⬜ | Risk, trading, exchange params as forms — no raw YAML |
-| 28 | Bot control panel | FE | ⬜ | Start/Stop/Restart buttons, status badge, uptime counter |
-| 29 | Discord webhook config | FE | ⬜ | Set/test webhook URL from UI |
+| 21 | Vite + React scaffold | FE | ✅ | Project init, TypeScript, dark theme, sidebar layout |
+| 22 | API client + hooks | FE | ✅ | Typed fetch wrapper, React Query, WebSocket hook |
+| 23 | Live status panel | FE | ✅ | Price, signal, position, balance — all via WebSocket |
+| 24 | Trade history table | FE | ✅ | Paginated, PnL coloring (green/red) |
+| 25 | Equity curve chart | FE | ✅ | Line chart from balance snapshots (recharts) |
+| 26 | Strategy selector | FE | ✅ | Dropdown + metadata display, saves via API |
+| 27 | Config editor | FE | ✅ | Risk, trading params as forms — no raw YAML |
+| 28 | Bot control panel | FE | ✅ | Start/Stop/Restart buttons, status badge, daily stats |
+| 29 | Discord webhook config | FE | ✅ | Set/test webhook URL from UI |
 
 ### Phase D — Docker
 
 | # | Task | Track | Status | Description |
 |---|------|-------|--------|-------------|
-| 30 | Backend Dockerfile | INF | ⬜ | Copy config/, expose 8000, healthcheck `/api/health` |
-| 31 | Frontend Dockerfile | INF | ⬜ | Multi-stage: node build → nginx serve |
-| 32 | compose.yml | INF | ⬜ | Services: `omnitrader` (8000), `frontend` (3000/80), `nginx` (reverse proxy) |
+| 30 | Backend Dockerfile | INF | ✅ | `backend/Dockerfile` — copies config/, exposes 8000, healthcheck `/api/health` |
+| 31 | Frontend Dockerfile | INF | ✅ | `frontend/Dockerfile` — multi-stage: node build → nginx serve with API proxy |
+| 32 | compose.yml | INF | ✅ | Services: `omnitrader` (8000) from `./backend`, `frontend` (3000/80) from `./frontend` |
 
 **Exit Criteria**: `docker compose up` → dashboard at localhost:3000 showing live BTC price, trade history, and working bot controls
 
