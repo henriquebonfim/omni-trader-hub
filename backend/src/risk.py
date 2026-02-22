@@ -125,7 +125,6 @@ class RiskManager:
                 previous_pnl=self.daily_stats.realized_pnl,
             )
             self.daily_stats = DailyStats(date=today, starting_balance=current_balance)
-            self.consecutive_losses = 0  # Reset streak for new day
             self._circuit_breaker_active = False
         elif self.daily_stats.starting_balance == 0:
             # First run of the day
@@ -148,19 +147,19 @@ class RiskManager:
         # With leverage, we can open a larger position
         notional_value = risk_amount * self.leverage
 
-        # Convert to base currency
-        position_size = notional_value / entry_price
-
         # Drawdown sizing: Reduce size by 50% if 3+ consecutive losses
         if self.consecutive_losses >= 3:
-            original_size = position_size
-            position_size *= 0.5
+            original_notional = notional_value
+            notional_value *= 0.5
             logger.warning(
                 "drawdown_sizing_active",
                 consecutive_losses=self.consecutive_losses,
-                original_size=original_size,
-                new_size=position_size,
+                original_notional=original_notional,
+                new_notional=notional_value,
             )
+
+        # Convert to base currency
+        position_size = notional_value / entry_price
 
         logger.debug(
             "position_size_calculated",

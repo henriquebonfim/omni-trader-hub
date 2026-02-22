@@ -27,7 +27,7 @@ def test_consecutive_losses_reset():
     risk.record_trade(-100.0)
     assert risk.consecutive_losses == 1
 
-def test_daily_reset_clears_streak(monkeypatch):
+def test_daily_reset_keeps_streak(monkeypatch):
     risk = RiskManager()
     risk.consecutive_losses = 3
 
@@ -42,4 +42,4 @@ def test_daily_reset_clears_streak(monkeypatch):
     monkeypatch.setattr("src.risk.date", MockDate)
     risk.initialize_daily_stats(10000.0)
 
-    assert risk.consecutive_losses == 0
+    assert risk.consecutive_losses == 3

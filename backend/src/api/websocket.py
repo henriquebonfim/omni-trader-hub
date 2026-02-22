@@ -63,9 +63,9 @@ class ConnectionManager:
                 # Only remove if they are still in the list (weren't removed by disconnect)
                 self._connections = [ws for ws in self._connections if ws not in dead]
 
-    @property
-    def client_count(self) -> int:
-        return len(self._connections)
+    async def get_client_count(self) -> int:
+        async with self._lock:
+            return len(self._connections)
 
 
 # Singleton manager — assigned to bot.ws_manager in main.py
