@@ -1,0 +1,35 @@
+## Pull request overview
+
+Copilot reviewed 45 out of 57 changed files in this pull request and generated 2 comments.
+
+
+<details>
+<summary>Comments suppressed due to low confidence (3)</summary>
+
+**backend/src/api/routes/notifications.py:17**
+* The `PUT /notifications/discord` payload requires `webhook_url`, but `GET /notifications/discord` only returns a masked preview, so clients can't update `enabled` without re-entering the full URL (and may accidentally clear it). Consider making `webhook_url` optional and preserving the existing stored webhook when it’s omitted, or provide a separate endpoint to toggle `enabled`.
+```
+class DiscordWebhookPayload(BaseModel):
+    webhook_url: str
+    enabled: bool = True
+
+```
+**backend/src/api/routes/notifications.py:58**
+* In the exception path, the handler returns `{ok: True, message: 'Updated in-memory...'}` but it never applies the update to the running bot (no `bot.notifier.update_config(...)` and no config mutation). Either apply the update in-memory before returning, or change the response to reflect that the update did not take effect.
+```
+    except Exception as e:
+        # Don't fail the request if persistence fails, but log it
+        import structlog
+        logger = structlog.get_logger()
+        logger.error("discord_config_persist_failed", error=str(e))
+        return {"ok": True, "message": "Updated in-memory (persistence failed)"}
+```
+**frontend/src/components/DiscordConfig.tsx:73**
+* The Save action is disabled when `webhookUrl` is empty, and the component never initializes `webhookUrl` from server data. This makes it impossible to toggle `enabled` without re-entering the full webhook URL (which the API does not return). Consider allowing saves when only `enabled` changes, and/or adjusting the API to accept an optional webhook URL.
+</details>
+
+
+
+---
+
+💡 <a href="/henriquebonfim/omnitrader/new/master/.github/instructions?filename=*.instructions.md" class="Link--inTextBlock" target="_blank" rel="noopener noreferrer">Add Copilot custom instructions</a> for smarter, more guided reviews. <a href="https://docs.github.com/en/copilot/customizing-copilot/adding-repository-custom-instructions-for-github-copilot" class="Link--inTextBlock" target="_blank" rel="noopener noreferrer">Learn how to get started</a>.

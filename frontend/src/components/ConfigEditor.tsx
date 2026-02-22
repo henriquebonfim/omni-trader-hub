@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { fetchConfig, updateConfig } from '../lib/api'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import React, { useEffect, useState } from 'react';
+import { fetchConfig, updateConfig } from '../lib/api';
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
