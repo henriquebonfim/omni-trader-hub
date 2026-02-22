@@ -170,7 +170,7 @@ Status:     Trading PAUSED until tomorrow
 ```
 Symbol:  {symbol}
 Mode:    {mode}
-Time:    {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+Time:    {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
 ```
         """.strip()
 
@@ -182,7 +182,7 @@ Time:    {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
 🛑 **OmniTrader Stopped**
 ```
 Reason:  {reason}
-Time:    {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+Time:    {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
 ```
         """.strip()
 

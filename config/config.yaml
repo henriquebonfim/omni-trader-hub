@@ -15,17 +15,43 @@ trading:
   cycle_seconds: 60 # Check every 60 seconds
 
 strategy:
-  name: ema_volume
+  name: ema_volume  # Active strategy: ema_volume, adx_trend, z_score, bollinger_bands, breakout
+
+  # EMA Volume Strategy Parameters
   ema_fast: 9 # Fast EMA period
   ema_slow: 21 # Slow EMA period
   volume_sma: 20 # Volume SMA period
   volume_threshold: 1.5 # Volume must be > 1.5x average
+
+  # ADX Trend Strategy Parameters
+  adx_period: 14       # ADX calculation period
+  adx_threshold: 25    # Minimum ADX for trend confirmation
+
+  # Z-Score Strategy Parameters
+  z_score_window: 20      # Rolling window for Z-Score
+  z_score_threshold: 2.0  # Std deviations for overbought/oversold
+
+  # Bollinger Bands Strategy Parameters
+  bollinger_bands:
+    length: 20
+    std: 2.0
+    rsi_length: 14
+    rsi_lower: 30
+    rsi_upper: 70
+
+  # Breakout Strategy Parameters
+  breakout:
+    period: 20 # Donchian channel period
 
 risk:
   stop_loss_pct: 2.0 # 2% stop loss
   take_profit_pct: 4.0 # 4% take profit (2:1 R:R)
   max_daily_loss_pct: 5.0 # Circuit breaker: pause if daily loss > 5%
   max_positions: 1 # Only one position at a time
+
+  # Trailing Stop Configuration
+  trailing_stop_activation_pct: 1.0 # Activate when PnL > 1%
+  trailing_stop_callback_pct: 0.5   # Trail price by 0.5%
 
 notifications:
   enabled: true
