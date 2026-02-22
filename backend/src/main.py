@@ -85,17 +85,39 @@ class OmniTrader:
         self._running = False
         self._shutdown_event = asyncio.Event()
         self.ws_manager = None  # Set by main() after API creation
+        self._reconcile_counter = 0
 
     async def reload_config(self):
         """Reload configuration and update all components."""
         logger.info("reloading_configuration")
         try:
+            old_strategy_name = getattr(self.config.strategy, "name", "ema_volume")
             self.config = reload_config()
+            new_strategy_name = getattr(self.config.strategy, "name", "ema_volume")
 
             # Update components
             await self.exchange.update_config(self.config)
             self.risk.update_config(self.config)
-            self.strategy.update_config(self.config)
+
+            # Switch strategy if name changed
+            if new_strategy_name != old_strategy_name:
+                logger.info(
+                    "strategy_switching", old=old_strategy_name, new=new_strategy_name
+                )
+                try:
+                    strategy_class = get_strategy(new_strategy_name)
+                    self.strategy = strategy_class(self.config)
+                    logger.info(
+                        "strategy_switched", metadata=self.strategy.metadata
+                    )
+                except Exception as e:
+                    logger.error(
+                        "strategy_switch_failed",
+                        error=str(e),
+                        keeping=old_strategy_name,
+                    )
+            else:
+                self.strategy.update_config(self.config)
 
             logger.info("configuration_reloaded")
         except Exception as e:
@@ -250,8 +272,11 @@ class OmniTrader:
             position = await self.exchange.get_position(symbol)
             current_side = position.side if position.is_open else None
 
-            # 2b. Reconcile state with database
-            await self._reconcile_positions(symbol, position)
+            # 2b. Reconcile state with database (throttled)
+            self._reconcile_counter += 1
+            if self._reconcile_counter >= 5:
+                await self._reconcile_positions(symbol, position)
+                self._reconcile_counter = 0
 
             # 3. Update daily stats with current balance
             balance_info = await self.exchange.get_balance()

@@ -4,7 +4,7 @@ Strategy listing route.
 
 from fastapi import APIRouter, Request
 
-from src.strategies.registry import _STRATEGIES
+from src.strategies.registry import get_all_strategies
 
 router = APIRouter(tags=["strategies"])
 
@@ -16,7 +16,7 @@ async def list_strategies(request: Request):
     active = getattr(bot.config.strategy, "name", "ema_volume")
 
     strategies = []
-    for name, cls in _STRATEGIES.items():
+    for name, cls in get_all_strategies().items():
         try:
             # Instantiate temporarily to read metadata
             instance = cls(bot.config)
