@@ -31,6 +31,7 @@ class Database:
     async def connect(self):
         """Initialize database connection and create tables."""
         self._connection = await aiosqlite.connect(self.db_path)
+        self._connection.row_factory = aiosqlite.Row
         # Enable WAL mode for concurrent reads while bot writes
         await self._connection.execute("PRAGMA journal_mode=WAL")
         await self._create_tables()
@@ -105,7 +106,7 @@ class Database:
         try:
             # Check if expected_price column exists in trades
             cursor = await self._connection.execute("PRAGMA table_info(trades)")
-            columns = [row[1] for row in await cursor.fetchall()]
+            columns = [row["name"] for row in await cursor.fetchall()]
 
             if "expected_price" not in columns:
                 logger.info("migrating_trades_table_add_expected_price")
@@ -247,8 +248,7 @@ class Database:
             "SELECT * FROM trades ORDER BY timestamp DESC LIMIT ?", (limit,)
         )
         rows = await cursor.fetchall()
-        columns = [description[0] for description in cursor.description]
-        return [dict(zip(columns, row, strict=False)) for row in rows]
+        return [dict(row) for row in rows]
 
     async def get_last_trade(self, symbol: str) -> dict | None:
         """Get the most recent trade for a symbol."""
@@ -257,10 +257,7 @@ class Database:
             (symbol,),
         )
         row = await cursor.fetchone()
-        if row:
-            columns = [description[0] for description in cursor.description]
-            return dict(zip(columns, row, strict=False))
-        return None
+        return dict(row) if row else None
 
     async def get_daily_summary(self, date: str) -> dict | None:
         """Get daily summary for a specific date."""
@@ -268,10 +265,7 @@ class Database:
             "SELECT * FROM daily_summary WHERE date = ?", (date,)
         )
         row = await cursor.fetchone()
-        if row:
-            columns = [description[0] for description in cursor.description]
-            return dict(zip(columns, row, strict=False))
-        return None
+        return dict(row) if row else None
 
     async def log_equity_snapshot(self, balance: float) -> None:
         """Log current balance as an equity snapshot."""
@@ -287,8 +281,7 @@ class Database:
             "SELECT * FROM equity_snapshots ORDER BY timestamp DESC LIMIT ?", (limit,)
         )
         rows = await cursor.fetchall()
-        columns = [description[0] for description in cursor.description]
-        return [dict(zip(columns, row, strict=False)) for row in rows]
+        return [dict(row) for row in rows]
 
     async def log_signal(
         self,
