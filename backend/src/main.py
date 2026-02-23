@@ -15,10 +15,13 @@ from datetime import datetime
 
 import structlog
 import uvicorn
+<<<<<<<< HEAD:src/main.py
+========
 
+>>>>>>>> p1-production-ready-1775469422449842578:backend/src/main.py
 from src.strategies import Signal, get_strategy
 
-from .config import get_config
+from .config import get_config, reload_config
 from .database import Database
 from .exchange import Exchange
 from .notifier import Notifier
@@ -85,6 +88,58 @@ class OmniTrader:
         self._running = False
         self._shutdown_event = asyncio.Event()
         self.ws_manager = None  # Set by main() after API creation
+<<<<<<<< HEAD:src/main.py
+========
+        self._reconcile_counter = 0
+
+    async def reload_config(self):
+        """Reload configuration and update all components."""
+        logger.info("reloading_configuration")
+        old_config = self.config
+        try:
+            old_strategy_name = getattr(self.config.strategy, "name", "ema_volume")
+            new_config = reload_config()
+            self.config = new_config
+            new_strategy_name = getattr(self.config.strategy, "name", "ema_volume")
+
+            # Update components
+            await self.exchange.update_config(self.config)
+            self.risk.update_config(self.config)
+            self.notifier.update_config(self.config)
+
+            # Switch strategy if name changed
+            if new_strategy_name != old_strategy_name:
+                logger.info(
+                    "strategy_switching", old=old_strategy_name, new=new_strategy_name
+                )
+                strategy_class = get_strategy(new_strategy_name)
+                self.strategy = strategy_class(self.config)
+                logger.info(
+                    "strategy_switched", metadata=self.strategy.metadata
+                )
+            else:
+                self.strategy.update_config(self.config)
+
+            logger.info("configuration_reloaded")
+
+        except Exception as e:
+            logger.error("config_reload_failed", error=str(e))
+            # Full rollback of all components
+            logger.info("rolling_back_configuration")
+            self.config = old_config
+            try:
+                await self.exchange.update_config(old_config)
+                self.risk.update_config(old_config)
+                self.notifier.update_config(old_config)
+                # If strategy was switched, we might need to revert it?
+                # But here we rely on the fact that if strategy init failed, self.strategy is untouched.
+                # If strategy init succeeded but something else failed later (unlikely here), we keep new strategy?
+                # Actually, if strategy init fails, exception is raised, self.strategy is NOT updated.
+                # So we just update config on the old strategy instance.
+                self.strategy.update_config(old_config)
+            except Exception as rollback_error:
+                logger.critical("rollback_failed", error=str(rollback_error))
+>>>>>>>> p1-production-ready-1775469422449842578:backend/src/main.py
 
     async def start(self):
         """Initialize and start the trading bot."""
@@ -108,6 +163,97 @@ class OmniTrader:
 
         self._running = True
         logger.info("omnitrader_started")
+
+    async def _reconcile_positions(self, symbol, position):
+        """
+        Check for discrepancies between exchange position and database state.
+        Fixes missed updates (e.g. SL hit while offline).
+        """
+        last_trade = await self.database.get_last_trade(symbol)
+
+        # Case 1: DB says OPEN, Exchange says FLAT -> Missed CLOSE
+        if last_trade and last_trade["action"] == "OPEN" and not position.is_open:
+            logger.warning(
+                "reconciliation_mismatch_closed",
+                db_action="OPEN",
+                exchange_status="FLAT",
+                last_trade_id=last_trade["id"],
+            )
+
+            # We don't know the exact exit price, so use current market price (approx)
+            # or try to fetch last user trade from exchange (better)
+            # For MVP, use ticker price as approximation, or SL if reasonable
+            ticker = await self.exchange.get_ticker(symbol)
+            current_price = float(ticker["last"])
+            exit_price = current_price
+
+            if last_trade.get("stop_loss"):
+                sl = float(last_trade["stop_loss"])
+                # If current price is below SL (long) or above SL (short),
+                # it's likely the SL was hit. Use SL as exit price.
+                side = last_trade["side"].lower()
+                if side == "long" and current_price < sl:
+                    exit_price = sl
+                elif side == "short" and current_price > sl:
+                    exit_price = sl
+
+            entry_price = float(last_trade["price"])
+            size = float(last_trade["size"])
+            side = last_trade["side"].lower()
+
+            # Calculate PnL
+            if side == "long":
+                pnl = (exit_price - entry_price) * size
+                pnl_pct = ((exit_price - entry_price) / entry_price) * 100
+            else:
+                pnl = (entry_price - exit_price) * size
+                pnl_pct = ((entry_price - exit_price) / entry_price) * 100
+
+            # Record in risk manager
+            self.risk.record_trade(pnl)
+
+            # Log to database
+            await self.database.log_trade_close(
+                symbol=symbol,
+                side=side,
+                price=exit_price,
+                size=size,
+                notional=size * exit_price,
+                pnl=pnl,
+                pnl_pct=pnl_pct,
+                reason="reconciliation_detected_close",
+            )
+
+            await self.notifier.send(
+                f"⚠️ **Reconciliation Alert**: Detected closed position for {symbol}. Database updated."
+            )
+
+        # Case 2: DB says CLOSE (or None), Exchange says OPEN -> Missed OPEN
+        elif (not last_trade or last_trade["action"] == "CLOSE") and position.is_open:
+            logger.warning(
+                "reconciliation_mismatch_opened",
+                db_action=last_trade["action"] if last_trade else "NONE",
+                exchange_status="OPEN",
+                size=position.size,
+            )
+
+            # Log the missing open
+            await self.database.log_trade_open(
+                symbol=symbol,
+                side=position.side,
+                price=position.entry_price,
+                size=position.size,
+                notional=position.notional,
+                stop_loss=None,  # Unknown
+                take_profit=None,  # Unknown
+                expected_price=None, # Unknown
+                slippage=None, # Unknown
+                reason="reconciliation_detected_open",
+            )
+
+            await self.notifier.send(
+                f"⚠️ **Reconciliation Alert**: Detected open position for {symbol}. Database updated."
+            )
 
     async def stop(self, reason: str = "Manual stop"):
         """Gracefully stop the trading bot."""
@@ -159,16 +305,32 @@ class OmniTrader:
             position = await self.exchange.get_position(symbol)
             current_side = position.side if position.is_open else None
 
+            # 2b. Reconcile state with database (throttled)
+            self._reconcile_counter += 1
+            if self._reconcile_counter >= 5:
+                await self._reconcile_positions(symbol, position)
+                self._reconcile_counter = 0
+
             # 3. Update daily stats with current balance
             balance_info = await self.exchange.get_balance()
             self.risk.initialize_daily_stats(balance_info["total"])
 
             # 4. Fetch market data
             ohlcv = await self.exchange.fetch_ohlcv(symbol, limit=100)
-            current_price = ohlcv["close"].iloc[-1]
+            current_price = float(ohlcv["close"].iloc[-1])
 
             # 5. Analyze with strategy
             result = self.strategy.analyze(ohlcv, current_side)
+
+            # Sanitize indicators for JSON serialization (handle numpy types)
+            def _sanitize(v):
+                if hasattr(v, "item"):  # Numpy scalar
+                    return v.item()
+                if isinstance(v, dict):
+                    return {k: _sanitize(val) for k, val in v.items()}
+                return v
+
+            sanitized_indicators = _sanitize(result.indicators)
 
             logger.info(
                 "cycle_analyzed",
@@ -176,7 +338,7 @@ class OmniTrader:
                 signal=result.signal.value,
                 position=current_side or "none",
                 reason=result.reason,
-                **result.indicators,
+                **sanitized_indicators,
             )
 
             # 5b. Persist cycle data for the dashboard
@@ -186,7 +348,11 @@ class OmniTrader:
                 price=current_price,
                 signal=result.signal.value,
                 reason=result.reason,
+<<<<<<<< HEAD:src/main.py
                 indicators=result.indicators,
+========
+                indicators=sanitized_indicators,
+>>>>>>>> p1-production-ready-1775469422449842578:backend/src/main.py
             )
 
             # 5c. Broadcast to connected WebSocket clients
@@ -199,7 +365,11 @@ class OmniTrader:
                         "price": current_price,
                         "signal": result.signal.value,
                         "reason": result.reason,
+<<<<<<<< HEAD:src/main.py
                         "indicators": result.indicators,
+========
+                        "indicators": sanitized_indicators,
+>>>>>>>> p1-production-ready-1775469422449842578:backend/src/main.py
                         "position": current_side,
                         "balance": balance_info["total"],
                         "daily_pnl": self.risk.daily_stats.realized_pnl,
@@ -305,6 +475,13 @@ class OmniTrader:
             entry_price = float(order.get("average", current_price))
             notional = risk_check.position_size * entry_price
 
+            # Calculate slippage
+            slippage = 0.0
+            if side == "long":
+                slippage = entry_price - current_price
+            else:
+                slippage = current_price - entry_price
+
             # Recalculate SL/TP with actual entry
             stop_loss = self.risk.calculate_stop_loss(entry_price, side)
             take_profit = self.risk.calculate_take_profit(entry_price, side)
@@ -331,6 +508,8 @@ class OmniTrader:
                 stop_loss=stop_loss,
                 take_profit=take_profit,
                 reason=reason,
+                expected_price=current_price,
+                slippage=slippage,
             )
 
             # Send notification

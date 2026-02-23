@@ -7,11 +7,15 @@ from pathlib import Path
 import yaml
 from fastapi import APIRouter, HTTPException, Request
 
-from src.config import reload_config
-
 router = APIRouter(tags=["config"])
 
-_CONFIG_PATH = Path(__file__).parent.parent.parent.parent / "config" / "config.yaml"
+# Resolves to project root/config/config.yaml
+# __file__ = backend/src/api/routes/config.py
+# parents[0] = backend/src/api/routes
+# parents[1] = backend/src/api
+# parents[2] = backend/src
+# parents[3] = backend
+_CONFIG_PATH = Path(__file__).parents[3] / "config" / "config.yaml"
 
 
 @router.get("/config")
@@ -25,6 +29,12 @@ async def get_config(request: Request):
         cfg["exchange"].pop("api_key", None)
         cfg["exchange"].pop("api_secret", None)
 
+    if "notifications" in cfg:
+        # Mask webhook if present
+        url = cfg["notifications"].get("discord_webhook", "")
+        if url and len(url) > 10:
+            cfg["notifications"]["discord_webhook"] = f"{url[:10]}...[REDACTED]"
+
     return cfg
 
 
@@ -33,12 +43,11 @@ async def update_config(updates: dict, request: Request):
     """
     Deep-merge `updates` into config.yaml and reload.
 
-    Only top-level section keys are merged (e.g. {"trading": {"symbol": "ETH/USDT:USDT"}}).
-    Missing sections are preserved unchanged.
+    Note: This operation rewrites the YAML file, so comments and formatting
+    may be lost.
     """
     bot = request.app.state.bot
 
-    # Load raw YAML to preserve comments / env-var placeholders
     if not _CONFIG_PATH.exists():
         raise HTTPException(status_code=500, detail="config.yaml not found on server")
 
@@ -59,8 +68,7 @@ async def update_config(updates: dict, request: Request):
     with open(_CONFIG_PATH, "w") as f:
         yaml.dump(merged, f, default_flow_style=False, allow_unicode=True)
 
-    # Reload singleton
-    new_cfg = reload_config()
-    bot.config = new_cfg
+    # Reload bot configuration
+    await bot.reload_config()
 
     return {"ok": True, "message": "Config updated and reloaded"}

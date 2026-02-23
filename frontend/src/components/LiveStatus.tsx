@@ -1,6 +1,6 @@
+import { useLiveFeed } from '../lib/ws'
 import { useQuery } from '@tanstack/react-query'
 import { fetchStatus } from '../lib/api'
-import { useLiveFeed } from '../lib/ws'
 
 function fmt(n: number, decimals = 2) {
   return n.toLocaleString('en-US', { minimumFractionDigits: decimals, maximumFractionDigits: decimals })

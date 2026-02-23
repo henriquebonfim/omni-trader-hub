@@ -1,5 +1,5 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { botRestart, botStart, botStop, fetchBotState } from '../lib/api'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { fetchBotState, botStart, botStop, botRestart } from '../lib/api'
 
 function fmt(n: number, d = 2) {
   return n.toLocaleString('en-US', { minimumFractionDigits: d, maximumFractionDigits: d })

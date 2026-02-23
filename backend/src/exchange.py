@@ -88,6 +88,66 @@ class Exchange:
         self.config = config
         self._markets_loaded = False
 
+    async def update_config(self, config):
+        """Update exchange configuration."""
+        old_paper_mode = self.paper_mode
+        self.config = config
+        self.paper_mode = getattr(config.exchange, "paper_mode", False)
+
+        # If switching from Paper -> Live, we need to load API keys
+        if old_paper_mode and not self.paper_mode:
+            import os
+
+            api_key = os.getenv("BINANCE_API_KEY")
+            secret = os.getenv("BINANCE_SECRET")
+
+            if not api_key or not secret:
+                logger.error("cannot_switch_to_live_missing_keys")
+                # Revert to paper mode for safety
+                self.paper_mode = True
+                return
+
+            # Re-initialize client with keys
+            exchange_config = {
+                "apiKey": api_key,
+                "secret": secret,
+                "enableRateLimit": True,
+                "options": {
+                    "defaultType": "swap",
+                    "adjustForTimeDifference": True,
+                },
+            }
+            await self.client.close()
+            self.client = ccxt.binance(exchange_config)
+            await self.client.load_markets()
+            logger.info("switched_to_live_trading")
+
+        # If switching from Live -> Paper, reset client
+        elif not old_paper_mode and self.paper_mode:
+            exchange_config = {
+                "apiKey": None,
+                "secret": None,
+                "enableRateLimit": True,
+                "options": {
+                    "defaultType": "swap",
+                    "adjustForTimeDifference": True,
+                },
+            }
+            await self.client.close()
+            self.client = ccxt.binance(exchange_config)
+            await self.client.load_markets()
+            logger.info("switched_to_paper_trading")
+
+        # Attempt to update leverage if live
+        if not self.paper_mode and self._markets_loaded:
+            symbol = self.config.trading.symbol
+            leverage = self.config.exchange.leverage
+            try:
+                await self.client.set_leverage(leverage, symbol)
+                logger.info("leverage_updated", symbol=symbol, leverage=leverage)
+            except Exception as e:
+                logger.warning("leverage_update_failed", error=str(e))
+
     async def connect(self) -> bool:
         """
         Initialize connection to exchange.

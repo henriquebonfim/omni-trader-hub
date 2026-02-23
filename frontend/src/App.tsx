@@ -1,14 +1,14 @@
-import { useQuery } from '@tanstack/react-query'
 import { useState } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import { fetchStatus } from './lib/api'
 
-import BotControl from './components/BotControl'
-import ConfigEditor from './components/ConfigEditor'
-import DiscordConfig from './components/DiscordConfig'
-import EquityCurve from './components/EquityCurve'
 import LiveStatus from './components/LiveStatus'
-import StrategySelector from './components/StrategySelector'
 import TradeHistory from './components/TradeHistory'
+import EquityCurve from './components/EquityCurve'
+import StrategySelector from './components/StrategySelector'
+import ConfigEditor from './components/ConfigEditor'
+import BotControl from './components/BotControl'
+import DiscordConfig from './components/DiscordConfig'
 
 type Page = 'dashboard' | 'trades' | 'config' | 'notifications'
 

@@ -17,14 +17,18 @@ async def get_status(request: Request):
 
     uptime_seconds = (datetime.utcnow() - started_at).total_seconds()
 
+    ws_clients = 0
+    if bot.ws_manager:
+        ws_clients = await bot.ws_manager.get_client_count()
+
     return {
         "running": bot._running,
         "symbol": bot.config.trading.symbol,
-        "paper_mode": getattr(bot.config.exchange, "paper_mode", True),
+        "paper_mode": bot.exchange.paper_mode,
         "strategy": getattr(bot.config.strategy, "name", "ema_volume"),
         "uptime_seconds": int(uptime_seconds),
         "circuit_breaker_active": bot.risk.check_circuit_breaker(),
-        "ws_clients": bot.ws_manager.client_count if bot.ws_manager else 0,
+        "ws_clients": ws_clients,
     }
 
 

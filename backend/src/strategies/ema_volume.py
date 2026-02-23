@@ -42,6 +42,21 @@ class EMAVolumeStrategy(BaseStrategy):
         self.bearish_cross = False
         self.high_volume = False
 
+    def update_config(self, config: Config):
+        """Update strategy configuration."""
+        super().update_config(config)
+        self.ema_fast_period = config.strategy.ema_fast
+        self.ema_slow_period = config.strategy.ema_slow
+        self.volume_sma_period = config.strategy.volume_sma
+        self.volume_threshold = config.strategy.volume_threshold
+        logger.info(
+            "strategy_config_updated",
+            ema_fast=self.ema_fast_period,
+            ema_slow=self.ema_slow_period,
+            volume_sma=self.volume_sma_period,
+            volume_threshold=self.volume_threshold,
+        )
+
     @property
     def metadata(self) -> Dict[str, str]:
         return {

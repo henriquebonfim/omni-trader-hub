@@ -4,7 +4,7 @@ Bot lifecycle control routes.
 
 import asyncio
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, Request
 
 router = APIRouter(prefix="/bot", tags=["bot"])
 

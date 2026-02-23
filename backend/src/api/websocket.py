@@ -4,8 +4,8 @@ WebSocket live feed.
 Broadcasts cycle results (price, signal, indicators, PnL) to all connected clients.
 """
 
-import json
 import asyncio
+import json
 from typing import Any
 
 import structlog
@@ -36,15 +36,22 @@ class ConnectionManager:
 
     async def broadcast(self, data: dict[str, Any]) -> None:
         """Send a JSON message to all connected clients, dropping stale ones."""
-        if not self._connections:
-            return
-
-        message = json.dumps(data, default=str)
-        dead: list[WebSocket] = []
+        # Data should be pre-sanitized in main.py to native types
+        message = json.dumps(data)
 
         async with self._lock:
+            if not self._connections:
+                return
+
+            # Iterate over a snapshot, but keep lock if we want absolute safety?
+            # Actually, standard pattern is to copy, iterate, then remove dead.
+            # But review flagged a race where 'dead' removal might remove a re-connected client?
+            # Or a client removed by disconnect is removed again?
+
+            # Safer approach: iterate copy, collect dead, remove dead if present.
             targets = list(self._connections)
 
+        dead: list[WebSocket] = []
         for ws in targets:
             try:
                 await ws.send_text(message)
@@ -53,11 +60,13 @@ class ConnectionManager:
 
         if dead:
             async with self._lock:
+                # Only remove if they are still in the list (weren't removed by disconnect)
                 self._connections = [ws for ws in self._connections if ws not in dead]
 
-    @property
-    def client_count(self) -> int:
-        return len(self._connections)
+    async def get_client_count(self) -> int:
+        """Get the number of connected clients thread-safely."""
+        async with self._lock:
+            return len(self._connections)
 
 
 # Singleton manager — assigned to bot.ws_manager in main.py

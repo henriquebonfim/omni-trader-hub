@@ -51,3 +51,8 @@ def get_strategy(name: str) -> Type[BaseStrategy]:
 def list_strategies() -> list[str]:
     """List all registered strategies."""
     return list(_STRATEGIES.keys())
+
+
+def get_all_strategies() -> Dict[str, Type[BaseStrategy]]:
+    """Return a dictionary of all registered strategies."""
+    return _STRATEGIES.copy()
