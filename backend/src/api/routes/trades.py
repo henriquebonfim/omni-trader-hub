@@ -2,9 +2,11 @@
 Trades, daily summary, and equity curve routes.
 """
 
-from fastapi import APIRouter, Query, Request
+from fastapi import APIRouter, Depends, Query, Request
 
-router = APIRouter(tags=["trades"])
+from ..auth import verify_api_key
+
+router = APIRouter(tags=["trades"], dependencies=[Depends(verify_api_key)])
 
 
 @router.get("/trades")
