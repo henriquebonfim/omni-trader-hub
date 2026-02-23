@@ -4,6 +4,7 @@ Binance Futures exchange wrapper using CCXT.
 Handles all exchange interactions: data fetching, order placement, position management.
 """
 
+import asyncio
 import os
 import time
 
@@ -508,9 +509,15 @@ class Exchange:
 
         # Cancel existing open STOP_MARKET orders to replace them
         open_orders = await self.client.fetch_open_orders(symbol)
-        for o in open_orders:
-            if o["type"] == "STOP_MARKET":
-                await self.client.cancel_order(o["id"], symbol)
+        orders_to_cancel = [o for o in open_orders if o["type"] == "STOP_MARKET"]
+        if orders_to_cancel:
+            tasks = [self.client.cancel_order(o["id"], symbol) for o in orders_to_cancel]
+            results = await asyncio.gather(*tasks, return_exceptions=True)
+            for o, res in zip(orders_to_cancel, results):
+                if isinstance(res, Exception):
+                    logger.warning(
+                        "stop_loss_cancel_failed", order_id=o.get("id"), error=str(res)
+                    )
 
         order = await self.client.create_order(
             symbol,
@@ -575,9 +582,15 @@ class Exchange:
 
         # Cancel existing open TAKE_PROFIT_MARKET orders
         open_orders = await self.client.fetch_open_orders(symbol)
-        for o in open_orders:
-            if o["type"] == "TAKE_PROFIT_MARKET":
-                await self.client.cancel_order(o["id"], symbol)
+        orders_to_cancel = [o for o in open_orders if o["type"] == "TAKE_PROFIT_MARKET"]
+        if orders_to_cancel:
+            tasks = [self.client.cancel_order(o["id"], symbol) for o in orders_to_cancel]
+            results = await asyncio.gather(*tasks, return_exceptions=True)
+            for o, res in zip(orders_to_cancel, results):
+                if isinstance(res, Exception):
+                    logger.warning(
+                        "take_profit_cancel_failed", order_id=o.get("id"), error=str(res)
+                    )
 
         order = await self.client.create_order(
             symbol,
