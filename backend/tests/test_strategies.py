@@ -280,3 +280,29 @@ def test_trailing_stop():
     # Case 2: PnL not high enough (< 1%)
     new_stop = risk.calculate_trailing_stop(100.5, pos)
     assert new_stop is None
+
+
+def test_strategy_required_candles(mock_config):
+    """Test that strategies correctly report required candles."""
+    ema = EMAVolumeStrategy(mock_config)
+    expected_ema = max(mock_config.strategy.ema_slow, mock_config.strategy.volume_sma) + 2
+    assert ema.required_candles == expected_ema
+
+    adx = ADXTrendStrategy(mock_config)
+    assert adx.required_candles == mock_config.strategy.adx_period + 20
+
+    zscore = ZScoreStrategy(mock_config)
+    assert zscore.required_candles == mock_config.strategy.z_score_window + 1
+
+    bb = BollingerBandsStrategy(mock_config)
+    expected_bb = (
+        max(
+            mock_config.strategy.bollinger_bands.length,
+            mock_config.strategy.bollinger_bands.rsi_length,
+        )
+        + 1
+    )
+    assert bb.required_candles == expected_bb
+
+    breakout = BreakoutStrategy(mock_config)
+    assert breakout.required_candles == mock_config.strategy.breakout.period + 1
