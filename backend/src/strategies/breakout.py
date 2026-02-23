@@ -51,6 +51,10 @@ class BreakoutStrategy(BaseStrategy):
             "description": "Donchian Channel Breakout",
         }
 
+    @property
+    def required_candles(self) -> int:
+        return self.donchian_period + 1
+
     def update(self, ohlcv: pd.DataFrame, current_position: str | None = None):
         """Calculate Donchian Channels."""
         self.ohlcv = ohlcv

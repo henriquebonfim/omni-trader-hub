@@ -51,6 +51,10 @@ class ZScoreStrategy(BaseStrategy):
             "timeframe": "15m",
         }
 
+    @property
+    def required_candles(self) -> int:
+        return self.window + 1
+
     def update(self, ohlcv: pd.DataFrame, current_position: str | None = None):
         """Calculate Z-Score."""
         self.ohlcv = ohlcv

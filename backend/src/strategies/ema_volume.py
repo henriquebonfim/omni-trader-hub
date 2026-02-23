@@ -65,6 +65,10 @@ class EMAVolumeStrategy(BaseStrategy):
             "timeframe": "15m",  # Default recommended
         }
 
+    @property
+    def required_candles(self) -> int:
+        return self.ema_slow_period + 2
+
     def update(self, ohlcv: pd.DataFrame, current_position: str | None = None):
         """Calculate indicators and update state."""
         self.ohlcv = ohlcv

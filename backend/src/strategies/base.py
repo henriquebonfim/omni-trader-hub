@@ -70,6 +70,14 @@ class BaseStrategy(ABC):
         """
         pass
 
+    @property
+    def required_candles(self) -> int:
+        """
+        Minimum number of candles required by the strategy for calculation.
+        Defaults to 100.
+        """
+        return 100
+
     @abstractmethod
     def update(self, ohlcv: pd.DataFrame, current_position: str | None = None):
         """

@@ -13,6 +13,7 @@ trading:
   timeframe: 15m # 15-minute candles
   position_size_pct: 2.0 # 2% of wallet per trade
   cycle_seconds: 60 # Check every 60 seconds
+  ohlcv_limit: 100 # Default number of candles to fetch
 
 strategy:
   name: ema_volume  # Active strategy: ema_volume, adx_trend, z_score, bollinger_bands, breakout
