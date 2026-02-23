@@ -285,7 +285,8 @@ def test_trailing_stop():
 def test_strategy_required_candles(mock_config):
     """Test that strategies correctly report required candles."""
     ema = EMAVolumeStrategy(mock_config)
-    assert ema.required_candles == mock_config.strategy.ema_slow + 2
+    expected_ema = max(mock_config.strategy.ema_slow, mock_config.strategy.volume_sma) + 2
+    assert ema.required_candles == expected_ema
 
     adx = ADXTrendStrategy(mock_config)
     assert adx.required_candles == mock_config.strategy.adx_period + 20

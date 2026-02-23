@@ -70,7 +70,7 @@ class BollingerBandsStrategy(BaseStrategy):
         self.ohlcv = ohlcv
         self.current_position = current_position
 
-        if len(ohlcv) < max(self.bb_length, self.rsi_length) + 1:
+        if len(ohlcv) < self.required_candles:
             return
 
         self.current_price = ohlcv["close"].iloc[-1]

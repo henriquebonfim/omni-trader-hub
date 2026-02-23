@@ -61,7 +61,7 @@ class ADXTrendStrategy(BaseStrategy):
         self.ohlcv = ohlcv
         self.current_position = current_position
 
-        if len(ohlcv) < self.adx_period + 20:
+        if len(ohlcv) < self.required_candles:
             return
 
         try:

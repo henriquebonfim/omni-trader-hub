@@ -60,7 +60,7 @@ class BreakoutStrategy(BaseStrategy):
         self.ohlcv = ohlcv
         self.current_position = current_position
 
-        if len(ohlcv) < self.donchian_period + 1:
+        if len(ohlcv) < self.required_candles:
             return
 
         self.current_price = ohlcv["close"].iloc[-1]

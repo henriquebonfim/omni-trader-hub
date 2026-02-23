@@ -60,7 +60,7 @@ class ZScoreStrategy(BaseStrategy):
         self.ohlcv = ohlcv
         self.current_position = current_position
 
-        if len(ohlcv) < self.window + 1:
+        if len(ohlcv) < self.required_candles:
             return
 
         close = ohlcv["close"]

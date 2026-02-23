@@ -67,14 +67,14 @@ class EMAVolumeStrategy(BaseStrategy):
 
     @property
     def required_candles(self) -> int:
-        return self.ema_slow_period + 2
+        return max(self.ema_slow_period, self.volume_sma_period) + 2
 
     def update(self, ohlcv: pd.DataFrame, current_position: str | None = None):
         """Calculate indicators and update state."""
         self.ohlcv = ohlcv
         self.current_position = current_position
 
-        if len(ohlcv) < self.ema_slow_period + 2:
+        if len(ohlcv) < self.required_candles:
             return
 
         # Calculate indicators
