@@ -16,6 +16,7 @@ from datetime import datetime
 import structlog
 import uvicorn
 
+
 from src.strategies import Signal, get_strategy
 
 from .config import get_config, reload_config
@@ -85,6 +86,7 @@ class OmniTrader:
         self._running = False
         self._shutdown_event = asyncio.Event()
         self.ws_manager = None  # Set by main() after API creation
+
         self._reconcile_counter = 0
 
     async def reload_config(self):
@@ -134,6 +136,7 @@ class OmniTrader:
                 self.strategy.update_config(old_config)
             except Exception as rollback_error:
                 logger.critical("rollback_failed", error=str(rollback_error))
+
 
     async def start(self):
         """Initialize and start the trading bot."""
