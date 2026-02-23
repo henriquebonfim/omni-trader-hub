@@ -15,10 +15,8 @@ from datetime import datetime
 
 import structlog
 import uvicorn
-<<<<<<<< HEAD:src/main.py
-========
 
->>>>>>>> p1-production-ready-1775469422449842578:backend/src/main.py
+
 from src.strategies import Signal, get_strategy
 
 from .config import get_config, reload_config
@@ -88,8 +86,7 @@ class OmniTrader:
         self._running = False
         self._shutdown_event = asyncio.Event()
         self.ws_manager = None  # Set by main() after API creation
-<<<<<<<< HEAD:src/main.py
-========
+
         self._reconcile_counter = 0
 
     async def reload_config(self):
@@ -139,7 +136,7 @@ class OmniTrader:
                 self.strategy.update_config(old_config)
             except Exception as rollback_error:
                 logger.critical("rollback_failed", error=str(rollback_error))
->>>>>>>> p1-production-ready-1775469422449842578:backend/src/main.py
+
 
     async def start(self):
         """Initialize and start the trading bot."""
@@ -348,11 +345,7 @@ class OmniTrader:
                 price=current_price,
                 signal=result.signal.value,
                 reason=result.reason,
-<<<<<<<< HEAD:src/main.py
-                indicators=result.indicators,
-========
                 indicators=sanitized_indicators,
->>>>>>>> p1-production-ready-1775469422449842578:backend/src/main.py
             )
 
             # 5c. Broadcast to connected WebSocket clients
@@ -365,11 +358,7 @@ class OmniTrader:
                         "price": current_price,
                         "signal": result.signal.value,
                         "reason": result.reason,
-<<<<<<<< HEAD:src/main.py
-                        "indicators": result.indicators,
-========
                         "indicators": sanitized_indicators,
->>>>>>>> p1-production-ready-1775469422449842578:backend/src/main.py
                         "position": current_side,
                         "balance": balance_info["total"],
                         "daily_pnl": self.risk.daily_stats.realized_pnl,
