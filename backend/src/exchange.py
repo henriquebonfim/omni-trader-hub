@@ -4,6 +4,8 @@ Binance Futures exchange wrapper using CCXT.
 Handles all exchange interactions: data fetching, order placement, position management.
 """
 
+import asyncio
+
 import ccxt.async_support as ccxt
 import pandas as pd
 import structlog
@@ -517,9 +519,13 @@ class Exchange:
 
         # Cancel existing open STOP_MARKET orders to replace them
         open_orders = await self.client.fetch_open_orders(symbol)
-        for o in open_orders:
-            if o["type"] == "STOP_MARKET":
-                await self.client.cancel_order(o["id"], symbol)
+        cancel_tasks = [
+            self.client.cancel_order(o["id"], symbol)
+            for o in open_orders
+            if o["type"] == "STOP_MARKET"
+        ]
+        if cancel_tasks:
+            await asyncio.gather(*cancel_tasks)
 
         order = await self.client.create_order(
             symbol,
@@ -586,9 +592,13 @@ class Exchange:
 
         # Cancel existing open TAKE_PROFIT_MARKET orders
         open_orders = await self.client.fetch_open_orders(symbol)
-        for o in open_orders:
-            if o["type"] == "TAKE_PROFIT_MARKET":
-                await self.client.cancel_order(o["id"], symbol)
+        cancel_tasks = [
+            self.client.cancel_order(o["id"], symbol)
+            for o in open_orders
+            if o["type"] == "TAKE_PROFIT_MARKET"
+        ]
+        if cancel_tasks:
+            await asyncio.gather(*cancel_tasks)
 
         order = await self.client.create_order(
             symbol,
