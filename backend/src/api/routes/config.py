@@ -7,6 +7,8 @@ from pathlib import Path
 import yaml
 from fastapi import APIRouter, HTTPException, Request
 
+from src.api.schemas import ConfigUpdate
+
 router = APIRouter(tags=["config"])
 
 # Resolves to project root/config/config.yaml
@@ -39,7 +41,7 @@ async def get_config(request: Request):
 
 
 @router.put("/config")
-async def update_config(updates: dict, request: Request):
+async def update_config(updates: ConfigUpdate, request: Request):
     """
     Deep-merge `updates` into config.yaml and reload.
 
@@ -50,6 +52,9 @@ async def update_config(updates: dict, request: Request):
 
     if not _CONFIG_PATH.exists():
         raise HTTPException(status_code=500, detail="config.yaml not found on server")
+
+    # Validate and convert to dict, excluding unset fields
+    updates_dict = updates.model_dump(exclude_unset=True)
 
     with open(_CONFIG_PATH) as f:
         current = yaml.safe_load(f) or {}
@@ -63,7 +68,7 @@ async def update_config(updates: dict, request: Request):
                 base[k] = v
         return base
 
-    merged = _merge(current, updates)
+    merged = _merge(current, updates_dict)
 
     with open(_CONFIG_PATH, "w") as f:
         yaml.dump(merged, f, default_flow_style=False, allow_unicode=True)
