@@ -61,12 +61,16 @@ class BollingerBandsStrategy(BaseStrategy):
             "description": "Mean reversion using BB and RSI",
         }
 
+    @property
+    def required_candles(self) -> int:
+        return max(self.bb_length, self.rsi_length) + 1
+
     def update(self, ohlcv: pd.DataFrame, current_position: str | None = None):
         """Calculate BB and RSI."""
         self.ohlcv = ohlcv
         self.current_position = current_position
 
-        if len(ohlcv) < max(self.bb_length, self.rsi_length) + 1:
+        if len(ohlcv) < self.required_candles:
             return
 
         self.current_price = ohlcv["close"].iloc[-1]

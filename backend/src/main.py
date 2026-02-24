@@ -16,7 +16,6 @@ from datetime import datetime
 import structlog
 import uvicorn
 
-
 from src.strategies import Signal, get_strategy
 
 from .config import get_config, reload_config
@@ -111,9 +110,7 @@ class OmniTrader:
                 )
                 strategy_class = get_strategy(new_strategy_name)
                 self.strategy = strategy_class(self.config)
-                logger.info(
-                    "strategy_switched", metadata=self.strategy.metadata
-                )
+                logger.info("strategy_switched", metadata=self.strategy.metadata)
             else:
                 self.strategy.update_config(self.config)
 
@@ -136,7 +133,6 @@ class OmniTrader:
                 self.strategy.update_config(old_config)
             except Exception as rollback_error:
                 logger.critical("rollback_failed", error=str(rollback_error))
-
 
     async def start(self):
         """Initialize and start the trading bot."""
@@ -243,8 +239,8 @@ class OmniTrader:
                 notional=position.notional,
                 stop_loss=None,  # Unknown
                 take_profit=None,  # Unknown
-                expected_price=None, # Unknown
-                slippage=None, # Unknown
+                expected_price=None,  # Unknown
+                slippage=None,  # Unknown
                 reason="reconciliation_detected_open",
             )
 
@@ -313,7 +309,11 @@ class OmniTrader:
             self.risk.initialize_daily_stats(balance_info["total"])
 
             # 4. Fetch market data
-            ohlcv = await self.exchange.fetch_ohlcv(symbol, limit=100)
+            limit = max(
+                getattr(self.config.trading, "ohlcv_limit", 100),
+                self.strategy.required_candles,
+            )
+            ohlcv = await self.exchange.fetch_ohlcv(symbol, limit=limit)
             current_price = float(ohlcv["close"].iloc[-1])
 
             # 5. Analyze with strategy

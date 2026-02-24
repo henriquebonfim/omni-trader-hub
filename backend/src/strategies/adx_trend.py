@@ -52,12 +52,16 @@ class ADXTrendStrategy(BaseStrategy):
             "timeframe": "1h",
         }
 
+    @property
+    def required_candles(self) -> int:
+        return self.adx_period + 20
+
     def update(self, ohlcv: pd.DataFrame, current_position: str | None = None):
         """Calculate ADX/DMI indicators."""
         self.ohlcv = ohlcv
         self.current_position = current_position
 
-        if len(ohlcv) < self.adx_period + 20:
+        if len(ohlcv) < self.required_candles:
             return
 
         try:

@@ -5,6 +5,8 @@ Handles all exchange interactions: data fetching, order placement, position mana
 """
 
 import asyncio
+import os
+import time
 
 import ccxt.async_support as ccxt
 import pandas as pd
@@ -76,8 +78,6 @@ class Exchange:
 
         # Only add API keys if not in paper mode
         if not self.paper_mode:
-            import os
-
             exchange_config["apiKey"] = os.getenv("BINANCE_API_KEY")
             exchange_config["secret"] = os.getenv("BINANCE_SECRET")
 
@@ -98,8 +98,6 @@ class Exchange:
 
         # If switching from Paper -> Live, we need to load API keys
         if old_paper_mode and not self.paper_mode:
-            import os
-
             api_key = os.getenv("BINANCE_API_KEY")
             secret = os.getenv("BINANCE_SECRET")
 
@@ -319,8 +317,6 @@ class Exchange:
                 "liquidationPrice": price * (1 - 1 / leverage * 0.9),
             }
 
-            import time
-
             order = {
                 "id": f"paper_{int(time.time() * 1000)}",
                 "symbol": symbol,
@@ -375,8 +371,6 @@ class Exchange:
                 "liquidationPrice": price * (1 + 1 / leverage * 0.9),
             }
 
-            import time
-
             order = {
                 "id": f"paper_{int(time.time() * 1000)}",
                 "symbol": symbol,
@@ -425,8 +419,6 @@ class Exchange:
                 pnl = (entry_price - exit_price) / entry_price * position.notional
 
             self._paper_balance += pnl
-
-            import time
 
             order = {
                 "id": f"paper_{int(time.time() * 1000)}",
@@ -503,8 +495,6 @@ class Exchange:
                 o for o in self._paper_orders if o["type"] != "stop_market"
             ]
 
-            import time
-
             order = {
                 "id": f"paper_sl_{int(time.time() * 1000)}",
                 "symbol": symbol,
@@ -573,8 +563,6 @@ class Exchange:
             self._paper_orders = [
                 o for o in self._paper_orders if o["type"] != "take_profit_market"
             ]
-
-            import time
 
             order = {
                 "id": f"paper_tp_{int(time.time() * 1000)}",
