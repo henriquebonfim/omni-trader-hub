@@ -5,13 +5,17 @@ FastAPI application factory. Call `create_api(bot)` to get a configured app
 that can be run alongside the trading loop via asyncio.gather().
 """
 
+import os
 from datetime import datetime
 
+import structlog
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from .routes import bot, config, notifications, status, strategies, trades
 from .websocket import router as ws_router
+
+logger = structlog.get_logger()
 
 
 def create_api(bot_instance) -> FastAPI:
@@ -47,6 +51,13 @@ def create_api(bot_instance) -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
+
+    # Check for API key and log warning if missing
+    if not os.getenv("OMNITRADER_API_KEY"):
+        logger.warning(
+            "api_auth_disabled",
+            message="OMNITRADER_API_KEY not set in environment. API endpoints are UNPROTECTED.",
+        )
 
     # Mount routers
     app.include_router(status.router, prefix="/api")

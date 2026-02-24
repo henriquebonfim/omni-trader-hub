@@ -9,9 +9,14 @@ class ApiClient {
 
   private async request(endpoint: string, options: RequestInit = {}) {
     const url = `${this.baseUrl}${endpoint}`
-    const headers = {
+    const apiKey = localStorage.getItem('omnitrader_api_key')
+    const headers: Record<string, string> = {
       'Content-Type': 'application/json',
-      ...options.headers,
+      ...((options.headers as Record<string, string>) || {}),
+    }
+
+    if (apiKey) {
+      headers['Authorization'] = `Bearer ${apiKey}`
     }
 
     const response = await fetch(url, { ...options, headers })
