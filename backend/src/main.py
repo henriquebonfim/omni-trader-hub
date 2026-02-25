@@ -89,6 +89,7 @@ class OmniTrader:
         self._reconcile_counter = 0
         # Initialize to 60 so it runs immediately on first cycle
         self._weekly_check_counter = 60
+        self._funding_check_counter = 0
 
     async def reload_config(self):
         """Reload configuration and update all components."""
@@ -364,6 +365,12 @@ class OmniTrader:
         # Send stop notification
         await self.notifier.bot_stopped(reason)
 
+        # Backup database
+        try:
+            await self.database.backup_db()
+        except Exception as e:
+            logger.error("backup_failed_on_stop", error=str(e))
+
         # Close connections
         await self.exchange.close()
         await self.database.close()
@@ -418,6 +425,38 @@ class OmniTrader:
             if self._reconcile_counter >= 5:
                 await self._reconcile_positions(symbol, position)
                 self._reconcile_counter = 0
+
+            # 2c. Check Funding Rate (Throttled: every 60 cycles ~1 hour)
+            self._funding_check_counter += 1
+            if self._funding_check_counter >= 60:
+                self._funding_check_counter = 0
+                funding_rate = await self.exchange.fetch_funding_rate(symbol)
+
+                # Alert if rate is high (> 0.01% * 3 = 0.03% or whatever "normal" is)
+                # Normal is usually 0.01% (0.0001) per 8h. High is > 0.05%?
+                # Task says > 3x normal. Normal = 0.01%. So > 0.03% (0.0003).
+                if abs(funding_rate) > 0.0003:
+                    logger.warning("high_funding_rate", rate=funding_rate)
+                    await self.notifier.send(f"⚠️ **High Funding Rate**: {funding_rate*100:.4f}% for {symbol}")
+
+                # Log payment estimation if in position
+                if position.is_open:
+                    payment = position.notional * funding_rate
+                    # If long and positive rate, I pay. If short and positive, I receive.
+                    # Payment direction: Positive rate -> Longs pay Shorts.
+                    # So if Long, cost = rate * notional. If Short, cost = -rate * notional (income).
+                    # We store "payment" as cost (positive = cost, negative = income).
+                    if position.side == "long":
+                        cost = payment
+                    else:
+                        cost = -payment
+
+                    await self.database.log_funding_payment(
+                        symbol=symbol,
+                        rate=funding_rate,
+                        payment=cost,
+                        position_size=position.size
+                    )
 
             # 3. Update daily stats with current balance
             self.risk.initialize_daily_stats(total_balance)

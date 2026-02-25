@@ -9,6 +9,12 @@ from fastapi import APIRouter, Request
 router = APIRouter(tags=["status"])
 
 
+@router.get("/health")
+async def health_check():
+    """Health check endpoint for watchdogs."""
+    return {"status": "ok", "timestamp": datetime.utcnow().isoformat()}
+
+
 @router.get("/status")
 async def get_status(request: Request):
     """Bot status — running state, uptime, symbol, paper mode."""

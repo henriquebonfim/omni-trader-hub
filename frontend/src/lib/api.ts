@@ -107,6 +107,10 @@ export interface Trade {
   reason: string | null
   stop_loss: number | null
   take_profit: number | null
+  expected_price: number | null
+  slippage: number | null
+  fee: number | null
+  fee_currency: string | null
 }
 
 export interface EquitySnapshot {

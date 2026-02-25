@@ -728,6 +728,52 @@ class Exchange:
 
         return await self.client.fetch_my_trades(symbol, since=since, limit=limit)
 
+    async def fetch_funding_rate(self, symbol: str | None = None) -> float:
+        """
+        Fetch current funding rate for symbol.
+
+        Returns:
+            Funding rate (e.g. 0.0001 for 0.01%)
+        """
+        symbol = symbol or self.config.trading.symbol
+
+        if self.paper_mode and not self._markets_loaded:
+            return 0.0001  # 0.01% dummy rate
+
+        try:
+            funding_info = await self.client.fetch_funding_rate(symbol)
+            return float(funding_info.get("fundingRate", 0.0))
+        except Exception as e:
+            logger.warning("fetch_funding_rate_failed", error=str(e))
+            return 0.0
+
+    async def get_rate_limit_usage(self) -> dict:
+        """
+        Get current API rate limit usage.
+
+        Returns:
+            Dict with used weight and reset time if available.
+        """
+        if self.paper_mode:
+            return {"used": 0, "remaining": 2400}
+
+        try:
+            # CCXT stores last response headers in client.last_response_headers
+            # Binance headers: x-mbx-used-weight, x-mbx-used-weight-1m
+            if hasattr(self.client, "last_response_headers") and self.client.last_response_headers:
+                headers = self.client.last_response_headers
+                used_weight_1m = headers.get("x-mbx-used-weight-1m")
+                used_weight = headers.get("x-mbx-used-weight")
+
+                return {
+                    "used_weight_1m": int(used_weight_1m) if used_weight_1m else 0,
+                    "used_weight": int(used_weight) if used_weight else 0
+                }
+        except Exception:
+            pass
+
+        return {}
+
     async def get_order_fill_details(
         self, order_id: str, symbol: str | None = None, retries: int = 5, delay: float = 1.0
     ) -> dict:

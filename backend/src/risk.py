@@ -77,6 +77,7 @@ class RiskManager:
         self.max_weekly_loss_pct = getattr(config.risk, "max_weekly_loss_pct", 10.0)
         self.max_positions = config.risk.max_positions
         self.leverage = config.exchange.leverage
+        self.auto_deleverage_threshold = getattr(config.risk, "auto_deleverage_threshold_pct", 10.0)
 
         self.liquidation_buffer_pct = getattr(config.risk, "liquidation_buffer_pct", 0.5)
 
@@ -151,11 +152,26 @@ class RiskManager:
         Returns:
             Position size in base currency (e.g., BTC)
         """
+        # Determine effective leverage (Auto-Deleverage)
+        effective_leverage = self.leverage
+
+        # Check for significant drawdown (using daily stats as proxy for now,
+        # ideally should track peak equity for total drawdown)
+        if self.daily_stats.pnl_pct <= -self.auto_deleverage_threshold:
+            effective_leverage = 1
+            logger.warning(
+                "auto_deleverage_active",
+                drawdown_pct=self.daily_stats.pnl_pct,
+                threshold=self.auto_deleverage_threshold,
+                original_leverage=self.leverage,
+                new_leverage=1
+            )
+
         # Risk amount in USDT
         risk_amount = balance * (self.position_size_pct / 100)
 
         # With leverage, we can open a larger position
-        notional_value = risk_amount * self.leverage
+        notional_value = risk_amount * effective_leverage
 
         # Convert to base currency
         position_size = notional_value / entry_price
@@ -175,7 +191,7 @@ class RiskManager:
             "position_size_calculated",
             balance=balance,
             risk_pct=self.position_size_pct,
-            leverage=self.leverage,
+            leverage=effective_leverage,
             notional=notional_value,
             size=position_size,
             consecutive_losses=self.consecutive_losses,
