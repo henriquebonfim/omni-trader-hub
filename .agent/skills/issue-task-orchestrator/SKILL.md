@@ -9,7 +9,7 @@ trigger: when user references reviewing issues, converting issues to tasks, or p
 1. Fetch all open issues.
 2. Build matrix:
 
-.agent/tmp/issue-matrix.json
+.agent/tmp/issue-task-orchestrator-matrix.json
 
 Schema:
 

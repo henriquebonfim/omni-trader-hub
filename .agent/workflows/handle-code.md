@@ -5,7 +5,7 @@ description: /handle-code <short_description>
 # Execution Sequence
 
 1. Load Skill:
-   software-engineer
+   software-engineer-worker
 
 2. Execute:
 

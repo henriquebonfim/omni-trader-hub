@@ -1,58 +1,140 @@
 ---
 trigger: model_decision
-description: review of a Pull Request with code modifications.
+description: This rule governs structured PR implementation workflows with strict scope control, minimal artifacts, runtime validation, and deterministic comment handling.
 ---
 
-## Branch Discipline
+# Branch Discipline (With Runtime Validation)
 
-- Never force push to shared or protected branches.
-- Never rebase a branch under active review unless explicitly approved.
-- Always work on the PR head branch (`gh pr checkout <number>`).
-- Never modify files unrelated to the review comment scope.
+Always begin with:
+
+gh pr checkout <PR_NUMBER>
+
+Then validate:
+
+- Current branch equals PR head branch.
+- Branch is NOT:
+  - main
+  - master
+  - production
+
+Strict constraints:
+
+- Never force push.
+- Never rebase under active review (unless explicitly approved).
+- Never create new branch.
+- Never amend historical commits.
+- Never modify unrelated files.
 - No drive-by refactors.
-- Keep PR scope aligned with original intent.
+- Keep scope aligned with original PR intent.
 
 ---
 
-## Temporary Artifacts Control (NEW)
+# Runtime & Project Validation (MANDATORY)
 
-The PR operator may generate temporary analysis artifacts.
+After checkout and before ANY code changes:
 
-Rules:
+1. Install dependencies (non-persistent).
+2. Build project.
+3. Run lint (if available).
+4. Run type-check (if available).
+5. Run full test suite.
+6. Attempt application start (if applicable).
 
-- All temporary files must live under:
+Store only summarized status (no logs).
 
-  .agent/tmp/
+If baseline is already failing:
+→ Mark related comments as ❌ UNSOLVED
+→ Report blocker
+→ Do NOT introduce fixes outside scope
 
-- No temp files allowed in root or source directories.
-- Temp files must never be committed.
-- `.agent/tmp/` must be listed in `.gitignore`.
-- Temp artifacts must be deleted after workflow completion.
+After each commit:
 
-Allowed temp files:
+- Re-run build.
+- Re-run tests.
+- Confirm zero regressions.
+- Confirm no new lint/type errors.
 
-- review-matrix.json
+---
+
+# Temporary Artifacts Control (Token Optimized)
+
+All temporary files must live under:
+
+.agent/tmp/
+
+Allowed files ONLY:
+
+- pr-code-matrix.json
 - task-plan.json
-- pr-context.json
+- runtime-summary.json
 
 No additional ad-hoc files allowed.
 
+Minimal schemas:
+
+pr-code-matrix.json
+
+[
+  {
+    comment_id,
+    path,
+    line,
+    classification,
+    status,
+    commit_sha
+  }
+]
+
+task-plan.json
+
+[
+  {
+    task_id,
+    related_comment_ids[]
+  }
+]
+
+runtime-summary.json
+
+{
+  build: "PASS | FAIL",
+  lint: "PASS | FAIL | N/A",
+  typecheck: "PASS | FAIL | N/A",
+  tests: "PASS | FAIL | N/A",
+  runtime: "PASS | FAIL | N/A"
+}
+
+Rules:
+
+- Never store full diffs.
+- Never store full logs.
+- Never store full comment bodies.
+- Only store structured metadata.
+- Skip clean entries.
+- Never commit temp files.
+- `.agent/tmp/` must be in `.gitignore`.
+- Delete `.agent/tmp/*` after workflow completion.
+
 ---
 
-## Commit Standards
+# Commit Standards (Deterministic + Minimal)
 
-- Follow Conventional Commits:
-  - fix:
-  - feat:
-  - refactor:
-  - test:
-  - docs:
-  - perf:
-  - chore:
+Follow Conventional Commits:
+
+- fix:
+- feat:
+- refactor:
+- test:
+- docs:
+- perf:
+- chore:
+
+Rules:
 
 - One logical change per commit.
-- Each commit must reference the PR comment URL in the body.
 - Never bundle unrelated fixes.
+- Each commit must reference the PR comment URL in body.
+- Never squash without approval.
 
 Example:
 
@@ -61,100 +143,106 @@ fix(auth): validate null token
 Addresses PR comment:
 https://github.com/org/repo/pull/123#discussion_r456
 
-- Do not squash without approval.
+Commit must be minimal and scoped strictly to affected files.
 
 ---
 
-## Mandatory Comment Reply Pattern (NEW)
+# Mandatory Comment Reply Pattern (STRICT)
 
-Every PR comment must receive an individual reply using one of the following status headers:
+Every PR comment must receive exactly ONE reply.
+
+Never bundle replies.
+Never close thread silently.
+
+---
 
 ### ✅ SOLVED
-Used when code change implemented.
-
-Format:
 
 Status: ✅ SOLVED
 Commit: <SHA>
 
 Summary:
 - What changed
-- Why it fixes issue
-- Tests added (if any)
-- **Self-Correction Check:** Confirmed that these changes follow `software-engineering-standards.md`.
+- Why it resolves issue
+- Tests added or updated
+- Self-Correction Check passed
 
 ---
 
 ### ❌ UNSOLVED
-Used when change cannot be safely implemented.
-
-Format:
 
 Status: ❌ UNSOLVED
 
 Reason:
 - Clear technical explanation
+- Blocker details
 - What is required to proceed
 
 ---
 
-## Mandatory Self-Correction (NEW)
-
-Before committing any code or replying to a comment:
-
-1.  **Analyze Standards:** Re-read `software-engineering-standards.md`.
-2.  **Verify Implementation:** Does the code use strict typing? Is it modular? Does it have tests?
-3.  **Validate Integrity:** Run `pytest` or relevant test suites to ensure zero regressions.
-4.  **Fix Deviations:** If the code fails any check, fix it BEFORE proceeding.
-
----
-
 ### 🆕 NEW ISSUE
-Used when request exceeds PR scope.
-
-Format:
 
 Status: 🆕 NEW ISSUE
 Issue: #<number>
 
 Reason:
-- Why it exceeds scope
-- Why separation is required
+- Why request exceeds scope
+- Why separation required
 
 ---
 
 ### ⏭ SKIPPED
-Used when feedback is invalid, outdated, or already addressed.
-
-Format:
 
 Status: ⏭ SKIPPED
 
 Reason:
-- Explanation
+- Invalid / outdated / already resolved
 
 ---
 
-- Never close a thread without one of these statuses.
-- Never combine multiple comments into one reply.
+Mandatory:
+
 - One reply per comment thread.
+- No reply before matrix status finalized.
+- Status header must match exactly.
+- Commit SHA required for SOLVED.
 
 ---
 
-## Scope Control
+# Mandatory Self-Correction Loop
 
-Create a new Issue if:
+Before committing or replying:
+
+1. Re-read `software-engineering-standards.md`.
+2. Validate:
+   - Strict typing
+   - Modularity
+   - Test presence
+   - Boundary compliance
+3. Run build + tests.
+4. Fix deviations BEFORE proceeding.
+
+If cannot stabilize:
+→ Mark affected comment ❌ UNSOLVED.
+
+---
+
+# Scope Control
+
+Create a NEW ISSUE when:
 
 - Architectural redesign required.
 - Cross-module refactor required.
 - Product clarification required.
 - Significant scope expansion detected.
 
-Never expand PR scope silently.
+Never expand scope silently.
+
+Never introduce opportunistic improvements.
 
 ---
 
-## CLI Enforcement
+# CLI Enforcement
 
 All GitHub operations must use:
 
@@ -167,15 +255,33 @@ All GitHub operations must use:
 - gh api
 
 No UI simulation.
+No manual workflow deviations.
 
 ---
 
-## Final Validation Requirements
+# Final Validation Requirements
 
 Before completion:
 
-- All review threads have a status reply.
+- Confirm PR branch active.
+- Confirm no protected branch commits.
+- Confirm build passing.
+- Confirm tests passing.
+- Confirm no regressions.
+- Confirm all comments have status reply.
+- Confirm no unrelated file changes.
+- Confirm no force push.
+- Confirm minimal commit set.
+- Confirm `.agent/tmp/` cleaned.
+- Verify via `git status`.
+
+---
+
+# Completion Criteria
+
+- All PR comments resolved with structured status.
+- Runtime validated.
 - CI passing.
-- No unrelated file changes.
-- No temp files committed.
-- `.agent/tmp/` cleaned.
+- No scope creep.
+- No temp artifacts committed.
+- Deterministic, minimal, reproducible execution.

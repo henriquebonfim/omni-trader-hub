@@ -1,5 +1,5 @@
 ---
-name: software-engineer
+name: software-engineer-worker
 description: Structured engineering execution for implementing features, refactors, and bug fixes with architectural discipline
 trigger: when user requests implementation, refactor, feature development, or bug fixing
 ---
