@@ -1,7 +1,7 @@
 import json
 from pathlib import Path
 
-BASE_DIR = Path(".agent/skills/pr-code-orchestrator/tmp")
+BASE_DIR = Path(".agent/tmp")
 
 def main():
     with open(BASE_DIR / "pr-comments.json") as f:
