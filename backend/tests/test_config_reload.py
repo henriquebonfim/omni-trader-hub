@@ -12,7 +12,10 @@ async def test_reload_config_updates_components(monkeypatch):
 
     # Mock reload_config to return a new config object
     new_config = MagicMock()
-    new_config.strategy.name = "ema_volume" # Same name to avoid class switch
+    # We need to ensure this matches the currently loaded config to avoid strategy switch
+    # Or we force the current config to match this one
+    bot.config.strategy.name = "ema_volume"
+    new_config.strategy.name = "ema_volume"
 
     monkeypatch.setattr("src.main.reload_config", lambda: new_config)
 
