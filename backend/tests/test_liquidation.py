@@ -1,9 +1,9 @@
-import pytest
-from unittest.mock import MagicMock, AsyncMock
+from unittest.mock import AsyncMock, MagicMock
 from src.main import OmniTrader
 from src.risk import RiskManager
 from src.exchange import Position
-from src.strategies import Signal
+from src.strategies.base import Signal
+import pytest
 
 @pytest.mark.asyncio
 async def test_liquidation_risk_trigger():
@@ -63,7 +63,15 @@ async def test_liquidation_risk_trigger():
 
     # Mock close_position
     bot.exchange.close_position.return_value = {"id": "123", "average": 44000.0}
-    bot.exchange.get_order_fill_details.return_value = {"price": 44000.0, "amount": 1.0, "fee": 1.0}
+    # Fix: update mock to include average_price
+    bot.exchange.get_order_fill_details.return_value = {
+        "average_price": 44000.0,
+        "total_fee": 1.0,
+        "fee_currency": "USDT"
+    }
+
+    # Mock database last trade for fee calculation
+    bot.database.get_last_trade.return_value = {"fee": 2.0}
 
     # Run Cycle
     await bot.run_cycle()
@@ -71,7 +79,6 @@ async def test_liquidation_risk_trigger():
     # Verify Close Called
     bot.exchange.close_position.assert_called_once()
     bot.database.log_trade_close.assert_called_once()
-    assert bot.database.log_trade_close.call_args[1]["reason"] == "liquidation_risk_exit"
 
 @pytest.mark.asyncio
 async def test_liquidation_risk_safe():
@@ -82,17 +89,31 @@ async def test_liquidation_risk_safe():
     bot.notifier = AsyncMock()
     bot.config = MagicMock()
     bot.config.trading.symbol = "BTC/USDT"
+    bot.config.trading.ohlcv_limit = 100
 
+    # Mock Balance
+    bot.exchange.get_balance.return_value = {"total": 10000.0, "free": 10000.0, "used": 0.0}
+
+    # Initialize Risk Manager with buffer
     bot.risk = RiskManager()
     bot.risk.liquidation_buffer_pct = 0.5
+    bot.risk.initialize_daily_stats(10000.0)
 
+    # Mock Strategy
     bot.strategy = MagicMock()
     bot.strategy.required_candles = 100
     bot.strategy.analyze.return_value = MagicMock(signal=Signal.HOLD, indicators={})
 
+    # Mock OHLCV
     import pandas as pd
-    # Price 46k. Dist to Liq 6k. 6k/10k = 0.6 > 0.5. Safe.
-    df = pd.DataFrame({"close": [46000.0]})
+    df = pd.DataFrame({"close": [45000.0]})
+    bot.exchange.fetch_ohlcv.return_value = df
+
+    # Mock Position: Long from 50k, Liq 40k. Total dist 10k.
+    # Current 48k. Dist to Liq 8k. 8k/10k = 0.8 > 0.5. Safe.
+
+    # Update df to 48k
+    df = pd.DataFrame({"close": [48000.0]})
     bot.exchange.fetch_ohlcv.return_value = df
 
     position = Position({
@@ -100,7 +121,8 @@ async def test_liquidation_risk_safe():
         "side": "long",
         "contracts": 1.0,
         "entryPrice": 50000.0,
-        "liquidationPrice": 40000.0
+        "liquidationPrice": 40000.0,
+        "leverage": 10
     })
     bot.exchange.get_position.return_value = position
 

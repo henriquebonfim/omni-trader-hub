@@ -13,6 +13,7 @@ from dataclasses import dataclass, field
 from datetime import date
 from typing import Optional
 
+import pandas as pd
 import structlog
 
 from .config import get_config
@@ -73,6 +74,7 @@ class RiskManager:
         self.stop_loss_pct = config.risk.stop_loss_pct
         self.take_profit_pct = config.risk.take_profit_pct
         self.max_daily_loss_pct = config.risk.max_daily_loss_pct
+        self.max_weekly_loss_pct = getattr(config.risk, "max_weekly_loss_pct", 10.0)
         self.max_positions = config.risk.max_positions
         self.leverage = config.exchange.leverage
 
@@ -90,6 +92,7 @@ class RiskManager:
         self.daily_stats = DailyStats()
         self.consecutive_losses = 0  # Track consecutive losses for drawdown sizing
         self._circuit_breaker_active = False
+        self._weekly_circuit_breaker_active = False
 
     def update_config(self, config):
         """Update risk parameters from new configuration."""
@@ -97,6 +100,7 @@ class RiskManager:
         self.stop_loss_pct = config.risk.stop_loss_pct
         self.take_profit_pct = config.risk.take_profit_pct
         self.max_daily_loss_pct = config.risk.max_daily_loss_pct
+        self.max_weekly_loss_pct = getattr(config.risk, "max_weekly_loss_pct", 10.0)
         self.max_positions = config.risk.max_positions
         self.leverage = config.exchange.leverage
 
@@ -348,12 +352,104 @@ class RiskManager:
 
     def check_circuit_breaker(self) -> bool:
         """
-        Check if trading should be paused.
+        Check if trading should be paused (daily or weekly).
 
         Returns:
             True if circuit breaker is active
         """
-        return self._circuit_breaker_active
+        return self._circuit_breaker_active or self._weekly_circuit_breaker_active
+
+    def check_weekly_circuit_breaker(self, weekly_pnl: float, current_balance: float) -> bool:
+        """
+        Check if weekly loss limit is exceeded.
+
+        Args:
+            weekly_pnl: Accumulated PnL for the rolling week
+            current_balance: Current account balance
+
+        Returns:
+            True if weekly circuit breaker is triggered
+        """
+        if self._weekly_circuit_breaker_active:
+            return True
+
+        # Approximate start of week balance
+        # start_balance + weekly_pnl = current_balance => start_balance = current_balance - weekly_pnl
+        # This approximation assumes no deposits/withdrawals
+        start_week_balance = current_balance - weekly_pnl
+
+        if start_week_balance <= 0:
+            return False
+
+        weekly_pnl_pct = (weekly_pnl / start_week_balance) * 100
+
+        if weekly_pnl_pct <= -self.max_weekly_loss_pct:
+            self._weekly_circuit_breaker_active = True
+            logger.warning(
+                "weekly_circuit_breaker_triggered",
+                weekly_pnl=weekly_pnl,
+                weekly_pnl_pct=f"{weekly_pnl_pct:.2f}%",
+                limit=f"-{self.max_weekly_loss_pct}%"
+            )
+            return True
+
+        return False
+
+    def check_black_swan(self, ohlcv: pd.DataFrame) -> bool:
+        """
+        Detect extreme market moves (Black Swan events).
+        Logic: >10% move in the last hour (High - Low range).
+
+        Args:
+            ohlcv: DataFrame containing OHLCV data.
+
+        Returns:
+            True if black swan event detected.
+        """
+        if ohlcv is None or ohlcv.empty:
+            return False
+
+        # Consider last 60 candles (assuming 1m timeframe)
+        # Or check config timeframe? If timeframe is 1h, checking last 1 candle is enough.
+        # But if timeframe is 1m, checking last 60 is safer.
+        # Let's assume we want to check volatility over last 1 hour regardless of timeframe.
+        # If timeframe > 1h, checking last candle covers > 1h.
+
+        # Calculate volatility
+        # We'll use the last 60 rows as a proxy for "recent" volatility if we don't know the timeframe explicitly here.
+        # Better: use time index.
+
+        try:
+            last_timestamp = ohlcv.index[-1]
+            one_hour_ago = last_timestamp - pd.Timedelta(hours=1)
+            recent_data = ohlcv[ohlcv.index >= one_hour_ago]
+
+            if recent_data.empty:
+                return False
+
+            high_max = recent_data["high"].max()
+            low_min = recent_data["low"].min()
+
+            if low_min <= 0:
+                return False
+
+            volatility_pct = (high_max - low_min) / low_min
+
+            # Threshold: 10% move
+            if volatility_pct > 0.10:
+                logger.critical(
+                    "black_swan_detected",
+                    volatility_pct=f"{volatility_pct:.2%}",
+                    high=high_max,
+                    low=low_min,
+                    duration="1h"
+                )
+                return True
+
+        except Exception as e:
+            logger.error("black_swan_check_failed", error=str(e))
+
+        return False
 
     def check_liquidation_risk(self, position, current_price: float) -> bool:
         """
@@ -394,7 +490,9 @@ class RiskManager:
     def get_status(self) -> dict:
         """Get current risk status summary."""
         return {
-            "circuit_breaker_active": self._circuit_breaker_active,
+            "circuit_breaker_active": self._circuit_breaker_active or self._weekly_circuit_breaker_active,
+            "daily_breaker": self._circuit_breaker_active,
+            "weekly_breaker": self._weekly_circuit_breaker_active,
             "daily_pnl": self.daily_stats.realized_pnl,
             "daily_pnl_pct": self.daily_stats.pnl_pct,
             "trades_today": self.daily_stats.trades_count,

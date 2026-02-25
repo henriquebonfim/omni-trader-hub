@@ -1,4 +1,5 @@
 from unittest.mock import AsyncMock, MagicMock
+from datetime import datetime, timezone
 
 import pytest
 
@@ -16,18 +17,23 @@ async def test_reconcile_positions_db_open_exchange_flat():
     bot.config.risk.reconciliation_lookback_trades = 50
 
     # DB says OPEN
+    ts_str = "2023-01-01T12:00:00"
     bot.database.get_last_trade.return_value = {
         "id": 1,
         "action": "OPEN",
         "side": "LONG",
         "price": "50000.0",
         "size": "0.1",
-        "timestamp": "2023-01-01T12:00:00"
+        "timestamp": ts_str
     }
 
     # Exchange says FLAT
     position = MagicMock()
     position.is_open = False
+
+    # Calculate expected 'since' timestamp
+    dt = datetime.fromisoformat(ts_str).replace(tzinfo=timezone.utc)
+    expected_since = int(dt.timestamp() * 1000)
 
     # Mock fetch_my_trades to find the closing trade
     # DB side LONG -> close side SELL
@@ -38,7 +44,7 @@ async def test_reconcile_positions_db_open_exchange_flat():
             "side": "sell",
             "price": 51500.0,
             "amount": 0.1,
-            "timestamp": 1672574460000 # 12:01:00
+            "timestamp": expected_since + 60000 # 1 minute later
         }
     ]
 
@@ -49,8 +55,9 @@ async def test_reconcile_positions_db_open_exchange_flat():
     kwargs = bot.database.log_trade_close.call_args[1]
     assert kwargs['reason'] == "reconciliation_detected_close"
     assert kwargs['price'] == 51500.0
-    # Also verify limit was passed
-    bot.exchange.fetch_my_trades.assert_called_with("BTC/USDT", limit=50)
+
+    # Verify call with correct 'since' parameter
+    bot.exchange.fetch_my_trades.assert_called_with("BTC/USDT", since=expected_since, limit=50)
 
 @pytest.mark.asyncio
 async def test_reconcile_positions_db_close_exchange_open():

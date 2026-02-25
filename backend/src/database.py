@@ -297,6 +297,23 @@ class Database:
         row = await cursor.fetchone()
         return dict(row) if row else None
 
+    async def get_weekly_pnl(self, start_date: str) -> float:
+        """
+        Get total PnL since start_date (inclusive).
+
+        Args:
+            start_date: Date string (YYYY-MM-DD)
+
+        Returns:
+            Total PnL
+        """
+        cursor = await self._connection.execute(
+            "SELECT SUM(pnl) as total_pnl FROM daily_summary WHERE date >= ?",
+            (start_date,),
+        )
+        row = await cursor.fetchone()
+        return row["total_pnl"] if row and row["total_pnl"] is not None else 0.0
+
     async def log_equity_snapshot(self, balance: float) -> None:
         """Log current balance as an equity snapshot."""
         await self._connection.execute(
