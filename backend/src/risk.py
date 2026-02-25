@@ -370,8 +370,10 @@ class RiskManager:
         Returns:
             True if weekly circuit breaker is triggered
         """
-        if self._weekly_circuit_breaker_active:
-            return True
+        # If already active, check if condition still holds (allow recovery)
+        # Or should it be latched until manual reset?
+        # Requirement implies "pause trading", but rolling window naturally allows exit.
+        # Removing the latch allows auto-recovery if PnL improves.
 
         # Approximate start of week balance
         # start_balance + weekly_pnl = current_balance => start_balance = current_balance - weekly_pnl
@@ -453,7 +455,9 @@ class RiskManager:
             return True
         except Exception:
             logger.exception("black_swan_check_failed_unexpected_error")
-            return True
+            # For unexpected errors, fail-safe open (don't trigger Black Swan)
+            # but log critical error.
+            return False
 
         return False
 

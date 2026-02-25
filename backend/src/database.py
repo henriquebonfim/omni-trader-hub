@@ -308,10 +308,10 @@ class Database:
         Returns:
             Total PnL
         """
-        # start_date is YYYY-MM-DD, so we compare it against the ISO timestamp in trades table.
-        # ISO format: YYYY-MM-DDTHH:MM:SS. So string comparison works for >= 'YYYY-MM-DD'
+        # start_date is YYYY-MM-DD. Use SQLite's date() function for robust comparison.
+        # This handles ISO strings with or without time/timezone correctly by truncating to date.
         cursor = await self._connection.execute(
-            "SELECT SUM(pnl) as total_pnl FROM trades WHERE action='CLOSE' AND timestamp >= ?",
+            "SELECT SUM(pnl) as total_pnl FROM trades WHERE action='CLOSE' AND date(timestamp) >= ?",
             (start_date,),
         )
         row = await cursor.fetchone()

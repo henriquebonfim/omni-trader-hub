@@ -3,8 +3,7 @@ from datetime import timedelta
 import pandas as pd
 from src.risk import RiskManager
 
-@pytest.mark.asyncio
-async def test_weekly_circuit_breaker_triggered():
+def test_weekly_circuit_breaker_triggered():
     # Setup
     risk = RiskManager()
     risk.max_weekly_loss_pct = 10.0
@@ -18,8 +17,7 @@ async def test_weekly_circuit_breaker_triggered():
     assert triggered is True
     assert risk._weekly_circuit_breaker_active is True
 
-@pytest.mark.asyncio
-async def test_weekly_circuit_breaker_not_triggered():
+def test_weekly_circuit_breaker_not_triggered():
     risk = RiskManager()
     risk.max_weekly_loss_pct = 10.0
 
@@ -29,8 +27,7 @@ async def test_weekly_circuit_breaker_not_triggered():
     triggered = risk.check_weekly_circuit_breaker(weekly_pnl, current_balance)
     assert triggered is False
 
-@pytest.mark.asyncio
-async def test_black_swan_detector():
+def test_black_swan_detector():
     risk = RiskManager()
 
     # Create OHLCV with extreme move
@@ -56,8 +53,7 @@ async def test_black_swan_detector():
     triggered = risk.check_black_swan(df)
     assert triggered is True
 
-@pytest.mark.asyncio
-async def test_black_swan_detector_normal():
+def test_black_swan_detector_normal():
     risk = RiskManager()
 
     now = pd.Timestamp.now()

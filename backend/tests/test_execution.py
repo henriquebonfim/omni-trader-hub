@@ -24,6 +24,9 @@ def bot():
             mock_strategy.metadata = {}
             mock_get_strategy.return_value.return_value = mock_strategy
 
+            # Mock Notifier as AsyncMock to support await calls
+            MockNotifier.return_value = AsyncMock()
+
             bot = OmniTrader()
             yield bot
 
@@ -52,11 +55,18 @@ async def test_close_position_slippage(bot):
     })
 
     bot.exchange.get_order_fill_details = AsyncMock(return_value={
-        "price": 50900.0,
-        "amount": 1.0,
-        "fee": 0.0,
+        "average_price": 50900.0,
+        "total_fee": 0.0,
+        "fee_currency": "USDT",
         "timestamp": 1234567890
     })
+
+    # Mock database connection for fee query
+    mock_cursor = AsyncMock()
+    mock_cursor.fetchone.return_value = {"fee": 2.0}
+
+    # Configure execute to be awaitable and return mock_cursor
+    bot.database._connection.execute = AsyncMock(return_value=mock_cursor)
 
     bot.database.log_trade_close = AsyncMock()
     bot.risk.record_trade = MagicMock()

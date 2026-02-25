@@ -87,6 +87,7 @@ class OmniTrader:
         self.ws_manager = None  # Set by main() after API creation
 
         self._reconcile_counter = 0
+        self._weekly_check_counter = 0
 
     async def reload_config(self):
         """Reload configuration and update all components."""
@@ -386,18 +387,26 @@ class OmniTrader:
             balance_info = await self.exchange.get_balance()
             total_balance = balance_info["total"]
 
-            # 1b. Update Weekly Circuit Breaker Status
-            try:
-                today = date.today()
-                start_of_week = today - timedelta(days=6) # 7 days inclusive
-                weekly_pnl = await self.database.get_weekly_pnl(start_of_week.isoformat())
+            # 1b. Update Weekly Circuit Breaker Status (Throttled: every 60 cycles ~1 hour)
+            self._weekly_check_counter += 1
+            if self._weekly_check_counter >= 60:
+                self._weekly_check_counter = 0
+                try:
+                    today = date.today()
+                    start_of_week = today - timedelta(days=6) # 7 days inclusive
+                    weekly_pnl = await self.database.get_weekly_pnl(start_of_week.isoformat())
 
-                if self.risk.check_weekly_circuit_breaker(weekly_pnl, total_balance):
-                    logger.critical("weekly_circuit_breaker_active", status="skipping_cycle")
-                    await self.notifier.send("🚨 **Weekly Circuit Breaker Triggered**! Trading paused.")
-                    return
-            except Exception as e:
-                logger.error("weekly_circuit_breaker_check_failed", error=str(e))
+                    if self.risk.check_weekly_circuit_breaker(weekly_pnl, total_balance):
+                        logger.critical("weekly_circuit_breaker_active", status="skipping_cycle")
+                        await self.notifier.send("🚨 **Weekly Circuit Breaker Triggered**! Trading paused.")
+                        return
+                except Exception as e:
+                    logger.error("weekly_circuit_breaker_check_failed", error=str(e))
+
+            # Check if breaker is ALREADY active (fast check)
+            if self.risk._weekly_circuit_breaker_active:
+                 logger.warning("weekly_circuit_breaker_active", status="skipping_cycle")
+                 return
 
             # 2. Get current position
             position = await self.exchange.get_position(symbol)
@@ -722,11 +731,15 @@ class OmniTrader:
             # RiskManager.record_trade takes `pnl`.
             # Let's subtract fees from the reported PnL to RiskManager so it tracks Net Equity.
 
-            # Fetch opening trade to get entry fees
-            last_trade = await self.database.get_last_trade(symbol)
-            open_fee = 0.0
-            if last_trade and last_trade.get("fee"):
-                open_fee = float(last_trade["fee"])
+            # Fetch opening trade to get entry fees.
+            # We specifically look for the last OPEN trade, not just the last trade (which could be this close if race condition, or older close).
+            # Assuming FIFO/single position logic for MVP.
+            open_trade_fee_query = await self.database._connection.execute(
+                "SELECT fee FROM trades WHERE symbol=? AND action='OPEN' ORDER BY timestamp DESC LIMIT 1",
+                (symbol,)
+            )
+            open_trade_row = await open_trade_fee_query.fetchone()
+            open_fee = float(open_trade_row["fee"]) if open_trade_row and open_trade_row["fee"] else 0.0
 
             net_pnl = pnl
 
