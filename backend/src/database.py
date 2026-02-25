@@ -186,11 +186,6 @@ class Database:
         )
         await self._connection.commit()
 
-        logger.info(
-            "trade_logged", action="OPEN", symbol=symbol, side=side, price=price
-        )
-        return cursor.lastrowid
-
     async def get_open_trade_fee(self, symbol: str) -> float:
         """
         Get the fee of the last OPEN trade for a symbol.
@@ -207,6 +202,11 @@ class Database:
         )
         row = await cursor.fetchone()
         return float(row["fee"]) if row and row["fee"] else 0.0
+
+        logger.info(
+            "trade_logged", action="OPEN", symbol=symbol, side=side, price=price
+        )
+        return cursor.lastrowid
 
     async def log_trade_close(
         self,

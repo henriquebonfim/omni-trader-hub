@@ -394,9 +394,6 @@ class RiskManager:
                 limit=f"-{self.max_weekly_loss_pct}%"
             )
             return True
-        else:
-            # Auto-recovery: rolling window naturally allows exit once PnL improves
-            self._weekly_circuit_breaker_active = False
 
         return False
 

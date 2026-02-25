@@ -21,7 +21,7 @@ async def test_slippage_calculation_long():
     # Slippage: 50100 - 50000 = 100 (Unfavorable)
 
     bot.exchange.market_long.return_value = {"id": "1", "average": 50100.0}
-    bot.exchange.get_order_fill_details.return_value = {"average_price": 50100.0, "total_fee": 1.0, "fee_currency": "USDT"}
+    bot.exchange.get_order_fill_details.return_value = {"price": 50100.0, "amount": 1.0, "fee": 1.0}
 
     await bot._open_position("long", 50000.0, 1000.0)
 
@@ -48,7 +48,7 @@ async def test_slippage_favorable():
     # Slippage: 49900 - 50000 = -100
 
     bot.exchange.market_long.return_value = {"id": "2", "average": 49900.0}
-    bot.exchange.get_order_fill_details.return_value = {"average_price": 49900.0, "total_fee": 1.0, "fee_currency": "USDT"}
+    bot.exchange.get_order_fill_details.return_value = {"price": 49900.0, "amount": 1.0, "fee": 1.0}
     await bot._open_position("long", 50000.0, 1000.0)
 
     kwargs = bot.database.log_trade_open.call_args[1]
@@ -67,7 +67,7 @@ async def test_slippage_zero():
     bot.risk.validate_trade.return_value = MagicMock(approved=True, position_size=1.0)
 
     bot.exchange.market_long.return_value = {"id": "3", "average": 50000.0}
-    bot.exchange.get_order_fill_details.return_value = {"average_price": 50000.0, "total_fee": 1.0, "fee_currency": "USDT"}
+    bot.exchange.get_order_fill_details.return_value = {"price": 50000.0, "amount": 1.0, "fee": 1.0}
     await bot._open_position("long", 50000.0, 1000.0)
 
     kwargs = bot.database.log_trade_open.call_args[1]
@@ -92,7 +92,7 @@ async def test_slippage_calculation_short():
     # Slippage: 50000 - 49900 = 100 (Unfavorable)
 
     bot.exchange.market_short.return_value = {"id": "4", "average": 49900.0}
-    bot.exchange.get_order_fill_details.return_value = {"average_price": 49900.0, "total_fee": 1.0, "fee_currency": "USDT"}
+    bot.exchange.get_order_fill_details.return_value = {"price": 49900.0, "amount": 1.0, "fee": 1.0}
 
     await bot._open_position("short", 50000.0, 1000.0)
 
