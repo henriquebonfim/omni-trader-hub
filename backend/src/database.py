@@ -60,6 +60,8 @@ class Database:
                 slippage REAL,
                 size REAL NOT NULL,
                 notional REAL NOT NULL,
+                fee REAL,
+                fee_currency TEXT,
                 pnl REAL,
                 pnl_pct REAL,
                 reason TEXT,
@@ -121,6 +123,18 @@ class Database:
                     "ALTER TABLE trades ADD COLUMN slippage REAL DEFAULT NULL"
                 )
 
+            if "fee" not in columns:
+                logger.info("migrating_trades_table_add_fee")
+                await self._connection.execute(
+                    "ALTER TABLE trades ADD COLUMN fee REAL DEFAULT NULL"
+                )
+
+            if "fee_currency" not in columns:
+                logger.info("migrating_trades_table_add_fee_currency")
+                await self._connection.execute(
+                    "ALTER TABLE trades ADD COLUMN fee_currency TEXT DEFAULT NULL"
+                )
+
             await self._connection.commit()
         except Exception as e:
             logger.error("migration_failed", error=str(e))
@@ -137,6 +151,8 @@ class Database:
         reason: str = "signal",
         expected_price: float | None = None,
         slippage: float | None = None,
+        fee: float | None = None,
+        fee_currency: str | None = None,
     ) -> int:
         """
         Log a trade open event.
@@ -148,9 +164,9 @@ class Database:
             """
             INSERT INTO trades (
                 timestamp, symbol, side, action, price, expected_price, slippage,
-                size, notional, reason, stop_loss, take_profit
+                size, notional, reason, stop_loss, take_profit, fee, fee_currency
             )
-            VALUES (?, ?, ?, 'OPEN', ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, 'OPEN', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 datetime.utcnow().isoformat(),
@@ -164,6 +180,8 @@ class Database:
                 reason,
                 stop_loss,
                 take_profit,
+                fee,
+                fee_currency,
             ),
         )
         await self._connection.commit()
@@ -185,6 +203,8 @@ class Database:
         reason: str = "signal",
         expected_price: float | None = None,
         slippage: float | None = None,
+        fee: float | None = None,
+        fee_currency: str | None = None,
     ) -> int:
         """
         Log a trade close event.
@@ -196,9 +216,9 @@ class Database:
             """
             INSERT INTO trades (
                 timestamp, symbol, side, action, price, size, notional, pnl, pnl_pct, reason,
-                expected_price, slippage
+                expected_price, slippage, fee, fee_currency
             )
-            VALUES (?, ?, ?, 'CLOSE', ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, 'CLOSE', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 datetime.utcnow().isoformat(),
@@ -212,6 +232,8 @@ class Database:
                 reason,
                 expected_price,
                 slippage,
+                fee,
+                fee_currency,
             ),
         )
         await self._connection.commit()

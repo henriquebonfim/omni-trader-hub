@@ -181,15 +181,19 @@ class OmniTrader:
 
             # Try to fetch actual trade from exchange history
             try:
-                # Fetch recent trades
-                trades = await self.exchange.fetch_my_trades(symbol, limit=lookback)
-
                 # Parse last open timestamp (ISO format in DB, assumed UTC)
                 last_open_dt = datetime.fromisoformat(last_trade["timestamp"])
                 # Ensure it's treated as UTC before converting to timestamp
                 if last_open_dt.tzinfo is None:
                     last_open_dt = last_open_dt.replace(tzinfo=timezone.utc)
                 last_open_ts = last_open_dt.timestamp() * 1000
+
+                # Fetch all trades since the last known open trade
+                # Using 'since' parameter ensures we don't miss trades if they are older than 'limit'
+                since_ts = int(last_open_ts)
+                # Use configured lookback or default to 50
+                limit = getattr(self.config.risk, "reconciliation_lookback_trades", 50)
+                trades = await self.exchange.fetch_my_trades(symbol, since=since_ts, limit=limit)
 
                 # Filter for trades that closed this position (after open, opposite side)
                 # Note: last_trade['side'] is UPPER ("LONG"/"SHORT"), exchange trade['side'] is lower ("buy"/"sell")
@@ -549,20 +553,17 @@ class OmniTrader:
                     symbol, risk_check.position_size
                 )
 
-            # Verify order fill details
-            fill_details = await self.exchange.get_order_fill_details(
-                order["id"], symbol
-            )
-
-            # Use verified price if available, fallback to order response or current price
-            entry_price = fill_details.get("price") or float(order.get("average", current_price))
-            # If price is still 0 (verification failed), fallback to current_price
-            if entry_price == 0:
-                entry_price = current_price
+            # Verify fills and get actual price/fees
+            fill_details = await self.exchange.get_order_fill_details(order["id"], symbol)
+            entry_price = float(fill_details["average_price"] or order.get("average", current_price))
+            total_fee = fill_details["total_fee"]
+            fee_currency = fill_details["fee_currency"]
 
             notional = risk_check.position_size * entry_price
 
-            # Calculate slippage
+            # Calculate slippage (Expected - Actual for buy is bad if Actual > Expected)
+            # Long (Buy): Slippage = Actual - Expected (Positive = Bad)
+            # Short (Sell): Slippage = Expected - Actual (Positive = Bad)
             slippage = 0.0
             if side == "long":
                 slippage = entry_price - current_price
@@ -606,6 +607,8 @@ class OmniTrader:
                 reason=reason,
                 expected_price=current_price,
                 slippage=slippage,
+                fee=total_fee,
+                fee_currency=fee_currency,
             )
 
             # Send notification
@@ -654,15 +657,11 @@ class OmniTrader:
             if order is None:
                 return
 
-            # Verify order fill details
-            fill_details = await self.exchange.get_order_fill_details(
-                order["id"], symbol
-            )
-
-            # Calculate P/L
-            exit_price = fill_details.get("price") or float(order.get("average") or order.get("price") or current_price)
-            if exit_price == 0:
-                exit_price = current_price
+            # Verify fills and get actual price/fees
+            fill_details = await self.exchange.get_order_fill_details(order["id"], symbol)
+            exit_price = float(fill_details["average_price"] or order.get("average") or order.get("price") or current_price)
+            total_fee = fill_details["total_fee"]
+            fee_currency = fill_details["fee_currency"]
 
             # Calculate Slippage (Positive = Bad, Negative = Good)
             # Long Exit (Sell): Expected - Actual
@@ -673,14 +672,10 @@ class OmniTrader:
             else:
                 slippage = exit_price - expected_price
 
-            logger.info(
-                "close_fill_verified",
-                side=position.side,
-                expected=expected_price,
-                actual=exit_price,
-                slippage=slippage,
-                fee=fill_details.get("fee")
-            )
+            # Subtract fees from PnL?
+            # Usually PnL is (Exit - Entry) * Size. Fees are separate.
+            # But "Net PnL" includes fees.
+            # For now, we calculate Gross PnL here as per standard, and log fees separately.
 
             if position.side == "long":
                 pnl = (exit_price - position.entry_price) * position.size
@@ -693,8 +688,29 @@ class OmniTrader:
                     (position.entry_price - exit_price) / position.entry_price
                 ) * 100
 
-            # Record in risk manager
-            self.risk.record_trade(pnl)
+            # Adjust PnL for fees if currency matches quote currency (USDT)
+            # RiskManager.record_trade takes `pnl`.
+            # Let's subtract fees from the reported PnL to RiskManager so it tracks Net Equity.
+
+            # Fetch opening trade to get entry fees
+            last_trade = await self.database.get_last_trade(symbol)
+            open_fee = 0.0
+            if last_trade and last_trade.get("fee"):
+                open_fee = float(last_trade["fee"])
+
+            net_pnl = pnl
+
+            # Subtract fees from Net PnL.
+            # Note: This assumes fees are in USDT (quote currency).
+            # If fees are in BNB or base asset, this simple subtraction is an approximation for MVP.
+            if total_fee > 0:
+                net_pnl -= total_fee
+
+            if open_fee > 0:
+                net_pnl -= open_fee
+
+            # Record in risk manager (use Net PnL to reflect actual equity change)
+            self.risk.record_trade(net_pnl)
 
             # Log to database
             await self.database.log_trade_close(
@@ -703,11 +719,13 @@ class OmniTrader:
                 price=exit_price,
                 size=position.size,
                 notional=position.size * exit_price,
-                pnl=pnl,
+                pnl=pnl,       # Log Gross PnL
                 pnl_pct=pnl_pct,
                 reason=reason,
                 expected_price=expected_price,
                 slippage=slippage,
+                fee=total_fee,
+                fee_currency=fee_currency,
             )
 
             # Send notification
