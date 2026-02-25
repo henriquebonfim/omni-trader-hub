@@ -14,10 +14,10 @@ trigger: when user references reviewing issues, converting issues to tasks, or p
 Schema:
 
 {
-  issue_number,
-  classification,
-  status,
-  confirmed
+issue_number,
+classification,
+status,
+confirmed
 }
 
 3. Classify each issue:
@@ -113,8 +113,8 @@ Closes #<issue_number>
 After all confirmed tasks implemented:
 
 gh pr create \
-  --title "Batch: Resolve confirmed issues" \
-  --body "
+ --title "Batch: Resolve confirmed issues" \
+ --body "
 This PR resolves the following issues:
 
 Closes #<issue1>
@@ -128,7 +128,7 @@ Do not skip PR creation.
 
 ## Phase 7 — Cleanup
 
-- Delete .agent/tmp/*
+- Delete .agent/tmp/\*
 - Ensure no temp artifacts staged
 
 ---

@@ -11,7 +11,6 @@ description: /handle-issues
    issue-task-orchestrator
 
 4. Execute:
-
    - Discovery
    - Classification
    - Engineering validation

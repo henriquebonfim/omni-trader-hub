@@ -8,7 +8,6 @@ description: /handle-code <short_description>
    software-engineer-worker
 
 2. Execute:
-
    - Discovery
    - Design
    - Veto Check
@@ -18,7 +17,6 @@ description: /handle-code <short_description>
    - Self-healing loop if required
 
 3. After successful validation:
-
    - Ensure code is verified against `software-engineering-standards.md`.
    - Ensure tests included.
    - Ensure no unrelated file changes.

@@ -1,66 +1,94 @@
 ---
 name: pr-review-orchestrator
-description: Deterministic, structured, read-only pull request review that replies directly to file-level review threads with "CHANGES REQUESTED" status
+description: Deterministic, structured, read-only pull request review with runtime validation and batched GitHub review submission
 trigger: when user references reviewing a PR without making code changes
 ---
 
 # THINKING PROTOCOL (MANDATORY)
 
-Before writing any review comment:
+Before writing ANY review comment:
 
-1. Fetch PR metadata.
-2. Fetch changed files (NOT full repo context).
-3. Fetch existing review threads (to avoid duplication).
-4. Build compact structured matrix:
+1. Checkout PR branch.
+2. Validate baseline runtime (build + tests).
+3. Fetch changed files only.
+4. Fetch existing review threads.
+5. Build compact structured matrix:
 
-.agent/tmp/pr-review-orchestrator-matrix.json
+.agent/skills/pr-review-orchestrator/tmp/pr-review-orchestrator-matrix.json
 
-Schema (token-optimized):
+Schema:
 
 [
   {
-    path,               // file path
-    line,               // line number in diff
-    severity,           // LOW | MEDIUM | HIGH
-    category,           // BUG | SAFETY | PERF | SECURITY | ARCH | TEST
-    message,            // short problem statement
-    required_action     // short corrective directive
+    path,
+    line,
+    severity,      // LOW | MEDIUM | HIGH
+    category,      // BUG | SAFETY | PERF | SECURITY | ARCH | TEST
+    message
   }
 ]
 
+Optional runtime summary:
+
+.agent/skills/pr-review-orchestrator/tmp/runtime-summary.json
+
+{
+  build,
+  lint,
+  typecheck,
+  tests,
+  runtime
+}
+
 Rules:
 
-- Only store issues.
-- Do NOT store full diff.
-- Do NOT store entire file contents.
-- Do NOT store analysis narrative.
-- One entry per actionable problem.
-- Skip files with no issues.
-
-No review comments before full diff scan completes.
+- Only store actionable issues.
+- Do NOT store full diffs.
+- Do NOT store file contents.
+- Do NOT store full logs.
+- Skip clean files.
+- No review submission before matrix complete.
 
 ---
 
 # EXECUTION WORKFLOW
 
-## Phase 1 — Discovery (Performance Optimized)
+## Phase 0 — Branch + Runtime Validation
 
-Fetch minimal data:
+gh pr checkout <PR_NUMBER>
 
-gh pr view <PR_NUMBER> --json number,headRefName
-gh pr diff <PR_NUMBER> --name-only
-gh api repos/:owner/:repo/pulls/<PR_NUMBER>/comments
+Then:
 
-Do NOT fetch entire repository.
-Analyze only changed hunks.
+- Install dependencies (non-persistent).
+- Build project.
+- Run lint (if available).
+- Run type-check (if available).
+- Run full test suite.
+- Attempt runtime start (if applicable).
+
+Store PASS/FAIL only in runtime-summary.json.
+
+If runtime/test failure:
+- Add HIGH severity issue entries referencing failing file/module.
+- Do NOT fix code.
 
 ---
 
-## Phase 2 — File-Level Targeted Review
+## Phase 1 — Discovery (Optimized)
+
+gh pr view <PR_NUMBER> --json number,headRefOid
+gh pr diff <PR_NUMBER> --name-only
+gh api repos/:owner/:repo/pulls/<PR_NUMBER>/comments
+
+Analyze modified hunks only.
+
+---
+
+## Phase 2 — Targeted File Review
 
 For each changed file:
 
-Analyze only modified lines.
+Analyze modified lines only.
 
 Detect:
 
@@ -70,100 +98,64 @@ Detect:
 - Unsafe async usage
 - Security exposure
 - Performance regression
-- Architectural boundary violation
-- Missing test coverage (when logic added)
+- Architectural boundary violations
+- Missing test coverage
 
-For each issue found:
+Append minimal entries to:
 
-Append minimal entry to:
+tmp/pr-review-orchestrator-matrix.json
 
-.agent/tmp/pr-review-orchestrator-matrix.json
-
-Do not generate commentary yet.
+No commentary generation yet.
 
 ---
 
-## Phase 3 — Thread Mapping (NEW)
+## Phase 3 — Batched Review Submission
 
-For each detected issue:
+Submit single review via helper script:
 
-- Identify correct diff position.
-- Determine if an existing thread already exists for same line.
-- If thread exists → reply in thread.
-- If no thread → create new review comment tied to file and line.
+python3 .agent/skills/pr-review-orchestrator/scripts/post_review.py <PR_NUMBER>
 
-Never duplicate existing concerns.
+Behavior:
 
----
-
-# PHASE 4 — Structured Per-File Comment Replies
-
-For each issue entry:
-
-Use file-level review comment (not generic PR comment):
-
-gh pr review <PR_NUMBER> \
-  --request-changes \
-  --comment \
-  --body "<structured message>" \
-  --path "<file_path>" \
-  --line <line_number>
-
-Structured format (MANDATORY):
-
-Status: ⚠️ CHANGES REQUESTED
-Severity: <LOW|MEDIUM|HIGH>
-Category: <BUG|SAFETY|PERF|SECURITY|ARCH|TEST>
-
-Problem:
-- Concise description
-
-Required Fix:
-- Concrete corrective direction
-
-Do not bundle unrelated issues.
-One comment per issue entry.
+- If matrix empty → APPROVE
+- If matrix contains issues → REQUEST_CHANGES
+- All inline comments submitted in single API call
+- Runtime summary included in review body
 
 ---
 
-# PHASE 5 — Final Review State
+## Phase 4 — Cleanup (MANDATORY)
 
-If pr-review-orchestrator-matrix.json is empty:
+Delete:
 
-gh pr review <PR_NUMBER> --approve
+- tmp/pr-review-orchestrator-matrix.json
+- tmp/runtime-summary.json
+- tmp/review_payload.json
 
-If at least one issue exists:
+Ensure no artifacts staged.
 
-gh pr review <PR_NUMBER> --request-changes
-
-Never leave PR without explicit decision.
-
----
-
-# PHASE 6 — Cleanup
-
-- Delete .agent/tmp/pr-review-orchestrator-matrix.json
-- Ensure no temp artifacts staged
+Verify via `git status`.
 
 ---
 
 # SELF-VALIDATION
 
-Before submission:
-
+- Confirm PR branch active.
 - Confirm no commits created.
 - Confirm no file modifications made.
-- Confirm each issue tied to exact file + line.
-- Confirm no duplicated review threads.
-- Confirm structured pattern respected.
-- Confirm minimal token footprint (no stored diffs).
+- Confirm runtime executed.
+- Confirm tests executed.
+- Confirm each issue tied to file + line.
+- Confirm single batched review used.
+- Confirm tmp directory empty.
 
 ---
 
 # COMPLETION CRITERIA
 
 - All changed files scanned.
-- Each detected issue has file-level "CHANGES REQUESTED" comment.
-- Review decision submitted.
+- Runtime validated.
+- Issues reported inline.
+- Final review state explicit.
 - No code modified.
-- `.agent/tmp/` empty.
+- tmp directory empty.

@@ -89,23 +89,23 @@ Allowed files (minimal schema only):
 review-analysis.json schema:
 
 [
-  {
-    path,
-    line,
-    severity,
-    category,
-    message
-  }
+{
+path,
+line,
+severity,
+category,
+message
+}
 ]
 
 runtime-summary.json schema:
 
 {
-  build: "PASS | FAIL",
-  lint: "PASS | FAIL | N/A",
-  typecheck: "PASS | FAIL | N/A",
-  tests: "PASS | FAIL | N/A",
-  runtime: "PASS | FAIL | N/A"
+build: "PASS | FAIL",
+lint: "PASS | FAIL | N/A",
+typecheck: "PASS | FAIL | N/A",
+tests: "PASS | FAIL | N/A",
+runtime: "PASS | FAIL | N/A"
 }
 
 Rules:
@@ -134,6 +134,7 @@ Allowed patterns:
 Status: ✅ APPROVED
 
 Summary:
+
 - Code correct
 - Runtime validated
 - Tests passing
@@ -148,13 +149,16 @@ Severity: LOW | MEDIUM | HIGH
 Category: BUG | SAFETY | PERF | SECURITY | ARCH | TEST
 
 Problem:
+
 - Precise technical issue
 - File and location
 
 Impact:
+
 - Clear technical consequence
 
 Required Fix:
+
 - Concrete corrective direction
 
 ---
@@ -164,9 +168,11 @@ Required Fix:
 Status: ❓ CLARIFICATION REQUIRED
 
 Concern:
+
 - What is unclear
 
 Question:
+
 - Explicit request
 
 ---
@@ -176,9 +182,11 @@ Question:
 Status: 🧪 TESTS MISSING
 
 Missing Coverage:
+
 - Specific behavior not tested
 
 Required:
+
 - Explicit test requirement
 
 ---

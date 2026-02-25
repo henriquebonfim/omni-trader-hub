@@ -1,6 +1,6 @@
 ---
 name: pr-code-orchestrator
-description: Deterministic PR lifecycle automation with structured per-comment replies, strict file-level mapping, and minimal artifact footprint
+description: Deterministic PR lifecycle automation with structured per-comment replies, scoped commits, runtime validation, and batched status execution
 trigger: when user references reviewing PRs, handling review comments, or fixing PR feedback
 ---
 
@@ -8,25 +8,28 @@ trigger: when user references reviewing PRs, handling review comments, or fixing
 
 Before ANY implementation:
 
-1. Fetch PR metadata.
-2. Fetch ALL review comments (including resolved + unresolved).
-3. Fetch changed files only (no full repo scan).
-4. Build compact structured matrix:
+1. Checkout PR branch.
+2. Run baseline build + tests.
+3. Fetch PR metadata.
+4. Fetch ALL review comments (resolved + unresolved).
+5. Fetch changed files only.
+6. Build compact structured matrix:
 
-.agent/tmp/pr-code-orchestrator-matrix.json
+.agent/skills/pr-code-orchestrator/tmp/pr-code-orchestrator-matrix.json
 
-Schema (token-optimized, one entry per comment):
+Schema:
 
 [
   {
-    comment_id,        // numeric GitHub comment id
+    comment_id,
     comment_url,
-    path,              // file path (null if general comment)
-    line,              // line number if applicable
-    classification,    // BUG | REFACTOR | PERF | TEST | DOC | CLARIFICATION_ONLY | OUT_OF_SCOPE | INVALID
-    task_id,           // logical batch id or null
-    status,            // SOLVED | UNSOLVED | NEW_ISSUE | SKIPPED
-    commit_sha         // nullable
+    path,
+    line,
+    classification,
+    task_id,
+    status,
+    commit_sha,
+    issue_number
   }
 ]
 
@@ -35,212 +38,151 @@ Rules:
 - One matrix entry per comment.
 - Do NOT store full diff.
 - Do NOT store comment bodies.
-- Do NOT store analysis narrative.
+- Do NOT store logs.
 - No code changes before matrix complete.
 
 ---
 
 # EXECUTION WORKFLOW
 
-## Phase 1 — Discovery (Minimal + Deterministic)
+## Phase 0 — Branch + Baseline Runtime
+
+gh pr checkout <PR_NUMBER>
+
+Then:
+
+- Install dependencies
+- Build project
+- Run lint
+- Run type-check
+- Run full test suite
+
+If baseline already failing:
+→ Mark affected comments UNSOLVED
+→ Do NOT introduce unrelated fixes
+
+Store runtime result in:
+
+tmp/runtime-summary.json
+
+---
+
+## Phase 1 — Discovery
 
 gh pr view <PR_NUMBER> --json number,title,headRefName
 gh api repos/:owner/:repo/pulls/<PR_NUMBER>/comments
 gh pr diff <PR_NUMBER> --name-only
 
-Only analyze changed files referenced by comments.
+Persist:
 
-Persist matrix to:
-
-.agent/tmp/pr-code-orchestrator-matrix.json
+tmp/pr-code-orchestrator-matrix.json
 
 ---
 
-## Phase 2 — Deterministic Classification
+## Phase 2 — Classification
 
 For each comment:
 
-Classify strictly:
+Classify:
 
-- BUG → incorrect behavior
-- REFACTOR → structure improvement
-- PERF → performance risk
-- TEST → missing/incorrect tests
-- DOC → documentation change
-- CLARIFICATION_ONLY → explanation required only
-- OUT_OF_SCOPE → exceeds PR scope
-- INVALID → already resolved / not applicable
+BUG | REFACTOR | PERF | TEST | DOC | CLARIFICATION_ONLY | OUT_OF_SCOPE | INVALID
 
-Assign:
+Assign initial status:
 
-- status = SOLVED (if trivial + explanation only)
-- status = SKIPPED (if INVALID)
-- status = NEW_ISSUE (if OUT_OF_SCOPE)
-- status = UNSOLVED (default for technical work)
+- SOLVED → clarification-only
+- SKIPPED → invalid
+- NEW_ISSUE → out of scope
+- UNSOLVED → technical work required
 
-Group technical items into minimal logical task batches:
+Group technical comments into minimal batches:
 
-.agent/tmp/task-plan.json
-
-Schema:
-
-[
-  {
-    task_id,
-    related_comment_ids[]
-  }
-]
-
-Rules:
-
-- No over-grouping.
-- No cross-boundary batching.
-- Keep commits minimal and scoped.
+tmp/task-plan.json
 
 ---
 
 ## Phase 3 — Scope Veto
 
-For each task:
+Validate each task:
 
-- Validate against architecture boundaries.
-- Validate against PR intent.
-- Confirm change belongs in this branch.
+- Architecture boundaries
+- PR intent
+- Branch ownership
 
-If violates scope:
+If violation:
 
 - status = NEW_ISSUE
-- Remove from task-plan.
+- Remove from task plan
 
 ---
 
-## Phase 4 — Nested Engineering Execution
+## Phase 4 — Engineering Execution
 
-For each task in task-plan:
+For each task:
 
 Invoke:
 
-/handle-code <precise scoped task>
+/handle-code <scoped task>
 
-After successful implementation:
+After success:
 
-- Capture commit SHA.
-- Update each related matrix entry:
-    status = SOLVED
-    commit_sha = <sha>
+- Capture commit SHA
+- Update matrix entries:
+  status = SOLVED
+  commit_sha = <sha>
 
-If implementation fails:
+If fails after stabilization:
+  status = UNSOLVED
 
-- Run self-healing loop.
-- If stabilization fails:
-    status = UNSOLVED
-
-Never batch unrelated fixes into same commit.
+Never batch unrelated fixes.
 
 ---
 
-# PHASE 5 — Structured Per-Comment Replies (STRICT)
+## Phase 5 — Automated Reply Execution (Batched Script)
 
-Reply to EACH comment individually.
+After matrix fully finalized:
 
-If comment tied to file/line:
+python3 .agent/skills/pr-code-orchestrator/scripts/post_comment_replies.py <PR_NUMBER>
 
-Use file-level reply:
+Behavior:
 
-gh api repos/:owner/:repo/pulls/comments/<comment_id>/replies \
-  -f body="<structured message>"
-
-If general PR comment:
-
-gh pr comment <PR_NUMBER> --body "<structured message>"
-
-Mandatory format:
-
-Status: <SOLVED | UNSOLVED | NEW ISSUE | SKIPPED>
-Commit: <SHA or N/A>
-
-Summary:
-- Concise explanation
-- If NEW ISSUE → reference issue number
-- If UNSOLVED → explain blocker
-
-Rules:
-
-- Never bundle multiple comment replies.
-- Never skip a comment.
-- Never omit status field.
-- Never reply before matrix status finalized.
+- Replies individually to each comment
+- Creates issues when required
+- Injects commit SHA
+- Injects issue number if created
+- Enforces strict status format
+- No duplicate replies
 
 ---
 
-## Phase 6 — Issue Creation (Scoped)
+## Phase 6 — Final Validation
 
-If status = NEW_ISSUE:
-
-gh issue create \
-  --title "Follow-up (PR #<PR_NUMBER>): <short description>" \
-  --body "Context:\n- Origin PR: #<PR_NUMBER>\n- Comment: <comment_url>\n- Rationale: Out of scope for current PR." \
-  --label "refactor"
-
-Capture issue number.
-Update matrix entry.
-Reference issue in reply.
+- Confirm CI passing
+- Confirm no force push
+- Confirm minimal commits
+- Confirm no unrelated file changes
+- Confirm every matrix entry resolved
 
 ---
 
-## Phase 7 — Self-Healing Loop (Strict)
+## Phase 7 — Cleanup
 
-If:
+Delete:
 
-- Tests fail
-- Lint fails
-- Type check fails
+- tmp/pr-code-orchestrator-matrix.json
+- tmp/task-plan.json
+- tmp/runtime-summary.json
 
-Then:
+Ensure tmp/ empty.
 
-1. Identify exact failing boundary.
-2. Validate against engineering standards.
-3. Apply smallest corrective patch.
-4. Re-run validation.
-5. Repeat until stable.
-
-If cannot stabilize:
-
-- Mark affected entries UNSOLVED.
-
----
-
-## Phase 8 — Final Validation
-
-Before finishing:
-
-- Ensure every matrix entry has final status.
-- Ensure all technical comments processed.
-- Ensure CI passing.
-- Ensure no force push performed.
-- Ensure no unrelated files modified.
-- Ensure commits are minimal and scoped.
-
----
-
-## Phase 9 — Cleanup (MANDATORY)
-
-- Delete:
-    .agent/tmp/pr-code-orchestrator-matrix.json
-    .agent/tmp/task-plan.json
-- Ensure .agent/tmp/ empty.
-- Verify via:
-    git status
-- Confirm no temp artifacts staged.
+Verify via git status.
 
 ---
 
 # COMPLETION CRITERIA
 
 - Every comment has structured reply.
-- Matrix fully resolved.
+- Issues created when required.
+- Commits minimal and scoped.
 - CI passing.
 - No temp artifacts committed.
-- No scope creep.
-- No force push.
-- Minimal, deterministic commits only.
+- Deterministic execution.

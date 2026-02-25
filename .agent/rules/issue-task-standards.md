@@ -63,20 +63,24 @@ Each issue must receive exactly one structured reply:
 Status: ✅ CONFIRMED TASK
 
 Scope:
+
 - Implementation boundaries: Describe exactly which files/functions will be modified.
 
 PR:
+
 - Will be included in new PR
 
 **Example:**
 Status: ✅ CONFIRMED TASK
 
 Scope:
+
 - Implement the `ADXTrendStrategy` in `backend/src/strategies/adx_trend.py`.
 - Register the new strategy in `backend/src/strategies/registry.py`.
 - Add unit tests in `backend/tests/test_strategies.py`.
 
 PR:
+
 - Will be included in new PR
 
 ---
@@ -86,12 +90,14 @@ PR:
 Status: ❌ NEEDS CLARIFICATION
 
 Missing:
+
 - Explicit missing details: List the specific information required from the user.
 
 **Example:**
 Status: ❌ NEEDS CLARIFICATION
 
 Missing:
+
 - Please specify the target timeframe for the ADX calculation (e.g., 1m, 5m, 1h).
 - Clarify if the strategy should use a fixed stop-loss or a trailing one.
 
@@ -102,12 +108,14 @@ Missing:
 Status: 🟢 ALREADY RESOLVED
 
 Evidence:
+
 - Commit or PR reference: Link to the specific commit or pull request.
 
 **Example:**
 Status: 🟢 ALREADY RESOLVED
 
 Evidence:
+
 - Feature implemented in commit `a1b2c3d` and merged in PR #42.
 
 Issue should be closed.
@@ -119,12 +127,14 @@ Issue should be closed.
 Status: ⏭ INVALID
 
 Reason:
+
 - Technical explanation: Why this issue cannot or will not be addressed.
 
 **Example:**
 Status: ⏭ INVALID
 
 Reason:
+
 - The requested feature is already covered by the existing `BollingerBandsStrategy` with the `auto_reversal` flag enabled.
 
 ---

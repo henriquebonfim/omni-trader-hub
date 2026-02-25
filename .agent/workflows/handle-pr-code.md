@@ -15,7 +15,6 @@ description: /handle-pr-code <PR_NUMBER>
    gh pr checkout <PR_NUMBER>
 
 5. Execute:
-
    - Discovery
    - Classification
    - Task Planning

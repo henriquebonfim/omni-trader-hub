@@ -75,33 +75,33 @@ Minimal schemas:
 pr-code-matrix.json
 
 [
-  {
-    comment_id,
-    path,
-    line,
-    classification,
-    status,
-    commit_sha
-  }
+{
+comment_id,
+path,
+line,
+classification,
+status,
+commit_sha
+}
 ]
 
 task-plan.json
 
 [
-  {
-    task_id,
-    related_comment_ids[]
-  }
+{
+task_id,
+related_comment_ids[]
+}
 ]
 
 runtime-summary.json
 
 {
-  build: "PASS | FAIL",
-  lint: "PASS | FAIL | N/A",
-  typecheck: "PASS | FAIL | N/A",
-  tests: "PASS | FAIL | N/A",
-  runtime: "PASS | FAIL | N/A"
+build: "PASS | FAIL",
+lint: "PASS | FAIL | N/A",
+typecheck: "PASS | FAIL | N/A",
+tests: "PASS | FAIL | N/A",
+runtime: "PASS | FAIL | N/A"
 }
 
 Rules:
@@ -162,6 +162,7 @@ Status: ✅ SOLVED
 Commit: <SHA>
 
 Summary:
+
 - What changed
 - Why it resolves issue
 - Tests added or updated
@@ -174,6 +175,7 @@ Summary:
 Status: ❌ UNSOLVED
 
 Reason:
+
 - Clear technical explanation
 - Blocker details
 - What is required to proceed
@@ -186,6 +188,7 @@ Status: 🆕 NEW ISSUE
 Issue: #<number>
 
 Reason:
+
 - Why request exceeds scope
 - Why separation required
 
@@ -196,6 +199,7 @@ Reason:
 Status: ⏭ SKIPPED
 
 Reason:
+
 - Invalid / outdated / already resolved
 
 ---

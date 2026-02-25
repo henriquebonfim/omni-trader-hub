@@ -15,7 +15,6 @@ description: /handle-pr-review <PR_NUMBER>
    gh pr checkout <PR_NUMBER>
 
 5. Execute:
-
    - Full diff analysis
    - File-by-file validation
    - Risk classification
@@ -24,7 +23,6 @@ description: /handle-pr-review <PR_NUMBER>
    - Cleanup
 
 6. Final Verification:
-
    - No commits created
    - No branch modified
    - No temp files staged
