@@ -76,6 +76,8 @@ class RiskManager:
         self.max_positions = config.risk.max_positions
         self.leverage = config.exchange.leverage
 
+        self.liquidation_buffer_pct = getattr(config.risk, "liquidation_buffer_pct", 0.5)
+
         # Trailing Stop Config
         self.trailing_stop_activation_pct = getattr(
             config.risk, "trailing_stop_activation_pct", 1.0
@@ -98,6 +100,8 @@ class RiskManager:
         self.max_positions = config.risk.max_positions
         self.leverage = config.exchange.leverage
 
+        self.liquidation_buffer_pct = getattr(config.risk, "liquidation_buffer_pct", 0.5)
+
         self.trailing_stop_activation_pct = getattr(
             config.risk, "trailing_stop_activation_pct", 1.0
         )
@@ -111,6 +115,7 @@ class RiskManager:
             stop_loss_pct=self.stop_loss_pct,
             take_profit_pct=self.take_profit_pct,
             max_daily_loss_pct=self.max_daily_loss_pct,
+            liquidation_buffer_pct=self.liquidation_buffer_pct,
         )
 
     def initialize_daily_stats(self, current_balance: float):
@@ -349,6 +354,42 @@ class RiskManager:
             True if circuit breaker is active
         """
         return self._circuit_breaker_active
+
+    def check_liquidation_risk(self, position, current_price: float) -> bool:
+        """
+        Check if position is too close to liquidation price.
+
+        Args:
+            position: Position object
+            current_price: Current market price
+
+        Returns:
+            True if risk is high (should close), False otherwise
+        """
+        if not position.is_open or position.liquidation_price <= 0:
+            return False
+
+        dist_to_liq = abs(current_price - position.liquidation_price)
+        total_dist = abs(position.entry_price - position.liquidation_price)
+
+        if total_dist == 0:
+            return False
+
+        # If remaining distance is less than X% of original distance
+        remaining_pct = dist_to_liq / total_dist
+
+        if remaining_pct < self.liquidation_buffer_pct:
+            logger.warning(
+                "liquidation_risk_critical",
+                symbol=position.symbol,
+                current_price=current_price,
+                liquidation_price=position.liquidation_price,
+                remaining_pct=f"{remaining_pct:.2%}",
+                threshold=f"{self.liquidation_buffer_pct:.2%}",
+            )
+            return True
+
+        return False
 
     def get_status(self) -> dict:
         """Get current risk status summary."""

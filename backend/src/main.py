@@ -164,6 +164,8 @@ class OmniTrader:
         """
         last_trade = await self.database.get_last_trade(symbol)
 
+        lookback = getattr(self.config.risk, "reconciliation_lookback_trades", 50)
+
         # Case 1: DB says OPEN, Exchange says FLAT -> Missed CLOSE
         if last_trade and last_trade["action"] == "OPEN" and not position.is_open:
             logger.warning(
@@ -175,11 +177,12 @@ class OmniTrader:
 
             exit_price = 0.0
             found_trade = False
+            slippage = 0.0
 
             # Try to fetch actual trade from exchange history
             try:
                 # Fetch recent trades
-                trades = await self.exchange.fetch_my_trades(symbol, limit=20)
+                trades = await self.exchange.fetch_my_trades(symbol, limit=lookback)
 
                 # Parse last open timestamp (ISO format in DB, assumed UTC)
                 last_open_dt = datetime.fromisoformat(last_trade["timestamp"])
@@ -239,6 +242,8 @@ class OmniTrader:
             if side == "long":
                 pnl = (exit_price - entry_price) * size
                 pnl_pct = ((exit_price - entry_price) / entry_price) * 100
+                # Slippage estimate if we found trade (assuming expected price was entry price?? No, we don't know expected price for exit)
+                # But we can assume stop loss price was expected if it was a SL hit
             else:
                 pnl = (entry_price - exit_price) * size
                 pnl_pct = ((entry_price - exit_price) / entry_price) * 100
@@ -256,6 +261,8 @@ class OmniTrader:
                 pnl=pnl,
                 pnl_pct=pnl_pct,
                 reason="reconciliation_detected_close",
+                slippage=slippage,
+                expected_price=exit_price if found_trade else None
             )
 
             await self.notifier.send(
@@ -271,17 +278,49 @@ class OmniTrader:
                 size=position.size,
             )
 
+            # Try to find the opening trade
+            open_price = position.entry_price
+            slippage = None
+            expected_price = None
+            found_open_trade = False
+
+            try:
+                trades = await self.exchange.fetch_my_trades(symbol, limit=lookback)
+                # Look for recent trade that matches position side
+                # Exchange side: buy (for long), sell (for short)
+                target_side = "buy" if position.side == "long" else "sell"
+
+                # We want the most recent trade of this side that created the position
+                # This is a bit heuristic if there are multiple trades.
+                # Ideally we find the trade that transitioned position from 0 to size.
+                # But since we are stateless here, let's grab the most recent large trade or aggregate recent trades?
+                # Simplify: find the most recent trade of correct side.
+
+                matching_trades = [t for t in trades if t["side"] == target_side]
+                matching_trades.sort(key=lambda x: x["timestamp"], reverse=True)
+
+                if matching_trades:
+                    # Check if it matches roughly the size or is recent enough?
+                    # Let's assume the most recent one is the entry.
+                    latest_trade = matching_trades[0]
+                    open_price = latest_trade["price"]
+                    found_open_trade = True
+                    logger.info("reconciliation_found_open_trade", price=open_price, timestamp=latest_trade["timestamp"])
+
+            except Exception as e:
+                logger.error("reconciliation_open_fetch_failed", error=str(e))
+
             # Log the missing open
             await self.database.log_trade_open(
                 symbol=symbol,
                 side=position.side,
-                price=position.entry_price,
+                price=open_price,
                 size=position.size,
                 notional=position.notional,
                 stop_loss=None,  # Unknown
                 take_profit=None,  # Unknown
-                expected_price=None,  # Unknown
-                slippage=None,  # Unknown
+                expected_price=expected_price,
+                slippage=slippage,
                 reason="reconciliation_detected_open",
             )
 
@@ -410,6 +449,15 @@ class OmniTrader:
 
             # 6. Manage Trailing Stop (if in position)
             if position.is_open:
+                # Check Liquidation Risk
+                if self.risk.check_liquidation_risk(position, current_price):
+                    await self._close_position(position, current_price, "liquidation_risk_exit")
+                    await self.notifier.send(
+                        f"🚨 **URGENT**: Position closed due to liquidation risk! Price: {current_price}, Liq: {position.liquidation_price}"
+                    )
+                    # Skip trailing stop logic since we are closing
+                    return
+
                 # Get existing stop loss
                 open_orders = await self.exchange.fetch_open_orders(symbol)
                 current_stop_price = None
@@ -501,8 +549,17 @@ class OmniTrader:
                     symbol, risk_check.position_size
                 )
 
-            # Get actual fill price
-            entry_price = float(order.get("average", current_price))
+            # Verify order fill details
+            fill_details = await self.exchange.get_order_fill_details(
+                order["id"], symbol
+            )
+
+            # Use verified price if available, fallback to order response or current price
+            entry_price = fill_details.get("price") or float(order.get("average", current_price))
+            # If price is still 0 (verification failed), fallback to current_price
+            if entry_price == 0:
+                entry_price = current_price
+
             notional = risk_check.position_size * entry_price
 
             # Calculate slippage
@@ -511,6 +568,15 @@ class OmniTrader:
                 slippage = entry_price - current_price
             else:
                 slippage = current_price - entry_price
+
+            logger.info(
+                "order_fill_verified",
+                side=side,
+                expected=current_price,
+                actual=entry_price,
+                slippage=slippage,
+                fee=fill_details.get("fee")
+            )
 
             # Recalculate SL/TP with actual entry
             stop_loss = self.risk.calculate_stop_loss(entry_price, side)
@@ -588,8 +654,15 @@ class OmniTrader:
             if order is None:
                 return
 
+            # Verify order fill details
+            fill_details = await self.exchange.get_order_fill_details(
+                order["id"], symbol
+            )
+
             # Calculate P/L
-            exit_price = float(order.get("average") or order.get("price") or current_price)
+            exit_price = fill_details.get("price") or float(order.get("average") or order.get("price") or current_price)
+            if exit_price == 0:
+                exit_price = current_price
 
             # Calculate Slippage (Positive = Bad, Negative = Good)
             # Long Exit (Sell): Expected - Actual
@@ -599,6 +672,15 @@ class OmniTrader:
                 slippage = expected_price - exit_price
             else:
                 slippage = exit_price - expected_price
+
+            logger.info(
+                "close_fill_verified",
+                side=position.side,
+                expected=expected_price,
+                actual=exit_price,
+                slippage=slippage,
+                fee=fill_details.get("fee")
+            )
 
             if position.side == "long":
                 pnl = (exit_price - position.entry_price) * position.size

@@ -45,9 +45,17 @@ async def test_close_position_slippage(bot):
 
     # Mock close_position to return an order with a different average price
     bot.exchange.close_position = AsyncMock(return_value={
+        "id": "123",
         "average": 50900.0, # Actual fill price (worse than expected)
         "price": 50900.0,
         "filled": 1.0
+    })
+
+    bot.exchange.get_order_fill_details = AsyncMock(return_value={
+        "price": 50900.0,
+        "amount": 1.0,
+        "fee": 0.0,
+        "timestamp": 1234567890
     })
 
     bot.database.log_trade_close = AsyncMock()
