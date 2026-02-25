@@ -7,6 +7,7 @@ Uses SQLite for persistent storage of trades and daily summaries.
 from datetime import datetime
 from pathlib import Path
 from typing import Optional
+import shutil
 
 import aiosqlite
 import structlog
@@ -44,6 +45,26 @@ class Database:
         if self._connection:
             await self._connection.close()
             logger.info("database_disconnected")
+
+    async def backup_db(self):
+        """Create a backup of the database file."""
+        if self.db_path == ":memory:":
+            logger.warning("cannot_backup_memory_db")
+            return
+
+        try:
+            timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+            backup_path = self.db_path.parent / f"trades_backup_{timestamp}.db"
+
+            # Using shutil.copy2 to preserve metadata
+            # Note: SQLite WAL mode might have .wal and .shm files.
+            # For a hot backup, using the SQLite API would be better, but simple file copy is okay if we accept risk or pause.
+            # Ideally use 'VACUUM INTO' which is supported in newer SQLite.
+
+            await self._connection.execute(f"VACUUM INTO '{backup_path}'")
+            logger.info("database_backup_created", path=str(backup_path))
+        except Exception as e:
+            logger.error("database_backup_failed", error=str(e))
 
     async def _create_tables(self):
         """Create database tables if they don't exist."""
@@ -96,10 +117,20 @@ class Database:
                 indicators TEXT
             );
 
+            CREATE TABLE IF NOT EXISTS funding_payments (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                timestamp TEXT NOT NULL,
+                symbol TEXT NOT NULL,
+                rate REAL NOT NULL,
+                payment REAL NOT NULL,
+                position_size REAL NOT NULL
+            );
+
             CREATE INDEX IF NOT EXISTS idx_trades_timestamp ON trades(timestamp);
             CREATE INDEX IF NOT EXISTS idx_trades_symbol ON trades(symbol);
             CREATE INDEX IF NOT EXISTS idx_equity_timestamp ON equity_snapshots(timestamp);
             CREATE INDEX IF NOT EXISTS idx_signals_timestamp ON signals_log(timestamp);
+            CREATE INDEX IF NOT EXISTS idx_funding_timestamp ON funding_payments(timestamp);
         """
         )
         await self._connection.commit()
@@ -186,6 +217,11 @@ class Database:
         )
         await self._connection.commit()
 
+        logger.info(
+            "trade_logged", action="OPEN", symbol=symbol, side=side, price=price
+        )
+        return cursor.lastrowid
+
     async def get_open_trade_fee(self, symbol: str) -> float:
         """
         Get the fee of the last OPEN trade for a symbol.
@@ -202,11 +238,6 @@ class Database:
         )
         row = await cursor.fetchone()
         return float(row["fee"]) if row and row["fee"] else 0.0
-
-        logger.info(
-            "trade_logged", action="OPEN", symbol=symbol, side=side, price=price
-        )
-        return cursor.lastrowid
 
     async def log_trade_close(
         self,
@@ -376,3 +407,32 @@ class Database:
             ),
         )
         await self._connection.commit()
+
+    async def log_funding_payment(
+        self,
+        symbol: str,
+        rate: float,
+        payment: float,
+        position_size: float,
+    ) -> None:
+        """Log a funding payment."""
+        await self._connection.execute(
+            """
+            INSERT INTO funding_payments (timestamp, symbol, rate, payment, position_size)
+            VALUES (?, ?, ?, ?, ?)
+            """,
+            (
+                datetime.utcnow().isoformat(),
+                symbol,
+                rate,
+                payment,
+                position_size,
+            ),
+        )
+        await self._connection.commit()
+        logger.info(
+            "funding_payment_logged",
+            symbol=symbol,
+            rate=rate,
+            payment=payment,
+        )

@@ -9,11 +9,15 @@ import StrategySelector from './components/StrategySelector'
 import ConfigEditor from './components/ConfigEditor'
 import BotControl from './components/BotControl'
 import DiscordConfig from './components/DiscordConfig'
+import RiskDashboard from './components/RiskDashboard'
+import SlippageReport from './components/SlippageReport'
 
-type Page = 'dashboard' | 'trades' | 'config' | 'notifications'
+type Page = 'dashboard' | 'risk' | 'slippage' | 'trades' | 'config' | 'notifications'
 
 const NAV: { id: Page; label: string }[] = [
   { id: 'dashboard',     label: '📊 Dashboard' },
+  { id: 'risk',          label: '🛡️ Risk' },
+  { id: 'slippage',      label: '📉 Slippage' },
   { id: 'trades',        label: '📋 Trades' },
   { id: 'config',        label: '⚙️ Config' },
   { id: 'notifications', label: '🔔 Notifications' },
@@ -61,6 +65,14 @@ export default function App() {
             </div>
             <EquityCurve />
           </>
+        )}
+
+        {page === 'risk' && (
+          <RiskDashboard />
+        )}
+
+        {page === 'slippage' && (
+          <SlippageReport />
         )}
 
         {page === 'trades' && (

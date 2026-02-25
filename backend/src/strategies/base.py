@@ -10,6 +10,7 @@ from enum import Enum
 from typing import Any, Dict
 
 import pandas as pd
+import pandas_ta as ta
 import structlog
 
 from src.config import Config
@@ -155,3 +156,29 @@ class BaseStrategy(ABC):
         Can be overridden by subclasses to provide specific indicators.
         """
         return {}
+
+    def check_trend(self, ohlcv: pd.DataFrame, period: int = 200) -> str:
+        """
+        Determine market trend using EMA 200 (or specified period).
+
+        Returns:
+            "bullish" if Close > EMA, "bearish" if Close < EMA, "neutral" if undefined.
+        """
+        if len(ohlcv) < period:
+            return "neutral"
+
+        try:
+            ema = ta.ema(ohlcv["close"], length=period)
+            if ema is None or pd.isna(ema.iloc[-1]):
+                return "neutral"
+
+            current_close = ohlcv["close"].iloc[-1]
+            current_ema = ema.iloc[-1]
+
+            if current_close > current_ema:
+                return "bullish"
+            else:
+                return "bearish"
+        except Exception as e:
+            logger.warning("trend_check_failed", error=str(e))
+            return "neutral"
