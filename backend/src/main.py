@@ -11,7 +11,7 @@ import asyncio
 import logging
 import signal
 import sys
-from datetime import datetime
+from datetime import datetime, timezone
 
 import structlog
 import uvicorn
@@ -173,22 +173,63 @@ class OmniTrader:
                 last_trade_id=last_trade["id"],
             )
 
-            # We don't know the exact exit price, so use current market price (approx)
-            # or try to fetch last user trade from exchange (better)
-            # For MVP, use ticker price as approximation, or SL if reasonable
-            ticker = await self.exchange.get_ticker(symbol)
-            current_price = float(ticker["last"])
-            exit_price = current_price
+            exit_price = 0.0
+            found_trade = False
 
-            if last_trade.get("stop_loss"):
-                sl = float(last_trade["stop_loss"])
-                # If current price is below SL (long) or above SL (short),
-                # it's likely the SL was hit. Use SL as exit price.
-                side = last_trade["side"].lower()
-                if side == "long" and current_price < sl:
-                    exit_price = sl
-                elif side == "short" and current_price > sl:
-                    exit_price = sl
+            # Try to fetch actual trade from exchange history
+            try:
+                # Fetch recent trades
+                trades = await self.exchange.fetch_my_trades(symbol, limit=20)
+
+                # Parse last open timestamp (ISO format in DB, assumed UTC)
+                last_open_dt = datetime.fromisoformat(last_trade["timestamp"])
+                # Ensure it's treated as UTC before converting to timestamp
+                if last_open_dt.tzinfo is None:
+                    last_open_dt = last_open_dt.replace(tzinfo=timezone.utc)
+                last_open_ts = last_open_dt.timestamp() * 1000
+
+                # Filter for trades that closed this position (after open, opposite side)
+                # Note: last_trade['side'] is UPPER ("LONG"/"SHORT"), exchange trade['side'] is lower ("buy"/"sell")
+                db_side = last_trade["side"].lower()
+                closing_side = "sell" if db_side == "long" else "buy"
+
+                closing_trades = [
+                    t for t in trades
+                    if t["timestamp"] > last_open_ts and t["side"] == closing_side
+                ]
+
+                if closing_trades:
+                    # Calculate weighted average price if multiple fills
+                    total_vol = sum(t["amount"] for t in closing_trades)
+                    total_notional = sum(t["amount"] * t["price"] for t in closing_trades)
+                    if total_vol > 0:
+                        exit_price = total_notional / total_vol
+                        found_trade = True
+                        logger.info(
+                            "reconciliation_found_trade",
+                            exit_price=exit_price,
+                            trades_count=len(closing_trades)
+                        )
+
+            except Exception as e:
+                logger.error("reconciliation_fetch_failed", error=str(e))
+
+            # Fallback if trade not found (e.g. liquidated or too old)
+            if not found_trade:
+                logger.warning("reconciliation_trade_not_found_using_fallback")
+                ticker = await self.exchange.get_ticker(symbol)
+                current_price = float(ticker["last"])
+                exit_price = current_price
+
+                if last_trade.get("stop_loss"):
+                    sl = float(last_trade["stop_loss"])
+                    # If current price is below SL (long) or above SL (short),
+                    # it's likely the SL was hit. Use SL as exit price.
+                    side = last_trade["side"].lower()
+                    if side == "long" and current_price < sl:
+                        exit_price = sl
+                    elif side == "short" and current_price > sl:
+                        exit_price = sl
 
             entry_price = float(last_trade["price"])
             size = float(last_trade["size"])
@@ -534,6 +575,9 @@ class OmniTrader:
             logger.warning("no_position_to_close")
             return
 
+        # Store expected price (decision price)
+        expected_price = current_price
+
         try:
             # Cancel any existing orders
             await self.exchange.cancel_all_orders(symbol)
@@ -545,7 +589,17 @@ class OmniTrader:
                 return
 
             # Calculate P/L
-            exit_price = float(order.get("average", current_price))
+            exit_price = float(order.get("average") or order.get("price") or current_price)
+
+            # Calculate Slippage (Positive = Bad, Negative = Good)
+            # Long Exit (Sell): Expected - Actual
+            # Short Exit (Buy): Actual - Expected
+            slippage = 0.0
+            if position.side == "long":
+                slippage = expected_price - exit_price
+            else:
+                slippage = exit_price - expected_price
+
             if position.side == "long":
                 pnl = (exit_price - position.entry_price) * position.size
                 pnl_pct = (
@@ -570,6 +624,8 @@ class OmniTrader:
                 pnl=pnl,
                 pnl_pct=pnl_pct,
                 reason=reason,
+                expected_price=expected_price,
+                slippage=slippage,
             )
 
             # Send notification

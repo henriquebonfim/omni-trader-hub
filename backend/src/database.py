@@ -183,6 +183,8 @@ class Database:
         pnl: float,
         pnl_pct: float,
         reason: str = "signal",
+        expected_price: float | None = None,
+        slippage: float | None = None,
     ) -> int:
         """
         Log a trade close event.
@@ -192,8 +194,11 @@ class Database:
         """
         cursor = await self._connection.execute(
             """
-            INSERT INTO trades (timestamp, symbol, side, action, price, size, notional, pnl, pnl_pct, reason)
-            VALUES (?, ?, ?, 'CLOSE', ?, ?, ?, ?, ?, ?)
+            INSERT INTO trades (
+                timestamp, symbol, side, action, price, size, notional, pnl, pnl_pct, reason,
+                expected_price, slippage
+            )
+            VALUES (?, ?, ?, 'CLOSE', ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 datetime.utcnow().isoformat(),
@@ -205,6 +210,8 @@ class Database:
                 pnl,
                 pnl_pct,
                 reason,
+                expected_price,
+                slippage,
             ),
         )
         await self._connection.commit()
