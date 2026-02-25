@@ -79,7 +79,9 @@ async def test_log_trade_close(db):
         notional=5100.0,
         pnl=100.0,
         pnl_pct=2.0,
-        reason="take_profit"
+        reason="take_profit",
+        expected_price=50950.0,
+        slippage=-50.0  # Favorable
     )
     assert trade_id == 1
 
@@ -91,6 +93,8 @@ async def test_log_trade_close(db):
     assert trade["price"] == 51000.0
     assert trade["pnl"] == 100.0
     assert trade["pnl_pct"] == 2.0
+    assert trade["expected_price"] == 50950.0
+    assert trade["slippage"] == -50.0
 
 @pytest.mark.asyncio
 async def test_get_last_trade(db):

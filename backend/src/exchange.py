@@ -619,3 +619,28 @@ class Exchange:
         """Get current market price."""
         ticker = await self.get_ticker(symbol)
         return float(ticker["last"])
+
+    async def fetch_my_trades(
+        self, symbol: str | None = None, limit: int = 10, since: int = None
+    ) -> list:
+        """
+        Fetch user's trade history.
+
+        Args:
+            symbol: Trading pair
+            limit: Number of trades to fetch
+            since: Timestamp in ms to fetch from
+
+        Returns:
+            List of trade dictionaries
+        """
+        symbol = symbol or self.config.trading.symbol
+
+        if self.paper_mode:
+            # Paper mode doesn't track trade history persistently in exchange wrapper yet.
+            # We could return empty list or implement a paper trade log if needed.
+            # For now, return empty to avoid errors, or maybe we should log paper trades to a list?
+            # Given we use this for reconciliation, returning empty list is safer than crashing.
+            return []
+
+        return await self.client.fetch_my_trades(symbol, since=since, limit=limit)
