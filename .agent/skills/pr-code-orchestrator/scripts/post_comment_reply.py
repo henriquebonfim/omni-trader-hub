@@ -15,12 +15,6 @@ def run(cmd):
     return subprocess.run(cmd, check=True, capture_output=True, text=True)
 
 
-def get_repo():
-    result = run(["gh", "repo", "view", "--json", "nameWithOwner"])
-    data = json.loads(result.stdout)
-    return data["nameWithOwner"]  # owner/repo
-
-
 def load_matrix():
     if not MATRIX_FILE.exists():
         print("Matrix file not found.")
@@ -48,6 +42,7 @@ def create_issue(pr_number, entry):
 
 def build_body(entry):
     status = entry["status"].replace("_", " ")
+
     commit = entry.get("commit_sha") or "N/A"
     issue_number = entry.get("issue_number")
 
@@ -70,11 +65,10 @@ def build_body(entry):
     return "\n".join(body_lines)
 
 
-def reply_to_comment(repo, entry, body):
-    # Always use comment replies (safe for self-PRs)
+def reply_to_comment(entry, body):
     run([
         "gh", "api",
-        f"repos/{repo}/pulls/comments/{entry['comment_id']}/replies",
+        f"repos/:owner/:repo/pulls/comments/{entry['comment_id']}/replies",
         "-f", f"body={body}"
     ])
 
@@ -85,7 +79,6 @@ def main():
         sys.exit(1)
 
     pr_number = sys.argv[1]
-    repo = get_repo()
     matrix = load_matrix()
 
     for entry in matrix:
@@ -95,11 +88,11 @@ def main():
             entry["issue_number"] = issue_number
 
         body = build_body(entry)
-        reply_to_comment(repo, entry, body)
+        reply_to_comment(entry, body)
 
     # Persist updated matrix (with issue numbers)
     with open(MATRIX_FILE, "w") as f:
-        json.dump(matrix, f, indent=2)
+        json.dump(matrix, f)
 
 
 if __name__ == "__main__":
