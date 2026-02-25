@@ -17,12 +17,30 @@ def run(cmd):
     return subprocess.run(cmd, check=True, capture_output=True, text=True)
 
 
+def get_repo():
+    result = run(["gh", "repo", "view", "--json", "nameWithOwner"])
+    return json.loads(result.stdout)["nameWithOwner"]
+
+
 def get_commit_sha(pr_number):
     result = run([
         "gh", "pr", "view", pr_number,
         "--json", "headRefOid"
     ])
     return json.loads(result.stdout)["headRefOid"]
+
+
+def get_pr_author(pr_number):
+    result = run([
+        "gh", "pr", "view", pr_number,
+        "--json", "author"
+    ])
+    return json.loads(result.stdout)["author"]["login"]
+
+
+def get_authenticated_user():
+    result = run(["gh", "api", "user"])
+    return json.loads(result.stdout)["login"]
 
 
 def load_json(path):
@@ -77,6 +95,7 @@ def main():
         print("Matrix file not found.")
         sys.exit(1)
 
+    repo = get_repo()
     issues = load_json(MATRIX_FILE) or []
     runtime_summary = load_json(RUNTIME_FILE)
 
@@ -84,9 +103,19 @@ def main():
 
     comments = [build_comment(issue) for issue in issues]
 
+    pr_author = get_pr_author(pr_number)
+    current_user = get_authenticated_user()
+
+    is_self_pr = pr_author == current_user
+
+    if is_self_pr:
+        review_event = "COMMENT"
+    else:
+        review_event = "REQUEST_CHANGES" if issues else "APPROVE"
+
     review_payload = {
         "commit_id": commit_sha,
-        "event": "REQUEST_CHANGES" if issues else "APPROVE",
+        "event": review_event,
         "body": build_review_body(runtime_summary, len(issues)),
         "comments": comments
     }
@@ -98,7 +127,7 @@ def main():
 
     subprocess.run([
         "gh", "api",
-        f"repos/:owner/:repo/pulls/{pr_number}/reviews",
+        f"repos/{repo}/pulls/{pr_number}/reviews",
         "--input", str(PAYLOAD_FILE)
     ], check=True)
 
