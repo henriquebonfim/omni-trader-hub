@@ -178,9 +178,6 @@ class OmniTrader:
 
             # Try to fetch actual trade from exchange history
             try:
-                # Fetch recent trades
-                trades = await self.exchange.fetch_my_trades(symbol, limit=20)
-
                 # Parse last open timestamp (ISO format in DB, assumed UTC)
                 last_open_dt = datetime.fromisoformat(last_trade["timestamp"])
                 # Ensure it's treated as UTC before converting to timestamp
@@ -188,27 +185,76 @@ class OmniTrader:
                     last_open_dt = last_open_dt.replace(tzinfo=timezone.utc)
                 last_open_ts = last_open_dt.timestamp() * 1000
 
+                # Fetch trades since open
+                trades = await self.exchange.fetch_my_trades(
+                    symbol, since=last_open_ts, limit=50
+                )
+
                 # Filter for trades that closed this position (after open, opposite side)
                 # Note: last_trade['side'] is UPPER ("LONG"/"SHORT"), exchange trade['side'] is lower ("buy"/"sell")
                 db_side = last_trade["side"].lower()
                 closing_side = "sell" if db_side == "long" else "buy"
 
-                closing_trades = [
-                    t for t in trades
+                candidate_closing_trades = [
+                    t
+                    for t in trades
                     if t["timestamp"] > last_open_ts and t["side"] == closing_side
                 ]
 
-                if closing_trades:
+                if candidate_closing_trades:
+                    # Determine original position size from DB trade
+                    position_size_raw = last_trade.get("size") or last_trade.get("amount")
+                    try:
+                        position_size = (
+                            abs(float(position_size_raw))
+                            if position_size_raw is not None
+                            else 0.0
+                        )
+                    except (TypeError, ValueError):
+                        position_size = 0.0
+
+                    # Sort by time so we can take the earliest fills that close the position
+                    sorted_trades = sorted(
+                        candidate_closing_trades, key=lambda t: t["timestamp"]
+                    )
+
+                    if position_size > 0:
+                        # Accumulate fills until we've matched or exceeded the original position size
+                        closing_trades = []
+                        cumulative_amount = 0.0
+                        for t in sorted_trades:
+                            closing_trades.append(t)
+                            try:
+                                amt = float(t["amount"])
+                            except (TypeError, ValueError):
+                                amt = 0.0
+                            cumulative_amount += abs(amt)
+                            if cumulative_amount >= position_size:
+                                break
+                    else:
+                        # Fallback to all opposite-side trades if size unknown
+                        closing_trades = sorted_trades
+
                     # Calculate weighted average price if multiple fills
-                    total_vol = sum(t["amount"] for t in closing_trades)
-                    total_notional = sum(t["amount"] * t["price"] for t in closing_trades)
+                    total_vol = sum(
+                        abs(float(t["amount"]))
+                        for t in closing_trades
+                        if t.get("amount") is not None
+                    )
+                    total_notional = sum(
+                        abs(float(t["amount"])) * float(t["price"])
+                        for t in closing_trades
+                        if t.get("amount") is not None and t.get("price") is not None
+                    )
+
                     if total_vol > 0:
                         exit_price = total_notional / total_vol
                         found_trade = True
                         logger.info(
                             "reconciliation_found_trade",
                             exit_price=exit_price,
-                            trades_count=len(closing_trades)
+                            trades_count=len(closing_trades),
+                            candidate_trades_count=len(candidate_closing_trades),
                         )
 
             except Exception as e:

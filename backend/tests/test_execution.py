@@ -106,9 +106,9 @@ async def test_reconcile_positions_with_trades(bot):
     bot.database.log_trade_close.assert_called_once()
     call_args = bot.database.log_trade_close.call_args[1]
 
-    # Should use price from trade (50500.0), not ticker or SL
     assert call_args["price"] == 50500.0
     assert call_args["reason"] == "reconciliation_detected_close"
+    bot.exchange.get_ticker.assert_not_called()
 
 @pytest.mark.asyncio
 async def test_reconcile_positions_fallback(bot):
