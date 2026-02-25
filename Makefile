@@ -1,7 +1,7 @@
 # OmniTrader Makefile
 # ====================
 
-.PHONY: install run live test clean logs help
+.PHONY: install run live test clean logs help db-stats dev check
 
 # Default target
 help:
@@ -17,38 +17,44 @@ help:
 # Install dependencies
 install:
 	@echo "Creating virtual environment..."
-	uv venv
-	@echo "Installing dependencies..."
-	. .venv/bin/activate && uv pip install -r requirements.txt
+	cd backend && uv venv
+	@echo "Installing backend dependencies..."
+	cd backend && . .venv/bin/activate && uv pip install -r requirements.txt
+	@echo "Installing frontend dependencies..."
+	cd frontend && npm install
 	@echo "Creating data directory..."
-	mkdir -p data
+	mkdir -p backend/data
 	@echo "Installation complete! Run 'make run' to start."
 
 # Run in paper trading mode (default)
 run:
-	@echo "Starting OmniTrader in PAPER mode..."
-	. .venv/bin/activate && python -m src.main
+	@echo "Starting OmniTrader Backend & Frontend in PAPER mode..."
+	@(cd backend && . .venv/bin/activate && python -m src.main) & \
+	(cd frontend && bun dev) & \
+	wait
 
 # Run in live trading mode
 live:
 	@echo "⚠️  Starting OmniTrader in LIVE mode!"
 	@echo "Press Ctrl+C within 5 seconds to cancel..."
 	@sleep 5
-	. .venv/bin/activate && OMNITRADER_LIVE=1 python -m src.main
+	@(cd backend && . .venv/bin/activate && OMNITRADER_LIVE=1 python -m src.main) & \
+	(cd frontend && npm run dev) & \
+	wait
 
 # Run tests
 test:
-	. .venv/bin/activate && python -m pytest tests/ -v
+	cd backend && . .venv/bin/activate && python -m pytest tests/ -v
 
 # Show recent logs
 logs:
 	@echo "Recent trade activity:"
-	@sqlite3 data/trades.db "SELECT * FROM trades ORDER BY opened_at DESC LIMIT 10;" 2>/dev/null || echo "No trades yet"
+	@sqlite3 backend/data/trades.db "SELECT * FROM trades ORDER BY opened_at DESC LIMIT 10;" 2>/dev/null || echo "No trades yet"
 
 # Database statistics
 db-stats:
 	@echo "=== Trade Statistics ==="
-	@sqlite3 data/trades.db "\
+	@sqlite3 backend/data/trades.db "\
 		SELECT \
 			COUNT(*) as total_trades, \
 			SUM(CASE WHEN pnl > 0 THEN 1 ELSE 0 END) as wins, \
@@ -59,19 +65,24 @@ db-stats:
 # Clean up
 clean:
 	@echo "Cleaning up..."
-	rm -rf .venv __pycache__ src/__pycache__
-	rm -f data/trades.db
+	rm -rf backend/.venv backend/__pycache__ backend/src/__pycache__
+	rm -f backend/data/trades.db
+	rm -rf frontend/node_modules
 	@echo "Clean complete"
 
 # Development: watch and run
 dev:
-	. .venv/bin/activate && python -m src.main 2>&1 | tee -a logs/omnitrader.log
+	@mkdir -p logs
+	@(cd backend && . .venv/bin/activate && python -m src.main 2>&1 | tee -a ../logs/omnitrader.log) & \
+	(cd frontend && npm run dev) & \
+	wait
 
 # Check config
 check:
 	@echo "=== Configuration Check ==="
-	@cat config/config.yaml
+	@cat backend/config/config.yaml
 	@echo ""
 	@echo "=== Environment Check ==="
 	@test -f .env && echo ".env file: ✓" || echo ".env file: ✗ (copy from .env.example)"
-	@test -f .venv/bin/activate && echo "Virtual env: ✓" || echo "Virtual env: ✗ (run 'make install')"
+	@test -f backend/.venv/bin/activate && echo "Backend Virtual env: ✓" || echo "Backend Virtual env: ✗ (run 'make install')"
+	@test -d frontend/node_modules && echo "Frontend Modules: ✓" || echo "Frontend Modules: ✗ (run 'make install')"

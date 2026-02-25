@@ -38,18 +38,19 @@ def test_trades_protected_when_key_set(mock_bot, monkeypatch):
     app = create_api(mock_bot)
     client = TestClient(app)
 
-    # Request without token
-    response = client.get("/api/trades")
-    # FastAPI HTTPBearer with auto_error=False returns 401 because of our logic in auth.py
-    assert response.status_code == 401
+    for endpoint in ["/api/trades", "/api/daily-summary/2023-01-01", "/api/equity"]:
+        # Request without token
+        response = client.get(endpoint)
+        # FastAPI HTTPBearer with auto_error=False returns 401 because of our logic in auth.py
+        assert response.status_code == 401
 
-    # Request with invalid token
-    response = client.get("/api/trades", headers={"Authorization": "Bearer wrong-token"})
-    assert response.status_code == 401
+        # Request with invalid token
+        response = client.get(endpoint, headers={"Authorization": "Bearer wrong-token"})
+        assert response.status_code == 401
 
-    # Request with valid token
-    response = client.get("/api/trades", headers={"Authorization": "Bearer test-secret"})
-    assert response.status_code == 200
+        # Request with valid token
+        response = client.get(endpoint, headers={"Authorization": "Bearer test-secret"})
+        assert response.status_code == 200
 
 def test_other_routes_unprotected(mock_bot, monkeypatch):
     # Set the API key

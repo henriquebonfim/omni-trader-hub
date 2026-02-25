@@ -1,3 +1,4 @@
+import hmac
 import os
 
 from fastapi import HTTPException, Security, status
@@ -22,7 +23,7 @@ async def verify_api_key(
         return None
 
     # If a key is configured but no credentials provided or they don't match
-    if not credentials or credentials.credentials != expected_key:
+    if not credentials or not hmac.compare_digest(credentials.credentials, expected_key):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid or missing API key",

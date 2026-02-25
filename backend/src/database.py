@@ -25,7 +25,8 @@ class Database:
             db_path = project_root / "data" / "trades.db"
 
         self.db_path = Path(db_path)
-        self.db_path.parent.mkdir(parents=True, exist_ok=True)
+        if db_path != ":memory:":
+            self.db_path.parent.mkdir(parents=True, exist_ok=True)
         self._connection: Optional[aiosqlite.Connection] = None
 
     async def connect(self):

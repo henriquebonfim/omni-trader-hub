@@ -1,12 +1,16 @@
 import asyncio
 from datetime import datetime
 
+import json
+from datetime import datetime, timezone
+
 import pytest
+import pytest_asyncio
 
 from src.database import Database
 
 
-@pytest.fixture
+@pytest_asyncio.fixture
 async def db():
     # Use :memory: for testing
     db = Database(":memory:")
@@ -25,6 +29,14 @@ async def test_connect_and_tables(db):
     assert "daily_summary" in tables
     assert "equity_snapshots" in tables
     assert "signals_log" in tables
+
+    async with db._connection.execute("SELECT name FROM sqlite_master WHERE type='index'") as cursor:
+        indexes = [row[0] for row in await cursor.fetchall()]
+
+    assert "idx_trades_timestamp" in indexes
+    assert "idx_trades_symbol" in indexes
+    assert "idx_equity_timestamp" in indexes
+    assert "idx_signals_timestamp" in indexes
 
 @pytest.mark.asyncio
 async def test_log_trade_open_and_get_recent(db):
@@ -92,6 +104,7 @@ async def test_get_last_trade(db):
     last_eth = await db.get_last_trade("ETH/USDT")
     assert last_eth["symbol"] == "ETH/USDT"
 
+    # Test None case
     last_none = await db.get_last_trade("SOL/USDT")
     assert last_none is None
 
@@ -131,6 +144,10 @@ async def test_daily_summary(db):
     assert summary["ending_balance"] == 10600.0
     assert summary["trades_count"] == 6
 
+    # Test None case for a non-existent date
+    summary_none = await db.get_daily_summary("1970-01-01")
+    assert summary_none is None
+
 @pytest.mark.asyncio
 async def test_equity_snapshots(db):
     await db.log_equity_snapshot(10000.0)
@@ -161,5 +178,4 @@ async def test_log_signal(db):
     assert signal["symbol"] == "BTC/USDT"
     assert signal["price"] == 52000.0
     assert signal["signal"] == "SELL"
-    import json
     assert json.loads(signal["indicators"]) == indicators
