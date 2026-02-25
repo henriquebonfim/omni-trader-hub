@@ -196,7 +196,9 @@ class Exchange:
             logger.info("exchange_connected", paper_mode=False, symbol=symbol)
             return True
 
-        return False
+        # Should be unreachable if raise happens in except block for non-paper mode,
+        # but as a safety for live mode if _markets_loaded is somehow False without exception:
+        raise ConnectionError("Failed to connect to exchange in live mode.")
 
     async def close(self):
         """Close exchange connection."""

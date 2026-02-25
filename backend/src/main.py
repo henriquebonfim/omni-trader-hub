@@ -188,7 +188,9 @@ class OmniTrader:
                 # Fetch all trades since the last known open trade
                 # Using 'since' parameter ensures we don't miss trades if they are older than 'limit'
                 since_ts = int(last_open_ts)
-                trades = await self.exchange.fetch_my_trades(symbol, since=since_ts, limit=50)
+                # Use configured lookback or default to 50
+                limit = getattr(self.config.risk, "reconciliation_lookback_trades", 50)
+                trades = await self.exchange.fetch_my_trades(symbol, since=since_ts, limit=limit)
 
                 # Filter for trades that closed this position (after open, opposite side)
                 # Note: last_trade['side'] is UPPER ("LONG"/"SHORT"), exchange trade['side'] is lower ("buy"/"sell")
@@ -630,18 +632,25 @@ class OmniTrader:
                 ) * 100
 
             # Adjust PnL for fees if currency matches quote currency (USDT)
-            # Ideally we log Gross PnL and Net PnL, but let's just log fees and let the dashboard handle it.
-            # Or should we subtract fees from realized_pnl in risk manager?
             # RiskManager.record_trade takes `pnl`.
             # Let's subtract fees from the reported PnL to RiskManager so it tracks Net Equity.
 
+            # Fetch opening trade to get entry fees
+            last_trade = await self.database.get_last_trade(symbol)
+            open_fee = 0.0
+            if last_trade and last_trade.get("fee"):
+                open_fee = float(last_trade["fee"])
+
             net_pnl = pnl
-            # Assuming fee is in USDT (quote currency) for linear futures usually.
+
+            # Subtract fees from Net PnL.
+            # Note: This assumes fees are in USDT (quote currency).
+            # If fees are in BNB or base asset, this simple subtraction is an approximation for MVP.
             if total_fee > 0:
-                 # If fee_currency is USDT, subtract it.
-                 # If BNB, we might need conversion, but for now assume USDT/quote.
-                 # For simplicity in MVP, if fee > 0, subtract it.
-                 net_pnl -= total_fee
+                net_pnl -= total_fee
+
+            if open_fee > 0:
+                net_pnl -= open_fee
 
             # Record in risk manager (use Net PnL to reflect actual equity change)
             self.risk.record_trade(net_pnl)
