@@ -11,7 +11,7 @@ import asyncio
 import logging
 import signal
 import sys
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta, date
 
 import structlog
 import uvicorn
@@ -87,6 +87,8 @@ class OmniTrader:
         self.ws_manager = None  # Set by main() after API creation
 
         self._reconcile_counter = 0
+        # Initialize to 60 so it runs immediately on first cycle
+        self._weekly_check_counter = 60
 
     async def reload_config(self):
         """Reload configuration and update all components."""
@@ -334,6 +336,10 @@ class OmniTrader:
 
     async def stop(self, reason: str = "Manual stop"):
         """Gracefully stop the trading bot."""
+        if not self._running:
+            logger.warning("omnitrader_already_stopped", reason=reason)
+            return
+
         logger.info("omnitrader_stopping", reason=reason)
 
         self._running = False
@@ -373,9 +379,34 @@ class OmniTrader:
         symbol = self.config.trading.symbol
 
         try:
-            # 1. Check circuit breaker
+            # 1. Check Circuit Breakers (Daily & Weekly)
             if self.risk.check_circuit_breaker():
                 logger.warning("circuit_breaker_active", status="skipping_cycle")
+                return
+
+            # Fetch balance early for risk checks
+            balance_info = await self.exchange.get_balance()
+            total_balance = balance_info["total"]
+
+            # 1b. Update Weekly Circuit Breaker Status (Throttled: every 60 cycles ~1 hour)
+            self._weekly_check_counter += 1
+            if self._weekly_check_counter >= 60:
+                self._weekly_check_counter = 0
+                try:
+                    today = date.today()
+                    start_of_week = today - timedelta(days=6) # 7 days inclusive
+                    weekly_pnl = await self.database.get_weekly_pnl(start_of_week.isoformat())
+
+                    if self.risk.check_weekly_circuit_breaker(weekly_pnl, total_balance):
+                        logger.critical("weekly_circuit_breaker_active", status="skipping_cycle")
+                        await self.notifier.send("🚨 **Weekly Circuit Breaker Triggered**! Trading paused.")
+                        return
+                except Exception as e:
+                    logger.error("weekly_circuit_breaker_check_failed", error=str(e))
+
+            # Check if breaker is ALREADY active (fast check)
+            if self.risk._weekly_circuit_breaker_active:
+                logger.warning("weekly_circuit_breaker_active", status="skipping_cycle")
                 return
 
             # 2. Get current position
@@ -389,8 +420,7 @@ class OmniTrader:
                 self._reconcile_counter = 0
 
             # 3. Update daily stats with current balance
-            balance_info = await self.exchange.get_balance()
-            self.risk.initialize_daily_stats(balance_info["total"])
+            self.risk.initialize_daily_stats(total_balance)
 
             # 4. Fetch market data
             limit = max(
@@ -399,6 +429,19 @@ class OmniTrader:
             )
             ohlcv = await self.exchange.fetch_ohlcv(symbol, limit=limit)
             current_price = float(ohlcv["close"].iloc[-1])
+
+            # 4b. Check Black Swan Event
+            if self.risk.check_black_swan(ohlcv):
+                try:
+                    if position.is_open:
+                        logger.critical("black_swan_flattening_positions")
+                        await self._close_position(position, current_price, "black_swan_emergency_exit")
+                except Exception as e:
+                    logger.error("black_swan_close_failed", error=str(e))
+                finally:
+                    await self.notifier.send("🚨 **BLACK SWAN DETECTED**: >10% move in 1h. Positions flattened. Bot stopping.")
+                    await self.stop("Black Swan Event")
+                    return
 
             # 5. Analyze with strategy
             result = self.strategy.analyze(ohlcv, current_side)
@@ -692,11 +735,10 @@ class OmniTrader:
             # RiskManager.record_trade takes `pnl`.
             # Let's subtract fees from the reported PnL to RiskManager so it tracks Net Equity.
 
-            # Fetch opening trade to get entry fees
-            last_trade = await self.database.get_last_trade(symbol)
-            open_fee = 0.0
-            if last_trade and last_trade.get("fee"):
-                open_fee = float(last_trade["fee"])
+            # Fetch opening trade to get entry fees.
+            # We specifically look for the last OPEN trade, not just the last trade (which could be this close if race condition, or older close).
+            # Assuming FIFO/single position logic for MVP.
+            open_fee = await self.database.get_open_trade_fee(symbol)
 
             net_pnl = pnl
 

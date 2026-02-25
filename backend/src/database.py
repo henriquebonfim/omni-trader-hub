@@ -186,6 +186,23 @@ class Database:
         )
         await self._connection.commit()
 
+    async def get_open_trade_fee(self, symbol: str) -> float:
+        """
+        Get the fee of the last OPEN trade for a symbol.
+
+        Args:
+            symbol: Trading pair
+
+        Returns:
+            Fee amount (0.0 if not found)
+        """
+        cursor = await self._connection.execute(
+            "SELECT fee FROM trades WHERE symbol=? AND action='OPEN' ORDER BY timestamp DESC LIMIT 1",
+            (symbol,),
+        )
+        row = await cursor.fetchone()
+        return float(row["fee"]) if row and row["fee"] else 0.0
+
         logger.info(
             "trade_logged", action="OPEN", symbol=symbol, side=side, price=price
         )
@@ -296,6 +313,26 @@ class Database:
         )
         row = await cursor.fetchone()
         return dict(row) if row else None
+
+    async def get_weekly_pnl(self, start_date: str) -> float:
+        """
+        Get total PnL since start_date (inclusive) directly from closed trades.
+        Using actual trades is more robust than daily summaries which might be stale.
+
+        Args:
+            start_date: Date string (YYYY-MM-DD)
+
+        Returns:
+            Total PnL
+        """
+        # start_date is YYYY-MM-DD. Use SQLite's date() function for robust comparison.
+        # This handles ISO strings with or without time/timezone correctly by truncating to date.
+        cursor = await self._connection.execute(
+            "SELECT SUM(pnl) as total_pnl FROM trades WHERE action='CLOSE' AND date(timestamp) >= ?",
+            (start_date,),
+        )
+        row = await cursor.fetchone()
+        return row["total_pnl"] if row and row["total_pnl"] is not None else 0.0
 
     async def log_equity_snapshot(self, balance: float) -> None:
         """Log current balance as an equity snapshot."""
