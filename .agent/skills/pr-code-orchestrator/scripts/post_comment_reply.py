@@ -5,7 +5,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-BASE_DIR = Path(".agent")
+BASE_DIR = Path(".agent/skills/pr-code-orchestrator")
 TMP_DIR = BASE_DIR / "tmp"
 
 MATRIX_FILE = TMP_DIR / "pr-code-orchestrator-matrix.json"
@@ -65,10 +65,10 @@ def build_body(entry):
     return "\n".join(body_lines)
 
 
-def reply_to_comment(entry, body, repo, pr_number):
+def reply_to_comment(entry, body):
     run([
         "gh", "api",
-        f"repos/{repo}/pulls/{pr_number}/comments/{entry['comment_id']}/replies",
+        f"repos/:owner/:repo/pulls/comments/{entry['comment_id']}/replies",
         "-f", f"body={body}"
     ])
 
@@ -79,10 +79,6 @@ def main():
         sys.exit(1)
 
     pr_number = sys.argv[1]
-
-    repo_result = run(["gh", "repo", "view", "--json", "nameWithOwner", "-q", ".nameWithOwner"])
-    repo = repo_result.stdout.strip()
-
     matrix = load_matrix()
 
     for entry in matrix:
@@ -92,11 +88,12 @@ def main():
             entry["issue_number"] = issue_number
 
         body = build_body(entry)
-        reply_to_comment(entry, body, repo, pr_number)
+        reply_to_comment(entry, body)
 
     # Persist updated matrix (with issue numbers)
     with open(MATRIX_FILE, "w") as f:
         json.dump(matrix, f)
+
 
 if __name__ == "__main__":
     main()
