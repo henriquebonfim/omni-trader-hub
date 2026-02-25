@@ -61,12 +61,8 @@ async def test_close_position_slippage(bot):
         "timestamp": 1234567890
     })
 
-    # Mock database connection for fee query
-    mock_cursor = AsyncMock()
-    mock_cursor.fetchone.return_value = {"fee": 2.0}
-
-    # Configure execute to be awaitable and return mock_cursor
-    bot.database._connection.execute = AsyncMock(return_value=mock_cursor)
+    # Mock database fee query
+    bot.database.get_open_trade_fee = AsyncMock(return_value=2.0)
 
     bot.database.log_trade_close = AsyncMock()
     bot.risk.record_trade = MagicMock()

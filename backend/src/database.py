@@ -186,6 +186,23 @@ class Database:
         )
         await self._connection.commit()
 
+    async def get_open_trade_fee(self, symbol: str) -> float:
+        """
+        Get the fee of the last OPEN trade for a symbol.
+
+        Args:
+            symbol: Trading pair
+
+        Returns:
+            Fee amount (0.0 if not found)
+        """
+        cursor = await self._connection.execute(
+            "SELECT fee FROM trades WHERE symbol=? AND action='OPEN' ORDER BY timestamp DESC LIMIT 1",
+            (symbol,),
+        )
+        row = await cursor.fetchone()
+        return float(row["fee"]) if row and row["fee"] else 0.0
+
         logger.info(
             "trade_logged", action="OPEN", symbol=symbol, side=side, price=price
         )

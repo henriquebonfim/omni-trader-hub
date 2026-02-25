@@ -455,9 +455,9 @@ class RiskManager:
             return True
         except Exception:
             logger.exception("black_swan_check_failed_unexpected_error")
-            # For unexpected errors, fail-safe open (don't trigger Black Swan)
-            # but log critical error.
-            return False
+            # For unexpected errors, fail-safe closed (trigger Black Swan stop).
+            # A silent False on unexpected error can mask real Black Swan events.
+            return True
 
         return False
 

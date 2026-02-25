@@ -80,8 +80,8 @@ async def test_liquidation_risk_trigger():
         "fee_currency": "USDT"
     }
 
-    # Mock database last trade for fee calculation
-    bot.database.get_last_trade.return_value = {"fee": 2.0}
+    # Mock database fee query
+    bot.database.get_open_trade_fee = AsyncMock(return_value=2.0)
 
     # Run Cycle
     await bot.run_cycle()

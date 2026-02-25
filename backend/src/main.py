@@ -87,7 +87,8 @@ class OmniTrader:
         self.ws_manager = None  # Set by main() after API creation
 
         self._reconcile_counter = 0
-        self._weekly_check_counter = 0
+        # Initialize to 60 so it runs immediately on first cycle
+        self._weekly_check_counter = 60
 
     async def reload_config(self):
         """Reload configuration and update all components."""
@@ -405,8 +406,8 @@ class OmniTrader:
 
             # Check if breaker is ALREADY active (fast check)
             if self.risk._weekly_circuit_breaker_active:
-                 logger.warning("weekly_circuit_breaker_active", status="skipping_cycle")
-                 return
+                logger.warning("weekly_circuit_breaker_active", status="skipping_cycle")
+                return
 
             # 2. Get current position
             position = await self.exchange.get_position(symbol)
@@ -431,13 +432,16 @@ class OmniTrader:
 
             # 4b. Check Black Swan Event
             if self.risk.check_black_swan(ohlcv):
-                if position.is_open:
-                    logger.critical("black_swan_flattening_positions")
-                    await self._close_position(position, current_price, "black_swan_emergency_exit")
-
-                await self.notifier.send("🚨 **BLACK SWAN DETECTED**: >10% move in 1h. Positions flattened. Bot stopping.")
-                await self.stop("Black Swan Event")
-                return
+                try:
+                    if position.is_open:
+                        logger.critical("black_swan_flattening_positions")
+                        await self._close_position(position, current_price, "black_swan_emergency_exit")
+                except Exception as e:
+                    logger.error("black_swan_close_failed", error=str(e))
+                finally:
+                    await self.notifier.send("🚨 **BLACK SWAN DETECTED**: >10% move in 1h. Positions flattened. Bot stopping.")
+                    await self.stop("Black Swan Event")
+                    return
 
             # 5. Analyze with strategy
             result = self.strategy.analyze(ohlcv, current_side)
@@ -734,12 +738,7 @@ class OmniTrader:
             # Fetch opening trade to get entry fees.
             # We specifically look for the last OPEN trade, not just the last trade (which could be this close if race condition, or older close).
             # Assuming FIFO/single position logic for MVP.
-            open_trade_fee_query = await self.database._connection.execute(
-                "SELECT fee FROM trades WHERE symbol=? AND action='OPEN' ORDER BY timestamp DESC LIMIT 1",
-                (symbol,)
-            )
-            open_trade_row = await open_trade_fee_query.fetchone()
-            open_fee = float(open_trade_row["fee"]) if open_trade_row and open_trade_row["fee"] else 0.0
+            open_fee = await self.database.get_open_trade_fee(symbol)
 
             net_pnl = pnl
 
