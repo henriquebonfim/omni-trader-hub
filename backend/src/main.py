@@ -334,6 +334,10 @@ class OmniTrader:
 
     async def stop(self, reason: str = "Manual stop"):
         """Gracefully stop the trading bot."""
+        if not self._running:
+            logger.warning("omnitrader_already_stopped", reason=reason)
+            return
+
         logger.info("omnitrader_stopping", reason=reason)
 
         self._running = False

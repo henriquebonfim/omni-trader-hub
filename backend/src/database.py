@@ -299,7 +299,8 @@ class Database:
 
     async def get_weekly_pnl(self, start_date: str) -> float:
         """
-        Get total PnL since start_date (inclusive).
+        Get total PnL since start_date (inclusive) directly from closed trades.
+        Using actual trades is more robust than daily summaries which might be stale.
 
         Args:
             start_date: Date string (YYYY-MM-DD)
@@ -307,8 +308,10 @@ class Database:
         Returns:
             Total PnL
         """
+        # start_date is YYYY-MM-DD, so we compare it against the ISO timestamp in trades table.
+        # ISO format: YYYY-MM-DDTHH:MM:SS. So string comparison works for >= 'YYYY-MM-DD'
         cursor = await self._connection.execute(
-            "SELECT SUM(pnl) as total_pnl FROM daily_summary WHERE date >= ?",
+            "SELECT SUM(pnl) as total_pnl FROM trades WHERE action='CLOSE' AND timestamp >= ?",
             (start_date,),
         )
         row = await cursor.fetchone()

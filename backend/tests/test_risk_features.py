@@ -1,9 +1,7 @@
 import pytest
-from unittest.mock import AsyncMock, MagicMock
-from datetime import datetime, date, timedelta
+from datetime import timedelta
 import pandas as pd
 from src.risk import RiskManager
-from src.main import OmniTrader
 
 @pytest.mark.asyncio
 async def test_weekly_circuit_breaker_triggered():
@@ -67,9 +65,11 @@ async def test_black_swan_detector_normal():
     times.reverse()
 
     data = {
+        "open": [49500.0] * 60,
         "high": [50000.0] * 60,
         "low": [49000.0] * 60, # 2% range
-        "close": [49500.0] * 60
+        "close": [49500.0] * 60,
+        "volume": [100.0] * 60
     }
     df = pd.DataFrame(data, index=times)
 

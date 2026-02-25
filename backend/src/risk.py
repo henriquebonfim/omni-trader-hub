@@ -446,8 +446,14 @@ class RiskManager:
                 )
                 return True
 
-        except Exception as e:
-            logger.error("black_swan_check_failed", error=str(e))
+        except (KeyError, IndexError, TypeError, AttributeError):
+            logger.exception("black_swan_check_failed_malformed_data")
+            # If data is malformed, we can't guarantee safety.
+            # Fail-safe: triggering stop is safer than running blind.
+            return True
+        except Exception:
+            logger.exception("black_swan_check_failed_unexpected_error")
+            return True
 
         return False
 
