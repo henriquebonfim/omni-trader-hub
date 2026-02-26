@@ -18,6 +18,7 @@ import uvicorn
 
 from src.strategies import Signal, get_strategy
 
+from .analysis.regime import RegimeClassifier
 from .config import get_config, reload_config
 from .database import Database
 from .exchange import Exchange
@@ -69,6 +70,7 @@ class OmniTrader:
         self.risk = RiskManager()
         self.notifier = Notifier()
         self.database = Database()
+        self.regime_classifier = RegimeClassifier()
 
         # Load strategy dynamically
         strategy_name = getattr(self.config.strategy, "name", "ema_volume")
@@ -504,6 +506,23 @@ class OmniTrader:
             # 5. Analyze with strategy
             result = self.strategy.analyze(market_data, current_side)
 
+            # 5a. Determine Market Regime
+            current_regime = self.regime_classifier.analyze(ohlcv)
+
+            # 5b. Regime Gating
+            # If current regime is not in strategy's valid regimes, force HOLD for entries.
+            # We allow exits to proceed even in wrong regime (to get out of trouble).
+            if current_regime not in self.strategy.valid_regimes:
+                if result.signal in (Signal.LONG, Signal.SHORT) and not position.is_open:
+                    logger.warning(
+                        "signal_rejected_regime_mismatch",
+                        signal=result.signal,
+                        regime=current_regime.value,
+                        valid_regimes=[r.value for r in self.strategy.valid_regimes],
+                    )
+                    result.signal = Signal.HOLD
+                    result.reason = f"Regime Mismatch: {current_regime.value}"
+
             # Sanitize indicators for JSON serialization (handle numpy types)
             def _sanitize(v):
                 if hasattr(v, "item"):  # Numpy scalar
@@ -529,6 +548,7 @@ class OmniTrader:
                 symbol=symbol,
                 price=current_price,
                 signal=result.signal.value,
+                regime=current_regime.value,
                 reason=result.reason,
                 indicators=sanitized_indicators,
             )
@@ -542,6 +562,7 @@ class OmniTrader:
                         "symbol": symbol,
                         "price": current_price,
                         "signal": result.signal.value,
+                        "regime": current_regime.value,
                         "reason": result.reason,
                         "indicators": sanitized_indicators,
                         "position": current_side,

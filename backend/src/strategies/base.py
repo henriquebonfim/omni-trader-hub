@@ -7,12 +7,13 @@ Defines the contract that all strategies must follow to be used in the bot.
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Dict
+from typing import Any, Dict, List
 
 import pandas as pd
 import pandas_ta as ta
 import structlog
 
+from src.analysis.regime import MarketRegime
 from src.config import Config
 
 logger = structlog.get_logger()
@@ -68,6 +69,17 @@ class BaseStrategy(ABC):
 
         Returns:
             Dict with keys like 'type' (trend/mean_reversion), 'risk' (low/medium/high)
+        """
+        pass
+
+    @property
+    @abstractmethod
+    def valid_regimes(self) -> List[MarketRegime]:
+        """
+        List of market regimes where this strategy is safe to operate.
+
+        Returns:
+            List of MarketRegime enums (e.g. [MarketRegime.TRENDING])
         """
         pass
 

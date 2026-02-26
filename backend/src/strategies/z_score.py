@@ -8,11 +8,12 @@ Logic:
 - Exit when Z-Score crosses 0 (Mean Reversion).
 """
 
-from typing import Any, Dict
+from typing import Any, Dict, List
 
 import pandas as pd
 import structlog
 
+from src.analysis.regime import MarketRegime
 from src.config import Config
 
 from .base import BaseStrategy
@@ -50,6 +51,10 @@ class ZScoreStrategy(BaseStrategy):
             "risk": "medium",
             "timeframe": "15m",
         }
+
+    @property
+    def valid_regimes(self) -> List[MarketRegime]:
+        return [MarketRegime.RANGING]
 
     @property
     def required_candles(self) -> int:

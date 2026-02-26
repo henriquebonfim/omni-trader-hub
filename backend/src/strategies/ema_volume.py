@@ -7,12 +7,13 @@ Logic:
 - Exit on opposite crossover.
 """
 
-from typing import Any, Dict
+from typing import Any, Dict, List
 
 import pandas as pd
 import pandas_ta as ta
 import structlog
 
+from src.analysis.regime import MarketRegime
 from src.config import Config
 
 from .base import BaseStrategy
@@ -64,6 +65,10 @@ class EMAVolumeStrategy(BaseStrategy):
             "risk": "medium",
             "timeframe": "15m",  # Default recommended
         }
+
+    @property
+    def valid_regimes(self) -> List[MarketRegime]:
+        return [MarketRegime.TRENDING]
 
     @property
     def required_candles(self) -> int:

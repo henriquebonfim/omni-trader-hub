@@ -113,6 +113,7 @@ class Database:
                 symbol TEXT NOT NULL,
                 price REAL NOT NULL,
                 signal TEXT NOT NULL,
+                regime TEXT,
                 reason TEXT,
                 indicators TEXT
             );
@@ -164,6 +165,16 @@ class Database:
                 logger.info("migrating_trades_table_add_fee_currency")
                 await self._connection.execute(
                     "ALTER TABLE trades ADD COLUMN fee_currency TEXT DEFAULT NULL"
+                )
+
+            # Check signals_log table for regime column
+            cursor = await self._connection.execute("PRAGMA table_info(signals_log)")
+            columns_signals = [row["name"] for row in await cursor.fetchall()]
+
+            if "regime" not in columns_signals:
+                logger.info("migrating_signals_log_table_add_regime")
+                await self._connection.execute(
+                    "ALTER TABLE signals_log ADD COLUMN regime TEXT DEFAULT NULL"
                 )
 
             await self._connection.commit()
@@ -386,6 +397,7 @@ class Database:
         symbol: str,
         price: float,
         signal: str,
+        regime: str,
         reason: str,
         indicators: dict,
     ) -> None:
@@ -394,14 +406,15 @@ class Database:
 
         await self._connection.execute(
             """
-            INSERT INTO signals_log (timestamp, symbol, price, signal, reason, indicators)
-            VALUES (?, ?, ?, ?, ?, ?)
+            INSERT INTO signals_log (timestamp, symbol, price, signal, regime, reason, indicators)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 datetime.utcnow().isoformat(),
                 symbol,
                 price,
                 signal,
+                regime,
                 reason,
                 json.dumps(indicators),
             ),
