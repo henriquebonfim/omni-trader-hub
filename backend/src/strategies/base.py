@@ -79,6 +79,14 @@ class BaseStrategy(ABC):
         """
         return 100
 
+    @property
+    def required_timeframes(self) -> list[str]:
+        """
+        List of timeframes required by the strategy.
+        Defaults to the configured trading timeframe.
+        """
+        return [self.config.trading.timeframe]
+
     @abstractmethod
     def update(self, ohlcv: pd.DataFrame, current_position: str | None = None):
         """
@@ -115,15 +123,31 @@ class BaseStrategy(ABC):
         self.config = config
 
     def analyze(
-        self, ohlcv: pd.DataFrame, current_position: str | None = None
+        self, market_data: Dict[str, pd.DataFrame], current_position: str | None = None
     ) -> StrategyResult:
         """
         Orchestrate strategy execution.
+
+        Args:
+            market_data: Dictionary mapping timeframe (str) to OHLCV DataFrame.
+            current_position: Current position side ("long", "short", or None).
 
         1. Update state
         2. Check for signals
         3. Return result
         """
+        # Default behavior: Extract primary timeframe and pass to update()
+        # Strategies requiring MTF should override analyze() or access other timeframes differently
+        primary_tf = self.config.trading.timeframe
+        ohlcv = market_data.get(primary_tf)
+
+        if ohlcv is None:
+            # Fallback or error if primary timeframe missing?
+            # Should be guaranteed by main loop if required_timeframes is correct.
+            # But let's be safe.
+            logger.error("primary_timeframe_data_missing", timeframe=primary_tf)
+            return StrategyResult(signal=Signal.HOLD, reason="Missing data")
+
         self.update(ohlcv, current_position)
 
         signal = Signal.HOLD

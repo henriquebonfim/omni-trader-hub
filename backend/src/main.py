@@ -461,16 +461,35 @@ class OmniTrader:
             # 3. Update daily stats with current balance
             self.risk.initialize_daily_stats(total_balance)
 
-            # 4. Fetch market data
+            # 4. Fetch market data (Multi-Timeframe)
             limit = max(
                 getattr(self.config.trading, "ohlcv_limit", 100),
                 self.strategy.required_candles,
             )
-            ohlcv = await self.exchange.fetch_ohlcv(symbol, limit=limit)
-            current_price = float(ohlcv["close"].iloc[-1])
 
-            # 4b. Check Black Swan Event
-            if self.risk.check_black_swan(ohlcv):
+            required_timeframes = self.strategy.required_timeframes
+            primary_tf = self.config.trading.timeframe
+
+            # Ensure primary timeframe is fetched even if strategy doesn't explicitly list it
+            if primary_tf not in required_timeframes:
+                required_timeframes.append(primary_tf)
+
+            market_data = {}
+            fetch_tasks = [
+                self.exchange.fetch_ohlcv(symbol, timeframe=tf, limit=limit)
+                for tf in required_timeframes
+            ]
+            results = await asyncio.gather(*fetch_tasks)
+
+            for tf, df in zip(required_timeframes, results):
+                market_data[tf] = df
+
+            # Get primary OHLCV for price and risk checks
+            primary_ohlcv = market_data[primary_tf]
+            current_price = float(primary_ohlcv["close"].iloc[-1])
+
+            # 4b. Check Black Swan Event (on primary timeframe)
+            if self.risk.check_black_swan(primary_ohlcv):
                 try:
                     if position.is_open:
                         logger.critical("black_swan_flattening_positions")
@@ -483,7 +502,7 @@ class OmniTrader:
                     return
 
             # 5. Analyze with strategy
-            result = self.strategy.analyze(ohlcv, current_side)
+            result = self.strategy.analyze(market_data, current_side)
 
             # Sanitize indicators for JSON serialization (handle numpy types)
             def _sanitize(v):
