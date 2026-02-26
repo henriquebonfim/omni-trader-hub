@@ -7,12 +7,13 @@ Logic:
 - Exit: Price crosses Middle Band (Mean Reversion)
 """
 
-from typing import Any, Dict
+from typing import Any, Dict, List
 
 import pandas as pd
 import pandas_ta as ta
 import structlog
 
+from src.analysis.regime import MarketRegime
 from src.config import Config
 
 from .base import BaseStrategy
@@ -60,6 +61,10 @@ class BollingerBandsStrategy(BaseStrategy):
             "timeframe": "15m",
             "description": "Mean reversion using BB and RSI",
         }
+
+    @property
+    def valid_regimes(self) -> List[MarketRegime]:
+        return [MarketRegime.RANGING]
 
     @property
     def required_candles(self) -> int:

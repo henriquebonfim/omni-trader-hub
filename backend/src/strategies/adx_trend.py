@@ -7,12 +7,13 @@ Logic:
 - Exit: Trend Reversal (DI Cross)
 """
 
-from typing import Any, Dict
+from typing import Any, Dict, List
 
 import pandas as pd
 import pandas_ta as ta
 import structlog
 
+from src.analysis.regime import MarketRegime
 from src.config import Config
 
 from .base import BaseStrategy
@@ -51,6 +52,10 @@ class ADXTrendStrategy(BaseStrategy):
             "risk": "low",
             "timeframe": "1h",
         }
+
+    @property
+    def valid_regimes(self) -> List[MarketRegime]:
+        return [MarketRegime.TRENDING]
 
     @property
     def required_candles(self) -> int:
