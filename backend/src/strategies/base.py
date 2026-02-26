@@ -115,27 +115,42 @@ class BaseStrategy(ABC):
         self.config = config
 
     def analyze(
-        self, ohlcv: pd.DataFrame, current_position: str | None = None
+        self,
+        ohlcv: pd.DataFrame,
+        current_position: str | None = None,
+        market_trend: str = "neutral",
     ) -> StrategyResult:
         """
         Orchestrate strategy execution.
 
         1. Update state
         2. Check for signals
-        3. Return result
+        3. Apply filters (trend)
+        4. Return result
         """
         self.update(ohlcv, current_position)
 
         signal = Signal.HOLD
         reason = "No signal"
+        trend_filter_enabled = getattr(self.config.strategy, "trend_filter_enabled", False)
 
         if current_position is None:
             if self.should_long():
-                signal = Signal.LONG
-                reason = "Strategy Entry Long"
+                if trend_filter_enabled and market_trend == "bearish":
+                    signal = Signal.HOLD
+                    reason = "Trend Filter (Bearish) blocked Long"
+                else:
+                    signal = Signal.LONG
+                    reason = "Strategy Entry Long"
+
             elif self.should_short():
-                signal = Signal.SHORT
-                reason = "Strategy Entry Short"
+                if trend_filter_enabled and market_trend == "bullish":
+                    signal = Signal.HOLD
+                    reason = "Trend Filter (Bullish) blocked Short"
+                else:
+                    signal = Signal.SHORT
+                    reason = "Strategy Entry Short"
+
         elif current_position == "long":
             if self.should_exit():
                 signal = Signal.EXIT_LONG

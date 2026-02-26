@@ -92,6 +92,38 @@ class Exchange:
         self.config = config
         self._markets_loaded = False
 
+    async def _check_rate_limit(self):
+        """
+        Check API rate limits and sleep if necessary.
+        Binance limit is usually 2400 per minute.
+        We'll keep a buffer of 400 (sleep if > 2000).
+        """
+        if self.paper_mode:
+            return
+
+        try:
+            # Check headers from last request
+            if hasattr(self.client, "last_response_headers") and self.client.last_response_headers:
+                headers = self.client.last_response_headers
+                # x-mbx-used-weight-1m
+                used_weight_1m = headers.get("x-mbx-used-weight-1m")
+
+                if used_weight_1m:
+                    weight = int(used_weight_1m)
+                    if weight > 2000:
+                        logger.warning("rate_limit_approaching", used=weight, limit=2400)
+                        # Simple backoff logic
+                        if weight > 2300:
+                            logger.warning("rate_limit_critical_sleep", duration=10)
+                            await asyncio.sleep(10)
+                        elif weight > 2200:
+                            logger.warning("rate_limit_high_sleep", duration=5)
+                            await asyncio.sleep(5)
+                        else:
+                            await asyncio.sleep(1)
+        except Exception as e:
+            logger.warning("rate_limit_check_failed", error=str(e))
+
     async def update_config(self, config):
         """Update exchange configuration."""
         old_paper_mode = self.paper_mode
@@ -219,6 +251,7 @@ class Exchange:
         Returns:
             DataFrame with columns: timestamp, open, high, low, close, volume
         """
+        await self._check_rate_limit()
         symbol = symbol or self.config.trading.symbol
         timeframe = timeframe or self.config.trading.timeframe
 
@@ -234,6 +267,7 @@ class Exchange:
 
     async def get_ticker(self, symbol: str | None = None) -> dict:
         """Get current ticker for symbol."""
+        await self._check_rate_limit()
         symbol = symbol or self.config.trading.symbol
 
         if self.paper_mode and not self._markets_loaded:
@@ -259,6 +293,7 @@ class Exchange:
                 "used": used,
             }
 
+        await self._check_rate_limit()
         balance = await self.client.fetch_balance()
         usdt = balance.get("USDT", {})
         return {
@@ -281,6 +316,7 @@ class Exchange:
                 return Position(self._paper_position)
             return Position()
 
+        await self._check_rate_limit()
         positions = await self.client.fetch_positions([symbol])
 
         for pos in positions:
@@ -299,6 +335,7 @@ class Exchange:
                 if o["status"] == "open" and o["symbol"] == symbol
             ]
 
+        await self._check_rate_limit()
         return await self.client.fetch_open_orders(symbol)
 
     async def market_long(
@@ -365,6 +402,7 @@ class Exchange:
             logger.info("paper_long_opened", symbol=symbol, amount=amount, price=price)
             return order
 
+        await self._check_rate_limit()
         order = await self.client.create_market_buy_order(
             symbol,
             amount,
@@ -438,6 +476,7 @@ class Exchange:
             logger.info("paper_short_opened", symbol=symbol, amount=amount, price=price)
             return order
 
+        await self._check_rate_limit()
         order = await self.client.create_market_sell_order(
             symbol,
             amount,
@@ -519,6 +558,7 @@ class Exchange:
             return order
 
         # Close by opening opposite position
+        await self._check_rate_limit()
         if position.side == "long":
             order = await self.client.create_market_sell_order(
                 symbol, position.size, params={"reduceOnly": True}
@@ -582,6 +622,7 @@ class Exchange:
             return order
 
         # Cancel existing open STOP_MARKET orders to replace them
+        await self._check_rate_limit()
         open_orders = await self.client.fetch_open_orders(symbol)
         cancel_tasks = [
             self.client.cancel_order(o["id"], symbol)
@@ -653,6 +694,7 @@ class Exchange:
             return order
 
         # Cancel existing open TAKE_PROFIT_MARKET orders
+        await self._check_rate_limit()
         open_orders = await self.client.fetch_open_orders(symbol)
         cancel_tasks = [
             self.client.cancel_order(o["id"], symbol)
@@ -685,6 +727,7 @@ class Exchange:
             logger.info("orders_cancelled", symbol=symbol, count=0)
             return []
 
+        await self._check_rate_limit()
         orders = await self.client.cancel_all_orders(symbol)
         logger.info("orders_cancelled", symbol=symbol, count=len(orders))
         return orders
@@ -726,6 +769,7 @@ class Exchange:
 
             return trades
 
+        await self._check_rate_limit()
         return await self.client.fetch_my_trades(symbol, since=since, limit=limit)
 
     async def fetch_funding_rate(self, symbol: str | None = None) -> float:
