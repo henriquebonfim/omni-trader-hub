@@ -14,6 +14,7 @@ async def test_liquidation_risk_trigger():
     bot.notifier = AsyncMock()
     bot.config = MagicMock()
     bot.config.trading.symbol = "BTC/USDT"
+    bot.config.trading.timeframe = "1h"
     bot.config.trading.ohlcv_limit = 100
 
     # Mock Balance
@@ -27,6 +28,7 @@ async def test_liquidation_risk_trigger():
 
     # Mock Strategy
     bot.strategy = MagicMock()
+    bot.strategy.required_timeframes = ["1h"]
     bot.strategy.required_candles = 100
     bot.strategy.analyze.return_value = MagicMock(signal=Signal.HOLD, indicators={})
 
@@ -100,6 +102,7 @@ async def test_liquidation_risk_safe():
     bot.notifier = AsyncMock()
     bot.config = MagicMock()
     bot.config.trading.symbol = "BTC/USDT"
+    bot.config.trading.timeframe = "1h"
     bot.config.trading.ohlcv_limit = 100
 
     # Mock Balance
@@ -112,6 +115,7 @@ async def test_liquidation_risk_safe():
 
     # Mock Strategy
     bot.strategy = MagicMock()
+    bot.strategy.required_timeframes = ["1h"]
     bot.strategy.required_candles = 100
     bot.strategy.analyze.return_value = MagicMock(signal=Signal.HOLD, indicators={})
 
