@@ -1,0 +1,51 @@
+# Context7 MCP Tool Guide
+
+Retrieved and query up-to-date documentation and code examples for any programming library or framework.
+
+## Usage Flow
+
+Using Context7 is a **two-step process**:
+1. **Resolve**: Turn a natural language name into a Library ID.
+2. **Query**: Use that ID to fetch documentation or code.
+
+---
+
+## 1. resolve-library-id
+
+Resolves a package/product name to a Context7-compatible library ID.
+
+> [!IMPORTANT]
+> You **MUST** call this tool before `query-docs` unless the user explicitly provides a library ID (e.g., `/org/project` or `/org/project/version`).
+
+### Parameters
+- **query**: The name of the library or package.
+
+### Output
+- **Library ID**: format: `/org/project`
+- **Name**: Official name.
+- **Description**: Summary.
+- **Code Snippets**: Count of examples.
+- **Source Reputation**: High, Medium, Low, or Unknown.
+- **Benchmark Score**: Quality indicator (0-100).
+- **Versions**: List of available versions.
+
+### Selection Rules
+1. Prioritize **Exact Name Matches**.
+2. Prioritize **High/Medium Reputation**.
+3. Prioritize higher **Snippet Counts** and **Benchmark Scores**.
+
+---
+
+## 2. query-docs
+
+Retrieves documentation and code examples using a resolved ID.
+
+### Parameters
+- **libraryId**: The exact ID obtained from `resolve-library-id`.
+- **query**: Specific documentation or code search term.
+
+---
+
+## Restrictions
+- **Limit**: Do not call either tool more than **3 times** per question.
+- **Fallback**: If no exact match is found after 3 tries, use the best available result or suggest refinements.

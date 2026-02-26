@@ -17,12 +17,20 @@ def run(cmd):
     return subprocess.run(cmd, check=True, capture_output=True, text=True)
 
 
-def get_commit_sha(pr_number):
+def get_pr_details(pr_number):
     result = run([
         "gh", "pr", "view", pr_number,
-        "--json", "headRefOid"
+        "--json", "headRefOid,author"
     ])
-    return json.loads(result.stdout)["headRefOid"]
+    data = json.loads(result.stdout)
+    return data["headRefOid"], data["author"]["login"]
+
+
+def get_current_user():
+    result = run([
+        "gh", "api", "user", "-q", ".login"
+    ])
+    return result.stdout.strip()
 
 
 def load_json(path):
@@ -80,13 +88,25 @@ def main():
     issues = load_json(MATRIX_FILE) or []
     runtime_summary = load_json(RUNTIME_FILE)
 
-    commit_sha = get_commit_sha(pr_number)
+    commit_sha, pr_author = get_pr_details(pr_number)
+
+    try:
+        current_user = get_current_user()
+    except Exception:
+        current_user = None
+
+    event = "COMMENT"
+    if current_user and pr_author != current_user:
+        if len(issues) > 0:
+            event = "REQUEST_CHANGES"
+        else:
+            event = "APPROVE"
 
     comments = [build_comment(issue) for issue in issues]
 
     review_payload = {
         "commit_id": commit_sha,
-        "event": "REQUEST_CHANGES" if issues else "APPROVE",
+        "event": event,
         "body": build_review_body(runtime_summary, len(issues)),
         "comments": comments
     }

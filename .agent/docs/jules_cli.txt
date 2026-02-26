@@ -1,0 +1,233 @@
+A CLI for Jules, the asynchronous coding agent from Google.
+
+Usage:
+  jules [flags]
+  jules [command]
+
+Examples:
+jules # Launch the TUI
+
+# Create a session (defaults to current working directory's repository)
+jules new "write unit tests"
+
+# Create a session for a specific repository
+jules new --repo torvalds/linux "write unit tests"
+
+# Create 3 parallel sessions for the same task
+jules new --repo torvalds/linux --parallel 3 "write unit tests"
+
+# List all sessions
+jules remote list --session
+
+# List all repos
+jules remote list --repo
+
+# Pull the result of a session
+jules remote pull --session 123456
+
+# Pull and apply the patch to the local repository
+jules remote pull --session 123456 --apply
+
+# Teleport to a session (clone repo + checkout branch + apply patch, or apply to existing repo)
+jules teleport 123456
+
+# Create multiple sessions for each task in TODO.md
+cat TODO.md | while IFS= read -r line; do\
+  jules new "$line";\
+done
+
+# Create a session based on the first issue assigned to @me
+gh issue list --assignee @me --limit 1 --json title | jq -r '.[0].title' | jules new
+
+# Use Gemini CLI to analyze GitHub issues and send the hardest one to Jules
+gemini -p "find the most tedious issue, print it verbatim\n$(gh issue list --assignee @me)" | jules new
+
+Available Commands:
+  completion  Generate the autocompletion script for the specified shell
+  help        Help about any command
+  login       Login your Google account to use Jules
+  logout      Logout your Google account
+  new         Assign a new session to Jules (defaults to current working directory)
+  remote      Interact with remote sessions, e.g. new/list/pull
+  teleport    Clone repository and apply session changes (or apply to existing repo)
+  version     Show the version
+
+Flags:
+  -h, --help           help for jules
+      --theme string   Which theme to use, dark/light (default "dark")
+
+Use "jules [command] --help" for more information about a command.
+
+Generate the autocompletion script for jules for the specified shell.
+See each sub-command's help for details on how to use the generated script.
+
+Usage:
+  jules completion [command]
+
+Available Commands:
+  bash        Generate the autocompletion script for bash
+  fish        Generate the autocompletion script for fish
+  powershell  Generate the autocompletion script for powershell
+  zsh         Generate the autocompletion script for zsh
+
+Flags:
+  -h, --help   help for completion
+
+Global Flags:
+      --theme string   Which theme to use, dark/light (default "dark")
+
+Use "jules completion [command] --help" for more information about a command.
+
+Login your Google account to use Jules
+
+Usage:
+  jules login [flags]
+
+Flags:
+  -h, --help                help for login
+      --no-launch-browser   Don't automatically open browser, use manual code entry instead
+
+Global Flags:
+      --theme string   Which theme to use, dark/light (default "dark")
+
+Logout your Google account
+
+Usage:
+  jules logout [flags]
+
+Flags:
+  -h, --help   help for logout
+
+Global Flags:
+      --theme string   Which theme to use, dark/light (default "dark")
+
+Assign a new session to Jules (defaults to current working directory)
+
+Usage:
+  jules new [flags]
+
+Examples:
+# Create a session using the current working directory's repository
+jules new "add the solarized dark theme"
+
+# Create a session for a specific repository
+jules new --repo jiahao42/jules-cli "add the solarized dark theme"
+
+# Create 3 parallel sessions for the same task
+jules new --repo jiahao42/jules-cli --parallel 3 "add the solarized dark theme"
+
+# Pipe input as the session description
+cat TODO.md | jules new
+
+Flags:
+  -h, --help           help for new
+      --parallel int   Number of parallel sessions to create for the same task (1-5) (default 1)
+      --repo string    Which repo you want Jules to work on (defaults to current working directory), example format: jiahao42/jules-cli
+
+Global Flags:
+      --theme string   Which theme to use, dark/light (default "dark")
+
+Interact with remote sessions, e.g. new/list/pull
+
+Usage:
+  jules remote [command]
+
+Available Commands:
+  list        List remote sessions or repos
+  new         Assign a new session to Jules in a remote VM
+  pull        Pull the result of a remote session
+
+Flags:
+  -h, --help   help for remote
+
+Global Flags:
+      --theme string   Which theme to use, dark/light (default "dark")
+
+Use "jules remote [command] --help" for more information about a command.
+
+List remote sessions or repos
+
+Usage:
+  jules remote list [flags]
+
+Examples:
+jules remote list --session
+
+Flags:
+  -h, --help      help for list
+      --repo      List all the repos connected to Jules
+      --session   List all the remote sessions
+
+Global Flags:
+      --theme string   Which theme to use, dark/light (default "dark")
+
+Assign a new session to Jules in a remote VM
+
+Usage:
+  jules remote new [flags]
+
+Examples:
+# Create a session using the current working directory's repository
+jules remote new --session "add the solarized dark theme"
+
+# Create a session for a specific repository
+jules remote new --repo jiahao42/jules-cli --session "add the solarized dark theme"
+
+# Create 3 parallel sessions for the same task
+jules remote new --repo jiahao42/jules-cli --session "add the solarized dark theme" --parallel 3
+
+Flags:
+  -h, --help             help for new
+      --parallel int     Number of parallel sessions to create for the same task (1-5) (default 1)
+      --repo string      Which repo you want Jules to work on (defaults to current working directory), example format: jiahao42/jules-cli
+      --session string   Create a Jules session based on your task, you may use pipe like 'cat task.md | jules remote new --repo jiahao42/jules-cli'
+
+Global Flags:
+      --theme string   Which theme to use, dark/light (default "dark")
+
+Pull the result of a remote session
+
+Usage:
+  jules remote pull [flags]
+
+Examples:
+jules remote pull --session 123456
+jules remote pull --session 123456 --apply
+
+Flags:
+      --apply            Apply the patch to the local repository
+  -h, --help             help for pull
+      --session string   The ID of the session you want to pull
+
+Global Flags:
+      --theme string   Which theme to use, dark/light (default "dark")
+
+Clone repository and apply session changes (or apply to existing repo)
+
+Usage:
+  jules teleport <session_id> [flags]
+
+Examples:
+jules teleport 123456
+
+# This command will:
+# - If not in a working directory: clone the repo, checkout the session's starting branch, and apply the patch
+# - If in a working directory: it will apply the patch to the current repository if it matches the session's repository
+
+
+Flags:
+  -h, --help   help for teleport
+
+Global Flags:
+      --theme string   Which theme to use, dark/light (default "dark")
+
+Show the version
+
+Usage:
+  jules version [flags]
+
+Flags:
+  -h, --help   help for version
+
+Global Flags:
+      --theme string   Which theme to use, dark/light (default "dark")

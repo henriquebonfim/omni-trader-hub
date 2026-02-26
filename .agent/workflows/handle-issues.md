@@ -18,6 +18,7 @@ description: /handle-issues
    - Structured per-issue replies
    - Confirmed task execution via /handle-code
    - Mandatory PR creation
+   - Generation of structured `TASKS.md` file (e.g. `gh issue list --json title,body > TASKS.md` or similar structured output) for handoff to the Jules CLI
    - Cleanup
 
 5. Final Validation:
