@@ -1,10 +1,10 @@
 # Stage 1: build
-FROM node:20-alpine AS builder
+FROM oven/bun:alpine AS builder
 WORKDIR /app
-COPY package.json package-lock.json* ./
-RUN npm install
+COPY package.json bun.lock ./
+RUN bun install
 COPY . .
-RUN npm run build
+RUN bun run build
 
 # Stage 2: serve with nginx
 FROM nginx:alpine

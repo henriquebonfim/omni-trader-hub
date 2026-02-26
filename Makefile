@@ -18,10 +18,10 @@ help:
 install:
 	@echo "Creating virtual environment..."
 	cd backend && uv venv
-	@echo "Installing backend dependencies..."
+	@echo "Installing backend	 dependencies..."
 	cd backend && . .venv/bin/activate && uv pip install -r requirements.txt
 	@echo "Installing frontend dependencies..."
-	cd frontend && npm install
+	cd frontend && bun install
 	@echo "Creating data directory..."
 	mkdir -p backend/data
 	@echo "Installation complete! Run 'make run' to start."
@@ -39,7 +39,7 @@ live:
 	@echo "Press Ctrl+C within 5 seconds to cancel..."
 	@sleep 5
 	@(cd backend && . .venv/bin/activate && OMNITRADER_LIVE=1 python -m src.main) & \
-	(cd frontend && npm run dev) & \
+	(cd frontend && bun dev) & \
 	wait
 
 # Run tests
@@ -74,7 +74,7 @@ clean:
 dev:
 	@mkdir -p logs
 	@(cd backend && . .venv/bin/activate && python -m src.main 2>&1 | tee -a ../logs/omnitrader.log) & \
-	(cd frontend && npm run dev) & \
+	(cd frontend && bun dev) & \
 	wait
 
 # Check config
