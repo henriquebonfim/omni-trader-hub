@@ -17,7 +17,7 @@ That's it. The orchestrator handles everything from there.
 ## Pipeline Overview
 
 ```
-Issues → Triage → Score → Branch → Implement → PR → Review → Merge → Release
+Issues → Triage → Score → Branch → Implement → PR → Review → Merge → Release → O11y (Friction)
 ```
 
 | Stage | Command | What happens |
@@ -37,7 +37,9 @@ Issues → Triage → Score → Branch → Implement → PR → Review → Merge
 ```
 .agent/
 ├── AGENTS.md               ← You are here
-├── _gitignore-additions.txt ← Add these 8 lines to your root .gitignore
+├── _gitignore-additions.txt ← Add these 8 lines to your root .ignore
+├── logs/                   ← System Observability (O11y)
+│   └── FRICTION.md          ← Global Friction Log (Black Box Recorder)
 │
 ├── skills/
 │   ├── issue-task-orchestrator/
@@ -197,10 +199,21 @@ gh run list --branch main --limit 3 --json status,conclusion
 make j-dispatch ARGS="--repo owner/repo" TASK="enriched task description"
 make j-dispatch ARGS="--repo owner/repo" PARALLEL=1 TASK="task"
 make j-list
-make j-pull ID=N
 make j-pull ID=N # With --apply integrated in j-pull
+make j-pull-apply ID=N # Explicit pull with --apply
 make j-teleport ID=SESSION_ID
 ```
+
+---
+
+## Jules Discipline
+
+To guarantee a clean handoff from Jules remote sessions to the local workspace:
+
+1. **Local Branch First**: Always create a feature branch (`git checkout -b feature/...`) before pulling changes.
+2. **Apply with Pull**: Use `jules remote pull --session <ID> --apply`. This ensures the changes are immediately available for verification.
+3. **Docker Verification**: NEVER test changes in the host environment. Build the image (`docker compose build`) and run tests inside the container (`docker compose run`).
+4. **Self-Correction**: If Jules's code breaks existing patterns (e.g. bypasses a factory), refactor immediately before committing.
 
 ---
 

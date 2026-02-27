@@ -301,5 +301,6 @@ git status  # Confirm nothing staged accidentally
 - [ ] Confirmed issues implemented on feature branch
 - [ ] PR created referencing all `Closes #N`
 - [ ] Protected branches untouched
+- [ ] Technical hurdles logged in .agent/logs/FRICTION.md
 - [ ] `tmp/` cleared
 - [ ] `git status` clean (no temp files staged)

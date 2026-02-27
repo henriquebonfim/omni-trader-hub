@@ -57,6 +57,26 @@ Tests are the proof that code does what it claims:
 
 ---
 
+## Execution Environment (Docker Mandatory)
+
+To ensure consistency and avoid environment drift:
+
+- **All tests, builds, and complex commands** (e.g., database migrations, dependency installs) **MUST** run inside the project's Docker containers.
+- **Never rely on the host machine's global Python/Node environment**.
+- Use `docker compose run --rm <service> <command>` for one-off tasks.
+
+---
+
+## Global Observability (O11y)
+
+All agents, workflows, and skills operate under a mandatory observability mandate:
+
+- **Record Every Friction Point**: Any technical hurdle (environment drift, tool failure, dependency gap, API delay) **MUST** be recorded in `.agent/logs/FRICTION.md`.
+- **Systemic Learning**: Friction logs are the "Black Box" of the pipeline. They are used for automated self-correction and infrastructure hardening.
+- **Log Format**: Date, Task, Type, Friction, Resolution, and Action Required.
+
+---
+
 ## Performance & Scalability
 
 Performance problems in production are the hardest to debug:
@@ -119,7 +139,9 @@ Before finalizing any task, explicitly verify:
 1. **Architecture**: Does this respect layer boundaries? Any circular deps?
 2. **Types**: Is everything typed? No any? No unsafe null access?
 3. **Tests**: Is new behavior covered? Is the bug regression-tested?
-4. **Lint + Typecheck**: Run both. Fix every warning.
+4. **Execution**: Were all tests and builds run inside Docker? Any local environment leaks?
+5. **Lint + Typecheck**: Run both (inside Docker). Fix every warning.
 5. **CHANGELOG**: Updated under [Unreleased]?
-6. **Diff review**: Are all changed files intentional? No temp files?
-7. **Secrets**: No credentials, tokens, or PII in the diff?
+6. **O11y**: Have all technical hurdles been logged in .agent/logs/FRICTION.md?
+7. **Diff review**: Are all changed files intentional? No temp files?
+8. **Secrets**: No credentials, tokens, or PII in the diff?
