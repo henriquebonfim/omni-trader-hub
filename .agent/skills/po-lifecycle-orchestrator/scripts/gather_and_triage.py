@@ -489,7 +489,8 @@ def main() -> None:
     merged_prs   = load_json(args.merged, [])
     docker       = load_json(args.docker, {"build_status": "SKIPPED"})
     tests        = load_json(args.tests, {"status": "SKIPPED"})
-    visual       = load_json(args.visual, [])
+    visual_raw   = load_json(args.visual, [])
+    visual       = visual_raw.get("findings", []) if isinstance(visual_raw, dict) else visual_raw
 
     print(f"Processing {len(issues)} open issues...")
 
