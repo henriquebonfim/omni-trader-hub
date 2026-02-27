@@ -2,42 +2,101 @@
 description: /handle-close-pr <PR_NUMBER>
 ---
 
-# Execution Sequence
+# Handle Close PR
 
-1. Ensure `.agent/tmp/` exists.
-2. Ensure `.agent/tmp/` is listed in `.gitignore`.
-
-3. Merge the PR and delete the branch:
-
-   gh pr merge <PR_NUMBER> --merge --delete-branch
-
-   *(Use `--squash` or `--rebase` depending on your repository's preferred merge strategy)*
-
-4. Cleanup the local and remote session references:
-   - Run `jules remote list --session` to check active sessions.
-   - Clean up any local branches and temporary states that were created for this PR.
-
-5. Final Validation:
-   - Ensure the PR is successfully merged (`gh pr view <PR_NUMBER>`).
-   - Ensure the respective branch is deleted.
-   - Clear the `.agent/tmp/` directory.
+Merge a PR, clean up branches, and optionally clean up Jules sessions.
 
 ---
 
-# Abort Conditions
+## Execution Sequence
 
-Abort if:
+### 1 — Pre-merge Validation
 
-- PR cannot be merged due to conflicts or failing checks.
-- PR number is invalid or not accessible.
-- Repository is in an unstable state.
+```bash
+# Confirm PR is ready to merge
+gh pr view <PR_NUMBER> \
+  --json number,title,state,mergeable,mergeStateStatus,statusCheckRollup \
+  --jq '{number,title,state,mergeable,mergeState:.mergeStateStatus}'
+
+# Confirm all checks pass
+gh pr checks <PR_NUMBER>
+
+# Confirm no outstanding review requests
+gh pr view <PR_NUMBER> --json reviewDecision \
+  --jq '.reviewDecision'  # Should be "APPROVED" or "REVIEW_REQUIRED" with approvals
+```
+
+### 2 — Merge
+
+```bash
+# Standard merge (use --squash or --rebase per repo convention)
+gh pr merge <PR_NUMBER> \
+  --merge \
+  --delete-branch \
+  --subject "$(gh pr view <PR_NUMBER> --json title --jq .title)"
+```
+
+Check repo convention first:
+
+```bash
+gh repo view --json mergeCommitAllowed,squashMergeAllowed,rebaseMergeAllowed \
+  --jq '{merge:.mergeCommitAllowed, squash:.squashMergeAllowed, rebase:.rebaseMergeAllowed}'
+```
+
+### 3 — Post-merge Cleanup
+
+```bash
+# Switch back to main and pull
+git checkout main
+git pull origin main
+
+# Confirm local branch is gone
+git branch | grep -v "^\* main"
+
+# Prune remote tracking refs
+git remote prune origin
+```
+
+### 4 — Jules Session Cleanup (if applicable)
+
+```bash
+# List active sessions
+jules remote list --session
+
+# Pull final state of any sessions related to this PR
+# jules remote pull --session <SESSION_ID>
+
+# No explicit session deletion needed — sessions expire automatically
+# But document which session ID was used for this PR for traceability
+```
+
+### 5 — Verify
+
+```bash
+gh pr view <PR_NUMBER> --json state --jq .state  # Should be "MERGED"
+git log --oneline -3  # Confirm merge commit present
+```
+
+### 6 — Cleanup
+
+```bash
+# Clear any tmp files from the PR workflow
+rm -f .agent/skills/pr-code-orchestrator/tmp/*
+rm -f .agent/skills/pr-review-orchestrator/tmp/*
+```
 
 ---
 
-# Success Condition
+## Abort Conditions
 
-Workflow completes only when:
+- PR has merge conflicts → resolve first
+- CI checks failing → fix before merging
+- Outstanding review requests → get approval first
+- Invalid PR number
 
-- PR is successfully merged and closed.
-- Associated branch is deleted.
-- Temporary artifacts and Jules sessions are verified cleaned up.
+## Success Condition
+
+- PR state is MERGED
+- Head branch deleted (remote + local)
+- `git status` clean on main
+- Jules sessions noted / cleaned up

@@ -1,0 +1,1882 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Agent Pipeline — How It Works</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Syne:wght@400;600;700;800&family=DM+Sans:ital,wght@0,300;0,400;0,500;1,300&display=swap');
+
+  :root {
+    --bg: #0a0c0f;
+    --bg2: #0f1318;
+    --bg3: #151a22;
+    --border: #1e2630;
+    --border2: #263040;
+    --text: #e2e8f0;
+    --muted: #64748b;
+    --dim: #334155;
+
+    --green: #22c55e;
+    --green-dim: #16a34a22;
+    --blue: #38bdf8;
+    --blue-dim: #0ea5e922;
+    --purple: #a78bfa;
+    --purple-dim: #7c3aed22;
+    --orange: #fb923c;
+    --orange-dim: #ea580c22;
+    --red: #f87171;
+    --red-dim: #dc262622;
+    --yellow: #fbbf24;
+    --yellow-dim: #d9770622;
+    --teal: #2dd4bf;
+    --teal-dim: #0d948822;
+    --pink: #f472b6;
+    --pink-dim: #db277722;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 15px;
+    line-height: 1.7;
+  }
+
+  /* ─── SIDEBAR ─── */
+  .sidebar {
+    position: fixed;
+    left: 0; top: 0; bottom: 0;
+    width: 240px;
+    background: var(--bg2);
+    border-right: 1px solid var(--border);
+    overflow-y: auto;
+    z-index: 100;
+    padding: 28px 0;
+  }
+
+  .sidebar-logo {
+    font-family: 'Syne', sans-serif;
+    font-weight: 800;
+    font-size: 13px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--muted);
+    padding: 0 20px 20px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 16px;
+  }
+
+  .sidebar-logo span { color: var(--blue); }
+
+  .sidebar-section {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--dim);
+    padding: 12px 20px 6px;
+  }
+
+  .sidebar a {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 7px 20px;
+    color: var(--muted);
+    text-decoration: none;
+    font-size: 13px;
+    transition: all 0.15s;
+    border-left: 2px solid transparent;
+  }
+
+  .sidebar a:hover {
+    color: var(--text);
+    background: var(--bg3);
+    border-left-color: var(--border2);
+  }
+
+  .sidebar a.active {
+    color: var(--blue);
+    border-left-color: var(--blue);
+    background: var(--blue-dim);
+  }
+
+  .dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+
+  /* ─── MAIN ─── */
+  .main {
+    margin-left: 240px;
+    min-height: 100vh;
+  }
+
+  /* ─── HERO ─── */
+  .hero {
+    background: linear-gradient(135deg, #0a0c0f 0%, #0d1520 50%, #0a0c0f 100%);
+    border-bottom: 1px solid var(--border);
+    padding: 80px 64px 72px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .hero::before {
+    content: '';
+    position: absolute;
+    top: -100px; right: -100px;
+    width: 500px; height: 500px;
+    background: radial-gradient(circle, #0ea5e910 0%, transparent 70%);
+    pointer-events: none;
+  }
+
+  .hero::after {
+    content: '';
+    position: absolute;
+    bottom: -80px; left: 200px;
+    width: 400px; height: 400px;
+    background: radial-gradient(circle, #7c3aed08 0%, transparent 70%);
+    pointer-events: none;
+  }
+
+  .hero-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: var(--blue-dim);
+    border: 1px solid #0ea5e930;
+    color: var(--blue);
+    padding: 4px 12px;
+    border-radius: 100px;
+    font-size: 11px;
+    font-family: 'JetBrains Mono', monospace;
+    letter-spacing: 0.08em;
+    margin-bottom: 20px;
+  }
+
+  .hero h1 {
+    font-family: 'Syne', sans-serif;
+    font-size: 52px;
+    font-weight: 800;
+    line-height: 1.05;
+    letter-spacing: -0.02em;
+    color: #f1f5f9;
+    margin-bottom: 16px;
+  }
+
+  .hero h1 em {
+    font-style: normal;
+    background: linear-gradient(135deg, var(--blue), var(--purple));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .hero-sub {
+    font-size: 17px;
+    color: var(--muted);
+    max-width: 620px;
+    line-height: 1.6;
+    font-weight: 300;
+  }
+
+  /* ─── CONTENT ─── */
+  .content {
+    padding: 56px 64px;
+    max-width: 960px;
+  }
+
+  section { margin-bottom: 72px; }
+
+  h2 {
+    font-family: 'Syne', sans-serif;
+    font-size: 26px;
+    font-weight: 700;
+    color: #f1f5f9;
+    margin-bottom: 6px;
+    scroll-margin-top: 32px;
+  }
+
+  .section-intro {
+    color: var(--muted);
+    font-size: 14px;
+    margin-bottom: 28px;
+    font-weight: 300;
+  }
+
+  h3 {
+    font-family: 'Syne', sans-serif;
+    font-size: 15px;
+    font-weight: 700;
+    margin-bottom: 10px;
+    margin-top: 28px;
+    color: #cbd5e1;
+    letter-spacing: 0.01em;
+  }
+
+  p { color: #94a3b8; margin-bottom: 14px; font-size: 14px; }
+
+  /* ─── PIPELINE OVERVIEW ─── */
+  .pipeline-track {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    margin: 32px 0;
+    position: relative;
+  }
+
+  .pipeline-track::before {
+    content: '';
+    position: absolute;
+    left: 20px;
+    top: 32px;
+    bottom: 32px;
+    width: 1px;
+    background: linear-gradient(to bottom, transparent, var(--border2) 10%, var(--border2) 90%, transparent);
+  }
+
+  .pipeline-step {
+    display: flex;
+    gap: 20px;
+    align-items: flex-start;
+    padding: 16px 0;
+    position: relative;
+  }
+
+  .step-num {
+    width: 40px;
+    height: 40px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    font-weight: 700;
+    flex-shrink: 0;
+    position: relative;
+    z-index: 1;
+  }
+
+  .step-body { flex: 1; padding-top: 8px; }
+  .step-title {
+    font-family: 'Syne', sans-serif;
+    font-size: 15px;
+    font-weight: 700;
+    color: #e2e8f0;
+    margin-bottom: 4px;
+  }
+  .step-desc { font-size: 13px; color: var(--muted); margin: 0; }
+
+  .step-tags { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
+  .tag {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+  }
+
+  /* ─── COMPONENT CARDS ─── */
+  .card-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+    margin: 24px 0;
+  }
+
+  .card {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px;
+    transition: border-color 0.15s;
+  }
+
+  .card:hover { border-color: var(--border2); }
+
+  .card-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 12px;
+  }
+
+  .card-icon {
+    width: 32px; height: 32px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+  }
+
+  .card-name {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    font-weight: 700;
+    color: #e2e8f0;
+  }
+
+  .card-type {
+    font-size: 10px;
+    color: var(--muted);
+    font-family: 'JetBrains Mono', monospace;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+  }
+
+  .card p { font-size: 13px; color: #64748b; margin: 0; line-height: 1.5; }
+
+  /* ─── CODE BLOCKS ─── */
+  .code-block {
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+    margin: 16px 0;
+  }
+
+  .code-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 16px;
+    border-bottom: 1px solid var(--border);
+    background: var(--bg2);
+  }
+
+  .code-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    font-weight: 600;
+  }
+
+  .code-dots { display: flex; gap: 5px; }
+  .code-dots span {
+    width: 8px; height: 8px; border-radius: 50%;
+  }
+
+  pre {
+    padding: 16px 20px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    line-height: 1.7;
+    color: #94a3b8;
+    overflow-x: auto;
+    white-space: pre;
+  }
+
+  .c-cmd { color: var(--blue); }
+  .c-flag { color: var(--purple); }
+  .c-str { color: var(--green); }
+  .c-comment { color: var(--dim); }
+  .c-key { color: var(--orange); }
+  .c-var { color: var(--teal); }
+
+  /* ─── FLOW DIAGRAM ─── */
+  .flow {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 32px;
+    margin: 24px 0;
+  }
+
+  .flow-row {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    flex-wrap: wrap;
+    row-gap: 12px;
+  }
+
+  .flow-node {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .flow-box {
+    border-radius: 8px;
+    padding: 9px 16px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    font-weight: 600;
+    white-space: nowrap;
+    text-align: center;
+    border: 1px solid;
+  }
+
+  .flow-sub {
+    font-size: 9px;
+    color: var(--muted);
+    font-family: 'JetBrains Mono', monospace;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+  }
+
+  .flow-arrow {
+    color: var(--dim);
+    font-size: 16px;
+    padding: 0 6px;
+    margin-top: -14px;
+  }
+
+  .flow-down {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0;
+  }
+
+  .flow-vert-arrow {
+    color: var(--dim);
+    font-size: 14px;
+    line-height: 1;
+    padding: 2px 0;
+  }
+
+  /* ─── PHASE BREAKDOWN ─── */
+  .phase-list {
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+    margin: 20px 0;
+  }
+
+  .phase-item {
+    display: flex;
+    gap: 0;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .phase-item:last-child { border-bottom: none; }
+
+  .phase-num {
+    width: 52px;
+    background: var(--bg3);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--dim);
+    flex-shrink: 0;
+    border-right: 1px solid var(--border);
+  }
+
+  .phase-content {
+    padding: 14px 18px;
+    flex: 1;
+  }
+
+  .phase-title {
+    font-family: 'Syne', sans-serif;
+    font-size: 13px;
+    font-weight: 700;
+    color: #e2e8f0;
+    margin-bottom: 3px;
+  }
+
+  .phase-detail { font-size: 12px; color: var(--muted); margin: 0; }
+
+  .phase-right {
+    display: flex;
+    align-items: center;
+    padding: 0 16px;
+  }
+
+  /* ─── DATA FLOW TABLE ─── */
+  .data-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 16px 0;
+    font-size: 12.5px;
+  }
+
+  .data-table th {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--muted);
+    padding: 10px 14px;
+    background: var(--bg3);
+    border-bottom: 1px solid var(--border);
+    text-align: left;
+  }
+
+  .data-table td {
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--border);
+    color: #94a3b8;
+    font-size: 12.5px;
+  }
+
+  .data-table tr:last-child td { border-bottom: none; }
+  .data-table tr:hover td { background: var(--bg3); }
+
+  .mono {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--teal);
+  }
+
+  /* ─── CALLOUT ─── */
+  .callout {
+    border-radius: 10px;
+    padding: 14px 18px;
+    margin: 16px 0;
+    border-left: 3px solid;
+    font-size: 13px;
+  }
+
+  .callout p { margin: 0; font-size: 13px; }
+
+  .callout.info {
+    background: var(--blue-dim);
+    border-color: var(--blue);
+    color: #7dd3fc;
+  }
+
+  .callout.warn {
+    background: var(--yellow-dim);
+    border-color: var(--yellow);
+    color: #fde68a;
+  }
+
+  .callout.success {
+    background: var(--green-dim);
+    border-color: var(--green);
+    color: #86efac;
+  }
+
+  .callout.danger {
+    background: var(--red-dim);
+    border-color: var(--red);
+    color: #fca5a5;
+  }
+
+  /* ─── INTEGRATION SECTION ─── */
+  .integration-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+    margin: 20px 0;
+  }
+
+  .integration-card {
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 18px;
+  }
+
+  .int-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 12px;
+  }
+
+  .int-logo {
+    width: 28px; height: 28px;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 13px;
+    font-weight: 800;
+    font-family: 'Syne', sans-serif;
+  }
+
+  .int-name {
+    font-family: 'Syne', sans-serif;
+    font-weight: 700;
+    font-size: 13px;
+    color: #e2e8f0;
+  }
+
+  .int-list {
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+  }
+
+  .int-list li {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    font-size: 12px;
+    color: #64748b;
+    line-height: 1.4;
+  }
+
+  .int-list li::before {
+    content: '›';
+    color: var(--muted);
+    flex-shrink: 0;
+  }
+
+  /* ─── MATRIX VIEW ─── */
+  .matrix {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+    margin: 20px 0;
+  }
+
+  .matrix-header {
+    display: grid;
+    grid-template-columns: 140px 1fr 1fr 1fr;
+    background: var(--bg3);
+    border-bottom: 1px solid var(--border);
+    padding: 10px 16px;
+    gap: 12px;
+  }
+
+  .matrix-header span {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+
+  .matrix-row {
+    display: grid;
+    grid-template-columns: 140px 1fr 1fr 1fr;
+    padding: 11px 16px;
+    gap: 12px;
+    border-bottom: 1px solid var(--border);
+    align-items: start;
+    transition: background 0.1s;
+  }
+
+  .matrix-row:last-child { border-bottom: none; }
+  .matrix-row:hover { background: var(--bg3); }
+
+  .matrix-row span {
+    font-size: 12.5px;
+    color: #64748b;
+  }
+
+  .matrix-row .label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: #e2e8f0;
+    font-weight: 600;
+  }
+
+  /* ─── DIVIDER ─── */
+  .divider {
+    border: none;
+    border-top: 1px solid var(--border);
+    margin: 48px 0;
+  }
+
+  /* ─── TOC NUMBERS ─── */
+  .toc-num {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    color: var(--dim);
+    margin-right: 4px;
+  }
+
+  /* ─── STATUSES ─── */
+  .status {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    font-weight: 600;
+  }
+
+  .connected-line {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin: 10px 0;
+    font-size: 12.5px;
+    color: #64748b;
+  }
+
+  .connected-line .arrow { color: var(--dim); }
+
+  /* ANIMATIONS */
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(12px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .hero > * { animation: fadeUp 0.5s ease forwards; }
+  .hero > *:nth-child(2) { animation-delay: 0.08s; opacity: 0; }
+  .hero > *:nth-child(3) { animation-delay: 0.16s; opacity: 0; }
+</style>
+</head>
+<body>
+
+<!-- SIDEBAR -->
+<nav class="sidebar">
+  <div class="sidebar-logo">Agent <span>Pipeline</span></div>
+
+  <div class="sidebar-section">Overview</div>
+  <a href="#overview"><span class="dot" style="background:#38bdf8"></span> Full Pipeline</a>
+  <a href="#components"><span class="dot" style="background:#a78bfa"></span> Components</a>
+  <a href="#data-flow"><span class="dot" style="background:#22c55e"></span> Data Flow</a>
+
+  <div class="sidebar-section">Workflows</div>
+  <a href="#start-workflow"><span class="dot" style="background:#38bdf8"></span> /start-workflow</a>
+  <a href="#handle-issues"><span class="dot" style="background:#fb923c"></span> /handle-issues</a>
+  <a href="#handle-code"><span class="dot" style="background:#22c55e"></span> /handle-code</a>
+  <a href="#handle-pr-review"><span class="dot" style="background:#a78bfa"></span> /handle-pr-review</a>
+  <a href="#handle-pr-code"><span class="dot" style="background:#fbbf24"></span> /handle-pr-code</a>
+  <a href="#handle-close-pr"><span class="dot" style="background:#f472b6"></span> /handle-close-pr</a>
+  <a href="#handle-release"><span class="dot" style="background:#2dd4bf"></span> /handle-release</a>
+
+  <div class="sidebar-section">Integrations</div>
+  <a href="#gh-cli"><span class="dot" style="background:#e2e8f0"></span> gh CLI</a>
+  <a href="#jules-cli"><span class="dot" style="background:#fbbf24"></span> jules CLI</a>
+
+  <div class="sidebar-section">Rules</div>
+  <a href="#rules"><span class="dot" style="background:#f87171"></span> Standards</a>
+</nav>
+
+<!-- MAIN -->
+<div class="main">
+
+  <!-- HERO -->
+  <div class="hero">
+    <div class="hero-badge">● ANTIGRAVITY IDE · AGENT PIPELINE</div>
+    <h1>How the <em>Pipeline</em><br>Actually Works</h1>
+    <p class="hero-sub">A complete walkthrough of every component, data flow, CLI integration, and decision point — from open issue to shipped release.</p>
+  </div>
+
+  <div class="content">
+
+    <!-- ═══════════════════════════════════════════════════ -->
+    <!-- OVERVIEW -->
+    <!-- ═══════════════════════════════════════════════════ -->
+    <section id="overview">
+      <h2>The Full Pipeline</h2>
+      <p class="section-intro">8 stages. Issues in, shipped releases out. Every stage is automated, validated, and traceable.</p>
+
+      <div class="pipeline-track">
+
+        <div class="pipeline-step">
+          <div class="step-num" style="background:var(--blue-dim);color:var(--blue);border:1px solid #0ea5e940">01</div>
+          <div class="step-body">
+            <div class="step-title">Strategic Context Scan</div>
+            <p class="step-desc">Reads TODO.md + README, lists open PRs, measures velocity from recent merges. Prevents creating duplicate work before anything starts.</p>
+            <div class="step-tags">
+              <span class="tag" style="background:var(--blue-dim);color:var(--blue);border:1px solid #0ea5e930">gh pr list</span>
+              <span class="tag" style="background:var(--blue-dim);color:var(--blue);border:1px solid #0ea5e930">gh issue list</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="pipeline-step">
+          <div class="step-num" style="background:var(--orange-dim);color:var(--orange);border:1px solid #ea580c40">02</div>
+          <div class="step-body">
+            <div class="step-title">Issue Triage & Scoring</div>
+            <p class="step-desc">Fetches all open issues as JSON, classifies each as BUG/FEATURE/REFACTOR/etc., scores each on 4 axes (Impact, Effort, Dependency Unblock, Risk). Produces a ranked matrix. Posts a structured status comment back to every issue.</p>
+            <div class="step-tags">
+              <span class="tag" style="background:var(--orange-dim);color:var(--orange);border:1px solid #ea580c30">score_issues.py</span>
+              <span class="tag" style="background:var(--orange-dim);color:var(--orange);border:1px solid #ea580c30">post_issue_comments.py</span>
+              <span class="tag" style="background:var(--orange-dim);color:var(--orange);border:1px solid #ea580c30">issue-matrix.json</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="pipeline-step">
+          <div class="step-num" style="background:var(--green-dim);color:var(--green);border:1px solid #16a34a40">03</div>
+          <div class="step-body">
+            <div class="step-title">Branch Creation & Implementation</div>
+            <p class="step-desc">Creates a feature branch (never touches main/master/production). Runs /handle-code for each confirmed issue in priority order. Every commit includes <code style="color:var(--teal);font-family:JetBrains Mono;font-size:11px">Closes #N</code>. CHANGELOG.md is updated automatically.</p>
+            <div class="step-tags">
+              <span class="tag" style="background:var(--green-dim);color:var(--green);border:1px solid #16a34a30">software-engineer-worker</span>
+              <span class="tag" style="background:var(--green-dim);color:var(--green);border:1px solid #16a34a30">git checkout -b</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="pipeline-step">
+          <div class="step-num" style="background:var(--yellow-dim);color:var(--yellow);border:1px solid #d9770640">04</div>
+          <div class="step-body">
+            <div class="step-title">Jules Handoff (async tasks)</div>
+            <p class="step-desc">Complex or parallel tasks are handed to Jules with an enriched description: problem context, acceptance criteria, constraints, and definition of done. Jules gets the top-ranked task from TASKS.md — not a vague one-liner.</p>
+            <div class="step-tags">
+              <span class="tag" style="background:var(--yellow-dim);color:var(--yellow);border:1px solid #d9770630">jules new --repo</span>
+              <span class="tag" style="background:var(--yellow-dim);color:var(--yellow);border:1px solid #d9770630">jules remote list</span>
+              <span class="tag" style="background:var(--yellow-dim);color:var(--yellow);border:1px solid #d9770630">jules teleport</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="pipeline-step">
+          <div class="step-num" style="background:var(--purple-dim);color:var(--purple);border:1px solid #7c3aed40">05</div>
+          <div class="step-body">
+            <div class="step-title">Batch PR Creation</div>
+            <p class="step-desc">After all confirmed tasks are implemented, a single PR is created referencing every closed issue. The PR body is auto-generated from the issue matrix — every <code style="color:var(--teal);font-family:JetBrains Mono;font-size:11px">Closes #N</code> reference is included. TASKS.md is also generated for the Jules handoff record.</p>
+            <div class="step-tags">
+              <span class="tag" style="background:var(--purple-dim);color:var(--purple);border:1px solid #7c3aed30">gh pr create</span>
+              <span class="tag" style="background:var(--purple-dim);color:var(--purple);border:1px solid #7c3aed30">TASKS.md</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="pipeline-step">
+          <div class="step-num" style="background:var(--pink-dim);color:var(--pink);border:1px solid #db277740">06</div>
+          <div class="step-body">
+            <div class="step-title">Code Review</div>
+            <p class="step-desc">Two modes: <strong>/handle-pr-review</strong> (read-only analysis — checks out PR, runs build+lint+tests, posts a structured batched review via GitHub API). <strong>/handle-pr-code</strong> (implements every actionable review comment, posts status replies, creates follow-up issues for out-of-scope items). Both use the same runtime-summary.json baseline to detect regressions.</p>
+            <div class="step-tags">
+              <span class="tag" style="background:var(--pink-dim);color:var(--pink);border:1px solid #db277730">post_review.py</span>
+              <span class="tag" style="background:var(--pink-dim);color:var(--pink);border:1px solid #db277730">post_comment_replies.py</span>
+              <span class="tag" style="background:var(--pink-dim);color:var(--pink);border:1px solid #db277730">gh api pulls/reviews</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="pipeline-step">
+          <div class="step-num" style="background:var(--teal-dim);color:var(--teal);border:1px solid #0d948840">07</div>
+          <div class="step-body">
+            <div class="step-title">Merge & Cleanup</div>
+            <p class="step-desc">/handle-close-pr validates CI, checks review approval, merges (respecting repo merge strategy), deletes the remote + local branch, prunes remote refs, and cleans all tmp/ artifacts. The working tree is confirmed clean before finishing.</p>
+            <div class="step-tags">
+              <span class="tag" style="background:var(--teal-dim);color:var(--teal);border:1px solid #0d948830">gh pr merge --delete-branch</span>
+              <span class="tag" style="background:var(--teal-dim);color:var(--teal);border:1px solid #0d948830">git remote prune</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="pipeline-step">
+          <div class="step-num" style="background:var(--green-dim);color:var(--green);border:1px solid #16a34a40">08</div>
+          <div class="step-body">
+            <div class="step-title">Release</div>
+            <p class="step-desc">/handle-release classifies all commits since the last tag by conventional prefix, recommends a SemVer bump, generates a CHANGELOG entry and a polished GitHub release body, bumps the version file, commits, tags, pushes, and calls <code style="color:var(--teal);font-family:JetBrains Mono;font-size:11px">gh release create</code>. Dry-run mode available for preview.</p>
+            <div class="step-tags">
+              <span class="tag" style="background:var(--green-dim);color:var(--green);border:1px solid #16a34a30">generate_release_notes.py</span>
+              <span class="tag" style="background:var(--green-dim);color:var(--green);border:1px solid #16a34a30">gh release create</span>
+              <span class="tag" style="background:var(--green-dim);color:var(--green);border:1px solid #16a34a30">git tag -a</span>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <div class="callout info">
+        <p>The pipeline is a loop — after Step 8, return to Step 3 (priority scoring) and assign the next task. Velocity data from completed cycles informs future scheduling.</p>
+      </div>
+    </section>
+
+    <hr class="divider">
+
+    <!-- ═══════════════════════════════════════════════════ -->
+    <!-- COMPONENTS -->
+    <!-- ═══════════════════════════════════════════════════ -->
+    <section id="components">
+      <h2>All Components</h2>
+      <p class="section-intro">6 skills, 7 workflows, 4 rules, and 5 Python scripts. Here's what each one does and where it lives.</p>
+
+      <h3>Skills — in <code style="color:var(--teal);font-family:JetBrains Mono;font-size:12px">.agent/skills/</code></h3>
+
+      <div class="card-grid">
+        <div class="card">
+          <div class="card-header">
+            <div class="card-icon" style="background:var(--orange-dim)">🎯</div>
+            <div>
+              <div class="card-name">issue-task-orchestrator</div>
+              <div class="card-type">skill</div>
+            </div>
+          </div>
+          <p>Transforms open GitHub issues into a scored, ranked matrix. Classifies each as BUG/FEATURE/REFACTOR/DOC/DUPLICATE/etc. Posts structured status replies. Detects already-resolved issues by scanning recent merged PR bodies.</p>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <div class="card-icon" style="background:var(--yellow-dim)">💬</div>
+            <div>
+              <div class="card-name">pr-code-orchestrator</div>
+              <div class="card-type">skill</div>
+            </div>
+          </div>
+          <p>Implements actionable PR review comments. Fetches ALL inline + general review comments, builds a classification matrix, groups into task batches, executes /handle-code, then posts structured status replies per comment.</p>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <div class="card-icon" style="background:var(--purple-dim)">🔍</div>
+            <div>
+              <div class="card-name">pr-review-orchestrator</div>
+              <div class="card-type">skill · read-only</div>
+            </div>
+          </div>
+          <p>Read-only PR analysis. Checks out PR, runs full validation suite, analyzes every changed file for BUG/SECURITY/PERF/ARCH/TEST issues. Submits one batched review via GitHub API. Never modifies code.</p>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <div class="card-icon" style="background:var(--green-dim)">⚙️</div>
+            <div>
+              <div class="card-name">software-engineer-worker</div>
+              <div class="card-type">skill</div>
+            </div>
+          </div>
+          <p>The implementation engine. Auto-detects stack (runtime, test framework, lint, typecheck commands). Enforces architecture discipline, strict typing, test coverage. Always updates CHANGELOG.md. Self-healing loop on failures.</p>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <div class="card-icon" style="background:var(--teal-dim)">🚀</div>
+            <div>
+              <div class="card-name">release-manager</div>
+              <div class="card-type">skill · new</div>
+            </div>
+          </div>
+          <p>Full release lifecycle. Parses commits since last tag using conventional commit prefixes, recommends SemVer bump, generates CHANGELOG entry + polished GitHub release body, bumps version file, tags, pushes, creates GitHub release.</p>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <div class="card-icon" style="background:var(--blue-dim)">🎨</div>
+            <div>
+              <div class="card-name">ui-ux-pro-max</div>
+              <div class="card-type">skill</div>
+            </div>
+          </div>
+          <p>Design-to-code. Searches 5 design domains (product, style, color, landing, typography) using BM25, generates a complete design system, then outputs production-ready Tailwind component code wired to the design tokens.</p>
+        </div>
+      </div>
+
+      <h3>Python Scripts</h3>
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Script</th>
+            <th>Skill</th>
+            <th>What it does</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><span class="mono">score_issues.py</span></td>
+            <td>issue-task-orchestrator</td>
+            <td>Reads raw-issues.json + open-prs.json, classifies each issue, computes 4-axis priority score, writes ranked issue-matrix.json</td>
+          </tr>
+          <tr>
+            <td><span class="mono">post_issue_comments.py</span></td>
+            <td>issue-task-orchestrator</td>
+            <td>Reads issue-matrix.json, posts one structured status comment to each issue via <code style="color:var(--teal);font-family:JetBrains Mono;font-size:11px">gh issue comment</code>, closes resolved/invalid issues</td>
+          </tr>
+          <tr>
+            <td><span class="mono">post_comment_replies.py</span></td>
+            <td>pr-code-orchestrator</td>
+            <td>Reads pr-code-matrix.json, creates GitHub issues for out-of-scope items, posts one structured reply to every PR comment thread</td>
+          </tr>
+          <tr>
+            <td><span class="mono">post_review.py</span></td>
+            <td>pr-review-orchestrator</td>
+            <td>Reads review-matrix.json + runtime-summary.json, classifies overall PR risk, builds review payload, submits batched review via <code style="color:var(--teal);font-family:JetBrains Mono;font-size:11px">gh api pulls/reviews</code></td>
+          </tr>
+          <tr>
+            <td><span class="mono">generate_release_notes.py</span></td>
+            <td>release-manager</td>
+            <td>Reads git log since last tag, classifies commits by conventional prefix, outputs changelog-entry.md + release-body.md. Has --dry-run mode.</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3>Workflows — in <code style="color:var(--teal);font-family:JetBrains Mono;font-size:12px">.agent/workflows/</code></h3>
+      <table class="data-table">
+        <thead>
+          <tr><th>Command</th><th>Invokes</th><th>Purpose</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><span class="mono">/start-workflow</span></td>
+            <td>All skills</td>
+            <td>Full orchestration loop — scan context → triage → score → assign Jules → review → merge → release</td>
+          </tr>
+          <tr>
+            <td><span class="mono">/handle-issues</span></td>
+            <td>issue-task-orchestrator</td>
+            <td>Issue triage, scoring, implementation, batch PR creation, TASKS.md generation</td>
+          </tr>
+          <tr>
+            <td><span class="mono">/handle-code &lt;task&gt;</span></td>
+            <td>software-engineer-worker</td>
+            <td>Direct implementation of a scoped task with full validation loop</td>
+          </tr>
+          <tr>
+            <td><span class="mono">/handle-pr-review &lt;N&gt;</span></td>
+            <td>pr-review-orchestrator</td>
+            <td>Read-only PR code review with runtime validation</td>
+          </tr>
+          <tr>
+            <td><span class="mono">/handle-pr-code &lt;N&gt;</span></td>
+            <td>pr-code-orchestrator</td>
+            <td>Implement all actionable PR review comments</td>
+          </tr>
+          <tr>
+            <td><span class="mono">/handle-close-pr &lt;N&gt;</span></td>
+            <td>—</td>
+            <td>Validate CI, merge, delete branch, clean sessions</td>
+          </tr>
+          <tr>
+            <td><span class="mono">/handle-release</span></td>
+            <td>release-manager</td>
+            <td>Full release: classify commits → version → CHANGELOG → tag → GitHub release</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <hr class="divider">
+
+    <!-- ═══════════════════════════════════════════════════ -->
+    <!-- DATA FLOW -->
+    <!-- ═══════════════════════════════════════════════════ -->
+    <section id="data-flow">
+      <h2>Data Flow Between Components</h2>
+      <p class="section-intro">Every tmp/ file, what writes it, and what reads it. No data is passed through human-readable text — everything is structured JSON.</p>
+
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>File</th>
+            <th>Location</th>
+            <th>Written by</th>
+            <th>Read by</th>
+            <th>Contents</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><span class="mono">raw-issues.json</span></td>
+            <td>issue-orchestrator/tmp</td>
+            <td>gh issue list --json</td>
+            <td>score_issues.py</td>
+            <td>Full issue metadata from GitHub API</td>
+          </tr>
+          <tr>
+            <td><span class="mono">open-prs.json</span></td>
+            <td>issue-orchestrator/tmp</td>
+            <td>gh pr list --json</td>
+            <td>score_issues.py</td>
+            <td>Active PRs — used to skip already-in-progress issues</td>
+          </tr>
+          <tr>
+            <td><span class="mono">recent-merged.json</span></td>
+            <td>issue-orchestrator/tmp</td>
+            <td>gh pr list --state merged</td>
+            <td>score_issues.py</td>
+            <td>Last 20 merged PRs — used to detect already-fixed issues</td>
+          </tr>
+          <tr>
+            <td><span class="mono">issue-matrix.json</span></td>
+            <td>issue-orchestrator/tmp</td>
+            <td>score_issues.py</td>
+            <td>post_issue_comments.py, handle-issues workflow</td>
+            <td>Ranked list with classification, status, priority score</td>
+          </tr>
+          <tr>
+            <td><span class="mono">pr-meta.json</span></td>
+            <td>pr-code-orchestrator/tmp</td>
+            <td>gh pr view --json</td>
+            <td>post_comment_replies.py</td>
+            <td>PR number, title, head branch, base branch</td>
+          </tr>
+          <tr>
+            <td><span class="mono">review-comments.json</span></td>
+            <td>pr-code-orchestrator/tmp</td>
+            <td>gh api pulls/comments</td>
+            <td>pr-code-orchestrator SKILL</td>
+            <td>All inline + general review comments with IDs and URLs</td>
+          </tr>
+          <tr>
+            <td><span class="mono">pr-code-matrix.json</span></td>
+            <td>pr-code-orchestrator/tmp</td>
+            <td>pr-code-orchestrator SKILL</td>
+            <td>post_comment_replies.py</td>
+            <td>Per-comment classification, task_id, status, commit SHA, issue #</td>
+          </tr>
+          <tr>
+            <td><span class="mono">task-plan.json</span></td>
+            <td>pr-code-orchestrator/tmp</td>
+            <td>pr-code-orchestrator SKILL</td>
+            <td>handle-pr-code workflow</td>
+            <td>Grouped task batches with related comment IDs</td>
+          </tr>
+          <tr>
+            <td><span class="mono">runtime-summary.json</span></td>
+            <td>pr-review-orchestrator/tmp</td>
+            <td>Both review skills</td>
+            <td>post_review.py</td>
+            <td>PASS/FAIL/N/A for build, lint, typecheck, tests, runtime</td>
+          </tr>
+          <tr>
+            <td><span class="mono">review-matrix.json</span></td>
+            <td>pr-review-orchestrator/tmp</td>
+            <td>pr-review-orchestrator SKILL</td>
+            <td>post_review.py</td>
+            <td>Findings: path, line, severity, category, message</td>
+          </tr>
+          <tr>
+            <td><span class="mono">review-payload.json</span></td>
+            <td>pr-review-orchestrator/tmp</td>
+            <td>post_review.py</td>
+            <td>gh api (direct --input)</td>
+            <td>Full GitHub review API payload: event, body, inline comments</td>
+          </tr>
+          <tr>
+            <td><span class="mono">commit-map.json</span></td>
+            <td>release-manager/tmp</td>
+            <td>generate_release_notes.py</td>
+            <td>SKILL (version logic)</td>
+            <td>Commits grouped by: breaking, added, fixed, security, performance, changed</td>
+          </tr>
+          <tr>
+            <td><span class="mono">changelog-entry.md</span></td>
+            <td>release-manager/tmp</td>
+            <td>generate_release_notes.py</td>
+            <td>handle-release workflow</td>
+            <td>Formatted CHANGELOG.md section ready for insertion</td>
+          </tr>
+          <tr>
+            <td><span class="mono">release-body.md</span></td>
+            <td>release-manager/tmp</td>
+            <td>generate_release_notes.py</td>
+            <td>gh release create --notes</td>
+            <td>Polished prose release notes for the GitHub release page</td>
+          </tr>
+          <tr>
+            <td><span class="mono">TASKS.md</span></td>
+            <td>repo root</td>
+            <td>handle-issues workflow</td>
+            <td>start-workflow, jules new</td>
+            <td>Ranked confirmed tasks with context for Jules assignment</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div class="callout warn">
+        <p>Every tmp/ directory is listed in .gitignore and wiped at the end of each workflow. None of these files ever get committed. See _gitignore-additions.txt for the lines to add.</p>
+      </div>
+    </section>
+
+    <hr class="divider">
+
+    <!-- ═══════════════════════════════════════════════════ -->
+    <!-- START WORKFLOW DETAIL -->
+    <!-- ═══════════════════════════════════════════════════ -->
+    <section id="start-workflow">
+      <h2>/start-workflow</h2>
+      <p class="section-intro">The master orchestrator. Runs everything in sequence. Loops until all issues are resolved and a release is shipped.</p>
+
+      <div class="phase-list">
+        <div class="phase-item">
+          <div class="phase-num">1</div>
+          <div class="phase-content">
+            <div class="phase-title">Context Scan</div>
+            <p class="phase-detail">Reads TODO.md, README.md head, lists open PRs with branches, lists last 10 merged PRs for velocity. Gets open issue count grouped by label. Prevents creating duplicate work.</p>
+          </div>
+        </div>
+        <div class="phase-item">
+          <div class="phase-num">2</div>
+          <div class="phase-content">
+            <div class="phase-title">Issue Processing → /handle-issues</div>
+            <p class="phase-detail">Full triage cycle. Outputs TASKS.md with scored, ranked confirmed tasks.</p>
+          </div>
+        </div>
+        <div class="phase-item">
+          <div class="phase-num">3</div>
+          <div class="phase-content">
+            <div class="phase-title">Priority Review</div>
+            <p class="phase-detail">Reviews TASKS.md. Cross-checks against active PRs. Checks if Jules already has sessions running. Confirms top task with user (or auto-proceeds).</p>
+          </div>
+        </div>
+        <div class="phase-item">
+          <div class="phase-num">4</div>
+          <div class="phase-content">
+            <div class="phase-title">Jules Assignment</div>
+            <p class="phase-detail">Builds enriched task description including: problem context, acceptance criteria (5+ checkboxes), technical constraints, definition of done. Calls <code style="color:var(--teal);font-family:JetBrains Mono;font-size:11px">jules new --repo owner/repo "description"</code>. For parallel workstreams: <code style="color:var(--teal);font-family:JetBrains Mono;font-size:11px">--parallel 2</code>.</p>
+          </div>
+        </div>
+        <div class="phase-item">
+          <div class="phase-num">5</div>
+          <div class="phase-content">
+            <div class="phase-title">Monitor Jules Session</div>
+            <p class="phase-detail">Polls <code style="color:var(--teal);font-family:JetBrains Mono;font-size:11px">jules remote list --session</code>. When Jules creates a PR, either <code style="color:var(--teal);font-family:JetBrains Mono;font-size:11px">jules remote pull --session N --apply</code> to apply patch locally, or <code style="color:var(--teal);font-family:JetBrains Mono;font-size:11px">jules teleport N</code> to clone+checkout+apply in one command.</p>
+          </div>
+        </div>
+        <div class="phase-item">
+          <div class="phase-num">6</div>
+          <div class="phase-content">
+            <div class="phase-title">Review → /handle-pr-review or /handle-pr-code</div>
+            <p class="phase-detail">Read-only review first. If changes needed: <code style="color:var(--teal);font-family:JetBrains Mono;font-size:11px">gh pr comment N --body "@jules &lt;specific correction&gt;"</code> to re-trigger Jules, OR /handle-pr-code to implement directly.</p>
+          </div>
+        </div>
+        <div class="phase-item">
+          <div class="phase-num">7</div>
+          <div class="phase-content">
+            <div class="phase-title">Merge → /handle-close-pr</div>
+            <p class="phase-detail">Validates CI, confirms approval, merges with branch deletion, prunes remote refs.</p>
+          </div>
+        </div>
+        <div class="phase-item">
+          <div class="phase-num">8</div>
+          <div class="phase-content">
+            <div class="phase-title">Release → /handle-release (when milestone complete)</div>
+            <p class="phase-detail">Counts unreleased commits since last tag. If significant, triggers release pipeline.</p>
+          </div>
+        </div>
+        <div class="phase-item">
+          <div class="phase-num">↺</div>
+          <div class="phase-content">
+            <div class="phase-title">Loop</div>
+            <p class="phase-detail">Return to Step 3. Pick the next ranked task from TASKS.md. Repeat.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <hr class="divider">
+
+    <!-- ═══════════════════════════════════════════════════ -->
+    <!-- HANDLE ISSUES DETAIL -->
+    <!-- ═══════════════════════════════════════════════════ -->
+    <section id="handle-issues">
+      <h2>/handle-issues</h2>
+      <p class="section-intro">Full issue triage pipeline. Takes GitHub issues from raw API responses to scored, classified, commented, and implemented tasks with a batch PR.</p>
+
+      <div class="flow">
+        <div class="flow-row" style="justify-content:flex-start;flex-wrap:wrap;gap:0">
+
+          <div class="flow-node">
+            <div class="flow-box" style="background:var(--bg3);color:var(--blue);border-color:#0ea5e940">gh issue list<br><span style="font-size:9px;color:var(--muted)">--json, limit 100</span></div>
+            <div class="flow-sub">fetch</div>
+          </div>
+          <div class="flow-arrow">→</div>
+          <div class="flow-node">
+            <div class="flow-box" style="background:var(--bg3);color:var(--orange);border-color:#ea580c40">raw-issues.json<br><span style="font-size:9px;color:var(--muted)">open-prs.json<br>recent-merged.json</span></div>
+            <div class="flow-sub">tmp files</div>
+          </div>
+          <div class="flow-arrow">→</div>
+          <div class="flow-node">
+            <div class="flow-box" style="background:var(--bg3);color:var(--yellow);border-color:#d9770640">score_issues.py<br><span style="font-size:9px;color:var(--muted)">4-axis scoring</span></div>
+            <div class="flow-sub">classify</div>
+          </div>
+          <div class="flow-arrow">→</div>
+          <div class="flow-node">
+            <div class="flow-box" style="background:var(--bg3);color:var(--green);border-color:#16a34a40">issue-matrix.json<br><span style="font-size:9px;color:var(--muted)">ranked + scored</span></div>
+            <div class="flow-sub">matrix</div>
+          </div>
+          <div class="flow-arrow">→</div>
+          <div class="flow-node">
+            <div class="flow-box" style="background:var(--bg3);color:var(--purple);border-color:#7c3aed40">post_issue_comments.py<br><span style="font-size:9px;color:var(--muted)">gh issue comment</span></div>
+            <div class="flow-sub">reply</div>
+          </div>
+          <div class="flow-arrow">→</div>
+          <div class="flow-node">
+            <div class="flow-box" style="background:var(--bg3);color:var(--teal);border-color:#0d948840">/handle-code<br><span style="font-size:9px;color:var(--muted)">per confirmed task</span></div>
+            <div class="flow-sub">implement</div>
+          </div>
+          <div class="flow-arrow">→</div>
+          <div class="flow-node">
+            <div class="flow-box" style="background:var(--bg3);color:var(--pink);border-color:#db277740">gh pr create<br><span style="font-size:9px;color:var(--muted)">Closes #N refs</span></div>
+            <div class="flow-sub">batch PR</div>
+          </div>
+
+        </div>
+      </div>
+
+      <h3>Priority Scoring Formula</h3>
+      <p>Each confirmed issue is scored across 4 axes, max 50 points:</p>
+
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-label">score_issues.py — scoring logic</span>
+          <div class="code-dots"><span style="background:#f87171"></span><span style="background:#fbbf24"></span><span style="background:#22c55e"></span></div>
+        </div>
+        <pre><span class="c-comment"># Axis 1: User Impact (0–10, weight ×2)</span>
+<span class="c-var">impact</span> = 10  <span class="c-comment"># crash, data loss, security, auth, payment</span>
+<span class="c-var">impact</span> = 7   <span class="c-comment"># error, fail, cannot, wrong</span>
+<span class="c-var">impact</span> = 5   <span class="c-comment"># default</span>
+<span class="c-var">impact</span> = 2   <span class="c-comment"># docs</span>
+
+<span class="c-comment"># Axis 2: Effort inverse (0–10, quick wins score higher)</span>
+<span class="c-var">effort</span> = 9   <span class="c-comment"># typo, rename, small change</span>
+<span class="c-var">effort</span> = 5   <span class="c-comment"># default</span>
+<span class="c-var">effort</span> = 2   <span class="c-comment"># refactor, rewrite, migrate, overhaul</span>
+
+<span class="c-comment"># Axis 3: Dependency Unblock (0–10, weight ×1.5)</span>
+<span class="c-var">unblock</span> = 7  <span class="c-comment"># "blocks" in body</span>
+<span class="c-var">unblock</span> = 3  <span class="c-comment"># references other issues</span>
+<span class="c-var">unblock</span> = 0  <span class="c-comment"># standalone</span>
+
+<span class="c-comment"># Axis 4: Risk if Delayed (0–10)</span>
+<span class="c-var">risk</span> = 10    <span class="c-comment"># security, CVE, XSS, injection</span>
+<span class="c-var">risk</span> = 6     <span class="c-comment"># BUG classification</span>
+<span class="c-var">risk</span> = 1     <span class="c-comment"># DOC only</span>
+
+<span class="c-comment"># Final score (max = 50)</span>
+<span class="c-var">score</span> = (<span class="c-var">impact</span> × 2) + <span class="c-var">effort</span> + (<span class="c-var">unblock</span> × 1.5) + <span class="c-var">risk</span></pre>
+      </div>
+
+      <h3>What Gets Posted to Each Issue</h3>
+      <table class="data-table">
+        <thead><tr><th>Status</th><th>Comment contains</th><th>Issue action</th></tr></thead>
+        <tbody>
+          <tr>
+            <td><span class="status" style="background:var(--green-dim);color:var(--green)">✅ CONFIRMED</span></td>
+            <td>Scope (files/functions), priority score, PR reference</td>
+            <td>Left open — will be closed by PR merge</td>
+          </tr>
+          <tr>
+            <td><span class="status" style="background:var(--red-dim);color:var(--red)">❌ NEEDS INFO</span></td>
+            <td>Specific missing information required before action</td>
+            <td>Left open</td>
+          </tr>
+          <tr>
+            <td><span class="status" style="background:var(--blue-dim);color:var(--blue)">🟢 RESOLVED</span></td>
+            <td>Evidence: PR # or commit SHA that fixed it</td>
+            <td>Closed with reason "completed"</td>
+          </tr>
+          <tr>
+            <td><span class="status" style="background:var(--dim);color:var(--muted)">⏭ INVALID</span></td>
+            <td>Technical explanation of why it won't be addressed</td>
+            <td>Closed with reason "not planned"</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <hr class="divider">
+
+    <!-- ═══════════════════════════════════════════════════ -->
+    <!-- HANDLE CODE DETAIL -->
+    <!-- ═══════════════════════════════════════════════════ -->
+    <section id="handle-code">
+      <h2>/handle-code</h2>
+      <p class="section-intro">The implementation engine. Every code change goes through here, whether triggered by an issue, a PR comment, or direct user request.</p>
+
+      <div class="phase-list">
+        <div class="phase-item">
+          <div class="phase-num">0</div>
+          <div class="phase-content">
+            <div class="phase-title">Stack Auto-Detection</div>
+            <p class="phase-detail">Detects: runtime (Node/Python/Go/Rust), package manager (npm/pnpm/yarn/pip/cargo), test framework (jest/vitest/pytest/cargo test), linter (eslint/ruff/biome), type checker (tsc/mypy/pyright), CI workflows. Stores as internal commands: test_cmd, lint_cmd, typecheck_cmd, build_cmd.</p>
+          </div>
+        </div>
+        <div class="phase-item">
+          <div class="phase-num">1</div>
+          <div class="phase-content">
+            <div class="phase-title">Thinking Protocol</div>
+            <p class="phase-detail">Restates the request, traces the call graph (reads actual source), classifies as feat/fix/refactor/perf/test/docs/chore, identifies risks (breaking changes, concurrency, security boundaries, migrations). No coding until complete.</p>
+          </div>
+        </div>
+        <div class="phase-item">
+          <div class="phase-num">2–3</div>
+          <div class="phase-content">
+            <div class="phase-title">Discovery → Design</div>
+            <p class="phase-detail">Reads source files, traces call graphs, checks git log on affected files, finds existing patterns to follow. Produces a design table: files to modify, new function signatures, data structures, test strategy, backward compatibility strategy.</p>
+          </div>
+        </div>
+        <div class="phase-item">
+          <div class="phase-num">4</div>
+          <div class="phase-content">
+            <div class="phase-title">Veto Checkpoint</div>
+            <p class="phase-detail">Hard stops: arch boundary violation? premature abstraction? scope creep? security boundary crossed? public API broken without versioning? Any veto → redesign before proceeding.</p>
+          </div>
+        </div>
+        <div class="phase-item">
+          <div class="phase-num">5</div>
+          <div class="phase-content">
+            <div class="phase-title">Implementation</div>
+            <p class="phase-detail">No any, no implicit types, no unchecked nulls. Functions &lt;50 lines. All external input validated at boundary. All async wrapped with error handling. Commit format: <code style="color:var(--teal);font-family:JetBrains Mono;font-size:11px">type(module): description\n\nRefs: #issue</code></p>
+          </div>
+        </div>
+        <div class="phase-item">
+          <div class="phase-num">6</div>
+          <div class="phase-content">
+            <div class="phase-title">Documentation Update (always)</div>
+            <p class="phase-detail">CHANGELOG.md updated under [Unreleased] — always. README if user-facing behavior changed. Docstrings/JSDoc for modified public functions. .env.example if new env vars added. Creates CHANGELOG.md if it doesn't exist.</p>
+          </div>
+        </div>
+        <div class="phase-item">
+          <div class="phase-num">7</div>
+          <div class="phase-content">
+            <div class="phase-title">Self-Correction Loop</div>
+            <p class="phase-detail">Runs: lint → typecheck → test suite → build. Classifies failures: TypeMismatch → fix annotations. TestFailure(regression) → fix root cause, never fix tests to hide bugs. ArchViolation → pause, redesign. Max 3 attempts on same failure before marking BLOCKED.</p>
+          </div>
+        </div>
+        <div class="phase-item">
+          <div class="phase-num">8</div>
+          <div class="phase-content">
+            <div class="phase-title">Final Validation</div>
+            <p class="phase-detail"><code style="color:var(--teal);font-family:JetBrains Mono;font-size:11px">git diff --stat HEAD</code> to confirm minimal scoped diff. <code style="color:var(--teal);font-family:JetBrains Mono;font-size:11px">git status</code> to confirm no unrelated changes or temp files. Reports: type, files changed, tests added/updated, docs updated.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <hr class="divider">
+
+    <!-- ═══════════════════════════════════════════════════ -->
+    <!-- PR REVIEW DETAIL -->
+    <!-- ═══════════════════════════════════════════════════ -->
+    <section id="handle-pr-review">
+      <h2>/handle-pr-review</h2>
+      <p class="section-intro">Read-only code review. Validates the full runtime, analyzes every changed file, and submits a single batched GitHub review. Never modifies any code.</p>
+
+      <div class="phase-list">
+        <div class="phase-item">
+          <div class="phase-num">0</div>
+          <div class="phase-content">
+            <div class="phase-title">Checkout + Validate Branch</div>
+            <p class="phase-detail"><code style="color:var(--teal);font-family:JetBrains Mono;font-size:11px">gh pr checkout N</code> → confirms current branch matches PR head ref. Runs full build+lint+typecheck+tests. Stores PASS/FAIL/N/A in runtime-summary.json. If failures: adds HIGH severity findings for each failing module — does NOT fix.</p>
+          </div>
+        </div>
+        <div class="phase-item">
+          <div class="phase-num">1</div>
+          <div class="phase-content">
+            <div class="phase-title">Discovery</div>
+            <p class="phase-detail">Fetches: PR metadata, changed file list (<code style="color:var(--teal);font-family:JetBrains Mono;font-size:11px">gh pr diff N --name-only</code>), full diff (<code style="color:var(--teal);font-family:JetBrains Mono;font-size:11px">gh pr diff N</code>), existing review threads (<code style="color:var(--teal);font-family:JetBrains Mono;font-size:11px">gh api pulls/N/comments</code>). Avoids duplicating already-resolved comments.</p>
+          </div>
+        </div>
+        <div class="phase-item">
+          <div class="phase-num">2</div>
+          <div class="phase-content">
+            <div class="phase-title">File-by-File Analysis</div>
+            <p class="phase-detail">Analyzes only changed lines. Detects: null/undefined access, unchecked external input, unsafe async, missing error handling, security exposure (injection, IDOR, missing auth), N+1 queries, architectural violations, missing test coverage. Each finding → {path, line, severity: HIGH/MEDIUM/LOW, category: BUG/SAFETY/SECURITY/PERF/ARCH/TEST, message}.</p>
+          </div>
+        </div>
+        <div class="phase-item">
+          <div class="phase-num">3</div>
+          <div class="phase-content">
+            <div class="phase-title">Risk Classification</div>
+            <p class="phase-detail">Overall PR gets: SAFE (no findings, all green) / LOW RISK (only LOW findings) / MEDIUM RISK (MEDIUM findings or test failures) / HIGH RISK (any HIGH finding, security issue, or runtime failure).</p>
+          </div>
+        </div>
+        <div class="phase-item">
+          <div class="phase-num">4</div>
+          <div class="phase-content">
+            <div class="phase-title">Batched Review Submission</div>
+            <p class="phase-detail"><code style="color:var(--teal);font-family:JetBrains Mono;font-size:11px">post_review.py N</code> builds a review payload with inline comments + review body. Event: APPROVE (no findings, different author) / REQUEST_CHANGES (findings present) / COMMENT (own PR). Submits via <code style="color:var(--teal);font-family:JetBrains Mono;font-size:11px">gh api repos/.../pulls/N/reviews --method POST --input payload.json</code>.</p>
+          </div>
+        </div>
+        <div class="phase-item">
+          <div class="phase-num">5</div>
+          <div class="phase-content">
+            <div class="phase-title">Verify + Cleanup</div>
+            <p class="phase-detail"><code style="color:var(--teal);font-family:JetBrains Mono;font-size:11px">git status</code> must be clean. <code style="color:var(--teal);font-family:JetBrains Mono;font-size:11px">git log</code> must be unchanged from checkout. Wipes all tmp/ files.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <hr class="divider">
+
+    <!-- ═══════════════════════════════════════════════════ -->
+    <!-- PR CODE DETAIL -->
+    <!-- ═══════════════════════════════════════════════════ -->
+    <section id="handle-pr-code">
+      <h2>/handle-pr-code</h2>
+      <p class="section-intro">Implements every actionable review comment. Builds a classification matrix, groups into task batches, implements each, then posts one structured reply per comment thread.</p>
+
+      <h3>Comment Classification Matrix</h3>
+      <table class="data-table">
+        <thead><tr><th>Comment asks for...</th><th>Classification</th><th>Initial Status</th><th>Action</th></tr></thead>
+        <tbody>
+          <tr><td>Fix null check, logic error, error handling</td><td>BUG</td><td>PENDING</td><td>Implement via /handle-code</td></tr>
+          <tr><td>Rename, extract, restructure</td><td>REFACTOR</td><td>PENDING</td><td>Implement via /handle-code</td></tr>
+          <tr><td>Add test, improve coverage</td><td>TEST</td><td>PENDING</td><td>Implement via /handle-code</td></tr>
+          <tr><td>Performance optimization</td><td>PERF</td><td>PENDING</td><td>Implement via /handle-code</td></tr>
+          <tr><td>"What does this do?" / just a question</td><td>CLARIFICATION_ONLY</td><td>SOLVED</td><td>Reply only, no code change</td></tr>
+          <tr><td>Architectural redesign, new subsystem</td><td>OUT_OF_SCOPE</td><td>NEW_ISSUE</td><td>Create GH issue, don't implement</td></tr>
+          <tr><td>Already handled elsewhere</td><td>INVALID</td><td>SKIPPED</td><td>Reply SKIPPED</td></tr>
+        </tbody>
+      </table>
+
+      <h3>Reply per Comment Thread (always exactly one)</h3>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-label">post_comment_replies.py — reply format</span>
+          <div class="code-dots"><span style="background:#f87171"></span><span style="background:#fbbf24"></span><span style="background:#22c55e"></span></div>
+        </div>
+        <pre><span class="c-comment"># SOLVED</span>
+<span class="c-str">**Status: ✅ SOLVED**
+Commit: `abc1234`
+
+**Summary:**
+- Null check added at token decode boundary
+- Regression test added in auth.test.ts
+- No regressions in CI</span>
+
+<span class="c-comment"># NEW ISSUE (out of scope)</span>
+<span class="c-str">**Status: 🆕 NEW ISSUE**
+Issue: #57
+
+**Reason:** Requires architectural redesign of auth layer — tracked separately</span>
+
+<span class="c-comment"># Reply posted via gh api (not gh pr comment)</span>
+<span class="c-cmd">gh api</span> <span class="c-str">"repos/{owner}/{repo}/pulls/comments/{id}/replies"</span> \
+  <span class="c-flag">-f</span> <span class="c-str">body="..."</span></pre>
+      </div>
+    </section>
+
+    <hr class="divider">
+
+    <!-- ═══════════════════════════════════════════════════ -->
+    <!-- CLOSE PR -->
+    <!-- ═══════════════════════════════════════════════════ -->
+    <section id="handle-close-pr">
+      <h2>/handle-close-pr</h2>
+      <p class="section-intro">Validates, merges, and fully cleans up a PR. Never merges failing or unapproved PRs.</p>
+
+      <div class="phase-list">
+        <div class="phase-item">
+          <div class="phase-num">1</div>
+          <div class="phase-content">
+            <div class="phase-title">Pre-merge Validation</div>
+            <p class="phase-detail">Checks: PR state (must be OPEN), mergeable status, mergeStateStatus (CLEAN required), all CI checks passing via <code style="color:var(--teal);font-family:JetBrains Mono;font-size:11px">gh pr checks N</code>, review decision. Detects repo merge strategy (merge/squash/rebase) from <code style="color:var(--teal);font-family:JetBrains Mono;font-size:11px">gh repo view --json mergeCommitAllowed...</code>.</p>
+          </div>
+        </div>
+        <div class="phase-item">
+          <div class="phase-num">2</div>
+          <div class="phase-content">
+            <div class="phase-title">Merge with Branch Deletion</div>
+            <p class="phase-detail"><code style="color:var(--teal);font-family:JetBrains Mono;font-size:11px">gh pr merge N --merge --delete-branch</code>. The <code>--delete-branch</code> flag removes the remote branch atomically with the merge. No separate cleanup step needed for remote.</p>
+          </div>
+        </div>
+        <div class="phase-item">
+          <div class="phase-num">3</div>
+          <div class="phase-content">
+            <div class="phase-title">Local Cleanup</div>
+            <p class="phase-detail"><code style="color:var(--teal);font-family:JetBrains Mono;font-size:11px">git checkout main && git pull origin main</code>. Then <code style="color:var(--teal);font-family:JetBrains Mono;font-size:11px">git remote prune origin</code> to remove stale tracking refs. Confirms local feature branch is gone.</p>
+          </div>
+        </div>
+        <div class="phase-item">
+          <div class="phase-num">4</div>
+          <div class="phase-content">
+            <div class="phase-title">Jules Session Note</div>
+            <p class="phase-detail">Lists active sessions via <code style="color:var(--teal);font-family:JetBrains Mono;font-size:11px">jules remote list --session</code>. Jules sessions expire automatically — no explicit deletion needed. Documents which session ID was used for traceability.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <hr class="divider">
+
+    <!-- ═══════════════════════════════════════════════════ -->
+    <!-- RELEASE DETAIL -->
+    <!-- ═══════════════════════════════════════════════════ -->
+    <section id="handle-release">
+      <h2>/handle-release</h2>
+      <p class="section-intro">From merged commits to a published, versioned GitHub release with a polished CHANGELOG and release notes.</p>
+
+      <h3>Commit Classification (generate_release_notes.py)</h3>
+      <table class="data-table">
+        <thead><tr><th>Commit prefix</th><th>CHANGELOG section</th><th>SemVer impact</th></tr></thead>
+        <tbody>
+          <tr><td><span class="mono">feat!:</span> / BREAKING CHANGE in body</td><td>⚠️ BREAKING CHANGES</td><td><strong style="color:var(--red)">MAJOR</strong></td></tr>
+          <tr><td><span class="mono">feat:</span></td><td>✨ Added</td><td><strong style="color:var(--orange)">MINOR</strong></td></tr>
+          <tr><td><span class="mono">fix:</span> <span class="mono">perf:</span></td><td>🐛 Fixed / ⚡ Performance</td><td><strong style="color:var(--green)">PATCH</strong></td></tr>
+          <tr><td><span class="mono">security:</span></td><td>🔒 Security</td><td><strong style="color:var(--green)">PATCH</strong></td></tr>
+          <tr><td><span class="mono">refactor:</span> <span class="mono">test:</span></td><td>🔧 Changed (collapsed)</td><td>PATCH or none</td></tr>
+          <tr><td><span class="mono">docs:</span> <span class="mono">chore:</span> <span class="mono">ci:</span></td><td>&lt;details&gt; Internal</td><td>None</td></tr>
+        </tbody>
+      </table>
+
+      <h3>What gets created</h3>
+      <div class="card-grid">
+        <div class="card">
+          <div class="card-header">
+            <div class="card-icon" style="background:var(--green-dim)">📝</div>
+            <div>
+              <div class="card-name">CHANGELOG.md entry</div>
+              <div class="card-type">inserted above previous release</div>
+            </div>
+          </div>
+          <p>Structured markdown with emoji section headers. Breaking changes at top. Maintenance items collapsed in &lt;details&gt;. PR/issue numbers linked where present in commit messages.</p>
+        </div>
+        <div class="card">
+          <div class="card-header">
+            <div class="card-icon" style="background:var(--blue-dim)">🚀</div>
+            <div>
+              <div class="card-name">GitHub Release</div>
+              <div class="card-type">via gh release create</div>
+            </div>
+          </div>
+          <p>Polished prose format. 1–2 sentence theme summary, highlights list, bug fixes, security section if applicable, upgrade guide for breaking changes, comparison URL to previous tag.</p>
+        </div>
+      </div>
+
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-label">Full release execution sequence</span>
+          <div class="code-dots"><span style="background:#f87171"></span><span style="background:#fbbf24"></span><span style="background:#22c55e"></span></div>
+        </div>
+        <pre><span class="c-comment"># 1. Pre-flight: clean tree + CI green</span>
+<span class="c-cmd">git status --short</span>
+<span class="c-cmd">gh run list</span> <span class="c-flag">--branch main --limit 3</span> <span class="c-flag">--json status,conclusion</span>
+
+<span class="c-comment"># 2. Generate notes</span>
+<span class="c-cmd">python3</span> .agent/skills/release-manager/scripts/generate_release_notes.py \
+  <span class="c-flag">--version</span> <span class="c-str">1.4.0</span>
+
+<span class="c-comment"># 3. Bump version file (example: package.json)</span>
+<span class="c-cmd">npm version</span> minor <span class="c-flag">--no-git-tag-version</span>
+
+<span class="c-comment"># 4. Insert changelog entry + commit</span>
+<span class="c-cmd">git add</span> CHANGELOG.md package.json
+<span class="c-cmd">git commit</span> <span class="c-flag">-m</span> <span class="c-str">"chore(release): bump version to v1.4.0"</span>
+
+<span class="c-comment"># 5. Tag + push</span>
+<span class="c-cmd">git tag</span> <span class="c-flag">-a</span> v1.4.0 <span class="c-flag">-m</span> <span class="c-str">"Release v1.4.0"</span>
+<span class="c-cmd">git push</span> origin HEAD
+<span class="c-cmd">git push</span> origin v1.4.0
+
+<span class="c-comment"># 6. Create GitHub release</span>
+<span class="c-cmd">gh release create</span> v1.4.0 \
+  <span class="c-flag">--title</span> <span class="c-str">"v1.4.0"</span> \
+  <span class="c-flag">--notes-file</span> .agent/skills/release-manager/tmp/release-body.md \
+  <span class="c-flag">--latest</span></pre>
+      </div>
+    </section>
+
+    <hr class="divider">
+
+    <!-- ═══════════════════════════════════════════════════ -->
+    <!-- GH CLI -->
+    <!-- ═══════════════════════════════════════════════════ -->
+    <section id="gh-cli">
+      <h2>gh CLI Integration</h2>
+      <p class="section-intro">Every GitHub operation uses the gh CLI. Here's every command used, where, and why — no web UI simulation.</p>
+
+      <div class="integration-grid">
+        <div class="integration-card">
+          <div class="int-header">
+            <div class="int-logo" style="background:#21262d;color:#e2e8f0">gh</div>
+            <div class="int-name">Issues</div>
+          </div>
+          <ul class="int-list">
+            <li><code style="color:var(--teal);font-family:JetBrains Mono;font-size:11px">gh issue list --state open --limit 100 --json number,title,body,labels,assignees,milestone,createdAt,updatedAt</code> — fetch all open issues as machine-readable JSON</li>
+            <li><code style="color:var(--teal);font-family:JetBrains Mono;font-size:11px">gh issue view N --json number,title,body,comments,labels</code> — read full issue for engineering validation</li>
+            <li><code style="color:var(--teal);font-family:JetBrains Mono;font-size:11px">gh issue comment N --body "..."</code> — post structured status reply</li>
+            <li><code style="color:var(--teal);font-family:JetBrains Mono;font-size:11px">gh issue close N --reason completed|not-planned --comment "..."</code> — close resolved/invalid issues</li>
+          </ul>
+        </div>
+
+        <div class="integration-card">
+          <div class="int-header">
+            <div class="int-logo" style="background:#21262d;color:#e2e8f0">gh</div>
+            <div class="int-name">Pull Requests</div>
+          </div>
+          <ul class="int-list">
+            <li><code style="color:var(--teal);font-family:JetBrains Mono;font-size:11px">gh pr list --state open|merged --json number,title,body,headRefName,mergedAt</code> — detect active PRs and recent merges</li>
+            <li><code style="color:var(--teal);font-family:JetBrains Mono;font-size:11px">gh pr checkout N</code> — check out PR branch for review or implementation</li>
+            <li><code style="color:var(--teal);font-family:JetBrains Mono;font-size:11px">gh pr view N --json number,title,headRefName,mergeable,statusCheckRollup</code> — pre-merge validation</li>
+            <li><code style="color:var(--teal);font-family:JetBrains Mono;font-size:11px">gh pr diff N --name-only</code> — changed files for scoped analysis</li>
+            <li><code style="color:var(--teal);font-family:JetBrains Mono;font-size:11px">gh pr checks N --watch</code> — wait for CI to finish</li>
+            <li><code style="color:var(--teal);font-family:JetBrains Mono;font-size:11px">gh pr create --title --body --label</code> — create batch PR with Closes refs</li>
+            <li><code style="color:var(--teal);font-family:JetBrains Mono;font-size:11px">gh pr merge N --merge --delete-branch</code> — atomic merge + branch cleanup</li>
+            <li><code style="color:var(--teal);font-family:JetBrains Mono;font-size:11px">gh pr comment N --body "@jules ..."</code> — re-trigger Jules on a PR</li>
+          </ul>
+        </div>
+
+        <div class="integration-card">
+          <div class="int-header">
+            <div class="int-logo" style="background:#21262d;color:#e2e8f0">gh</div>
+            <div class="int-name">API (direct)</div>
+          </div>
+          <ul class="int-list">
+            <li><code style="color:var(--teal);font-family:JetBrains Mono;font-size:11px">gh api repos/{owner}/{repo}/pulls/N/comments</code> — fetch ALL inline review comments with IDs</li>
+            <li><code style="color:var(--teal);font-family:JetBrains Mono;font-size:11px">gh api repos/{owner}/{repo}/pulls/comments/{id}/replies -f body="..."</code> — reply to specific inline comment thread</li>
+            <li><code style="color:var(--teal);font-family:JetBrains Mono;font-size:11px">gh api repos/{owner}/{repo}/pulls/N/reviews --method POST --input payload.json</code> — submit batched review with all inline comments in one API call</li>
+            <li><code style="color:var(--teal);font-family:JetBrains Mono;font-size:11px">gh api repos/{owner}/{repo}/pulls/N/reviews</code> — fetch existing review threads to avoid duplicates</li>
+          </ul>
+        </div>
+
+        <div class="integration-card">
+          <div class="int-header">
+            <div class="int-logo" style="background:#21262d;color:#e2e8f0">gh</div>
+            <div class="int-name">Releases & Repo</div>
+          </div>
+          <ul class="int-list">
+            <li><code style="color:var(--teal);font-family:JetBrains Mono;font-size:11px">gh release create vX.Y.Z --title --notes-file --latest</code> — publish GitHub release</li>
+            <li><code style="color:var(--teal);font-family:JetBrains Mono;font-size:11px">gh release view vX.Y.Z</code> — verify release was created correctly</li>
+            <li><code style="color:var(--teal);font-family:JetBrains Mono;font-size:11px">gh repo view --json nameWithOwner,mergeCommitAllowed,squashMergeAllowed,rebaseMergeAllowed</code> — detect merge strategy</li>
+            <li><code style="color:var(--teal);font-family:JetBrains Mono;font-size:11px">gh run list --branch main --limit 3 --json status,conclusion,workflowName</code> — CI health check before release</li>
+            <li><code style="color:var(--teal);font-family:JetBrains Mono;font-size:11px">gh issue create --title --body --label follow-up</code> — create tracking issues for out-of-scope PR comments</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <hr class="divider">
+
+    <!-- ═══════════════════════════════════════════════════ -->
+    <!-- JULES CLI -->
+    <!-- ═══════════════════════════════════════════════════ -->
+    <section id="jules-cli">
+      <h2>Jules CLI Integration</h2>
+      <p class="section-intro">Jules handles async, complex, and parallelizable engineering tasks. The pipeline assigns Jules the top-priority task with a rich description — not a vague one-liner.</p>
+
+      <div class="integration-grid">
+        <div class="integration-card">
+          <div class="int-header">
+            <div class="int-logo" style="background:#1a1a2e;color:#fbbf24">J</div>
+            <div class="int-name">Assigning Tasks</div>
+          </div>
+          <ul class="int-list">
+            <li><code style="color:var(--teal);font-family:JetBrains Mono;font-size:11px">jules new --repo owner/repo "enriched task description"</code> — assign a single task. Jules gets: problem context, acceptance criteria, technical constraints, definition of done.</li>
+            <li><code style="color:var(--teal);font-family:JetBrains Mono;font-size:11px">jules new --repo owner/repo --parallel 2 "task"</code> — spin up 2 parallel sessions for the same task when exploring solutions</li>
+          </ul>
+        </div>
+
+        <div class="integration-card">
+          <div class="int-header">
+            <div class="int-logo" style="background:#1a1a2e;color:#fbbf24">J</div>
+            <div class="int-name">Monitoring Sessions</div>
+          </div>
+          <ul class="int-list">
+            <li><code style="color:var(--teal);font-family:JetBrains Mono;font-size:11px">jules remote list --session</code> — list all active sessions and their status</li>
+            <li><code style="color:var(--teal);font-family:JetBrains Mono;font-size:11px">jules remote pull --session N</code> — view session result without applying</li>
+            <li><code style="color:var(--teal);font-family:JetBrains Mono;font-size:11px">jules remote pull --session N --apply</code> — apply Jules' patch to local repo for local review</li>
+          </ul>
+        </div>
+
+        <div class="integration-card">
+          <div class="int-header">
+            <div class="int-logo" style="background:#1a1a2e;color:#fbbf24">J</div>
+            <div class="int-name">Teleport</div>
+          </div>
+          <ul class="int-list">
+            <li><code style="color:var(--teal);font-family:JetBrains Mono;font-size:11px">jules teleport SESSION_ID</code> — if not in a repo: clones the repo, checks out Jules' starting branch, applies the patch. If already in the repo: applies the patch directly. One command to get Jules' work onto your local machine.</li>
+          </ul>
+        </div>
+
+        <div class="integration-card">
+          <div class="int-header">
+            <div class="int-logo" style="background:#1a1a2e;color:#fbbf24">J</div>
+            <div class="int-name">Feedback Loop</div>
+          </div>
+          <ul class="int-list">
+            <li>When Jules creates a PR, check it with <code style="color:var(--teal);font-family:JetBrains Mono;font-size:11px">/handle-pr-review N</code></li>
+            <li>If changes are needed: <code style="color:var(--teal);font-family:JetBrains Mono;font-size:11px">gh pr comment N --body "@jules &lt;specific correction&gt;"</code> re-triggers Jules on the same PR</li>
+            <li>If direct fix is faster: <code style="color:var(--teal);font-family:JetBrains Mono;font-size:11px">/handle-pr-code N</code> implements the changes directly</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="callout info">
+        <p>The quality of Jules' output is directly proportional to the quality of the task description. The pipeline builds descriptions with: problem context from the issue body, 5+ acceptance criteria checkboxes, technical constraints (follow existing patterns, conventional commits), and a definition of done checklist. Jules gets a spec, not a sentence.</p>
+      </div>
+    </section>
+
+    <hr class="divider">
+
+    <!-- ═══════════════════════════════════════════════════ -->
+    <!-- RULES -->
+    <!-- ═══════════════════════════════════════════════════ -->
+    <section id="rules">
+      <h2>Rules & Standards</h2>
+      <p class="section-intro">4 rule files in .agent/rules/. These are model_decision triggers — they activate automatically when the relevant workflow runs.</p>
+
+      <div class="card-grid">
+        <div class="card">
+          <div class="card-header">
+            <div class="card-icon" style="background:var(--green-dim)">📐</div>
+            <div>
+              <div class="card-name">software-engineering-standards</div>
+              <div class="card-type">trigger: any code modification</div>
+            </div>
+          </div>
+          <p>Architecture discipline (layer separation, no circular deps), strict typing (no any/implicit/unchecked nulls), code quality (functions &lt;50 lines, no duplication), testing requirements (every public fn + every bug fix), security (validate input, no hardcoded secrets), CHANGELOG discipline. Explains the WHY behind each rule — not just MUST/NEVER commands.</p>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <div class="card-icon" style="background:var(--orange-dim)">🎯</div>
+            <div>
+              <div class="card-name">issue-task-standards</div>
+              <div class="card-type">trigger: processing issues</div>
+            </div>
+          </div>
+          <p>Branch safety enforcement (never commit to main/master/production), mandatory PR creation with Closes #N references, gh CLI-only GitHub operations, temp artifact control (all files in skills/tmp/, gitignored, wiped after), per-issue status patterns (exact format for each status type).</p>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <div class="card-icon" style="background:var(--yellow-dim)">💬</div>
+            <div>
+              <div class="card-name">pr-code-standards</div>
+              <div class="card-type">trigger: implementing PR feedback</div>
+            </div>
+          </div>
+          <p>Branch discipline (checkout → validate → never force push), runtime validation before any change (baseline must be stored), commit standards (conventional commits, one per logical fix, PR comment URL in body), comment reply pattern (exactly one reply per thread, never silent close), scope control (create new issue instead of expanding scope).</p>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <div class="card-icon" style="background:var(--purple-dim)">🔍</div>
+            <div>
+              <div class="card-name">pr-review-standards</div>
+              <div class="card-type">trigger: read-only code review</div>
+            </div>
+          </div>
+          <p>Absolute no-modification rule (no code edits, no commits, no branch creation), runtime validation mandatory, review comment pattern (one comment per issue, structured format), risk classification (SAFE/LOW/MEDIUM/HIGH RISK), gh CLI only (gh api for batched review submission).</p>
+        </div>
+      </div>
+
+      <div class="callout success">
+        <p>Add the 7 lines from <code style="font-family:JetBrains Mono;font-size:12px">_gitignore-additions.txt</code> to your .gitignore once. Every skill's tmp/ directory will be protected from accidental commits for all future runs.</p>
+      </div>
+    </section>
+
+  </div>
+</div>
+
+<script>
+  // Highlight active sidebar link on scroll
+  const sections = document.querySelectorAll('section[id], div[id]');
+  const links = document.querySelectorAll('.sidebar a');
+
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        links.forEach(l => l.classList.remove('active'));
+        const link = document.querySelector(`.sidebar a[href="#${entry.target.id}"]`);
+        if (link) link.classList.add('active');
+      }
+    });
+  }, { threshold: 0.3, rootMargin: '-80px 0px -60% 0px' });
+
+  sections.forEach(s => observer.observe(s));
+</script>
+
+</body>
+</html>

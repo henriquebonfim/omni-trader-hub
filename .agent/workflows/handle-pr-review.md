@@ -2,50 +2,74 @@
 description: /handle-pr-review <PR_NUMBER>
 ---
 
-# Execution Sequence
+# Handle PR Review
 
-1. Ensure `.agent/tmp/` exists.
-2. Ensure `.agent/tmp/` in `.gitignore`.
-
-3. Load Skill:
-   pr-review-orchestrator
-
-4. Checkout PR branch:
-
-   gh pr checkout <PR_NUMBER>
-
-5. Execute:
-   - Full diff analysis
-   - File-by-file validation
-   - Risk classification
-   - Structured review comments
-   - Final approval or request-changes
-   - Cleanup
-
-6. Final Verification:
-   - No commits created
-   - No branch modified
-   - No temp files staged
-   - Review state submitted
+Read-only code review with runtime validation. No code changes.
 
 ---
 
-# Abort Conditions
+## Execution Sequence
 
-Abort if:
+### 1 — Setup
+
+```bash
+mkdir -p .agent/skills/pr-review-orchestrator/tmp
+grep -qxF '.agent/skills/pr-review-orchestrator/tmp/' .gitignore \
+  || echo '.agent/skills/pr-review-orchestrator/tmp/' >> .gitignore
+```
+
+### 2 — Load Skill
+
+```
+pr-review-orchestrator
+```
+
+### 3 — Checkout
+
+```bash
+gh pr checkout <PR_NUMBER>
+
+# Validate branch
+EXPECTED=$(gh pr view <PR_NUMBER> --json headRefName --jq .headRefName)
+CURRENT=$(git branch --show-current)
+echo "Expected: $EXPECTED | Current: $CURRENT"
+```
+
+### 4 — Execute Review
+
+- Runtime validation (build, lint, typecheck, tests) → `tmp/runtime-summary.json`
+- Full diff analysis → `tmp/review-matrix.json`
+- Risk classification
+- Submit batched review via `post_review.py`
+
+```bash
+python3 .agent/skills/pr-review-orchestrator/scripts/post_review.py <PR_NUMBER>
+```
+
+### 5 — Verify No Changes Made
+
+```bash
+git status          # Must be clean
+git log --oneline -3  # Must be unchanged from checkout
+```
+
+### 6 — Cleanup
+
+```bash
+rm -f .agent/skills/pr-review-orchestrator/tmp/*
+```
+
+---
+
+## Abort Conditions
 
 - PR cannot be checked out
-- Diff retrieval fails
 - Repository in unstable state
 
----
-
-# Success Condition
-
-Workflow completes only when:
+## Success Condition
 
 - All changed files analyzed
-- Structured review comments posted
-- Final review decision submitted
-- No code changes performed
-- `.agent/tmp/` empty
+- Structured review submitted via `gh api`
+- Risk level stated
+- Zero code modifications
+- `tmp/` empty

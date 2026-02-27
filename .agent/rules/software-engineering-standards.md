@@ -1,85 +1,125 @@
 ---
 trigger: model_decision
-description: Activate for any code creation, modification, refactor, bug fix, test, or architecture changes
+description: Activate for any code creation, modification, refactor, bug fix, test, or architecture change. These standards apply universally — no exceptions.
+---
+
+# Software Engineering Standards
+
+These standards exist to keep the codebase predictable, safe, and easy to change. When a standard feels bureaucratic, it's usually protecting against a real failure mode. Understand the why, not just the rule.
+
 ---
 
 ## Architecture Discipline
 
-- Prefer simple, composable designs over complex abstractions.
-- Enforce separation of concerns.
-- No business logic inside controllers/routes.
-- No direct database access outside repository/data layer.
-- No circular dependencies.
-- All modules must have clear responsibility boundaries.
+Good architecture makes future changes cheap. These rules prevent the most common forms of drift:
+
+- **Separation of concerns**: controllers/routes handle HTTP only; services contain business logic; repositories handle data access. When these mix, changes to one layer break others unexpectedly.
+- **No circular dependencies**: a dependency cycle is a design smell — split the shared logic into a third module.
+- **Clear module boundaries**: every module has one reason to exist. If you can't name it in 5 words, it's probably doing too much.
+- **Prefer simple, composable designs**: complexity compounds. A simple design with good interfaces beats a clever abstraction that nobody understands in 6 months.
 
 ---
 
 ## Type & Safety Enforcement
 
-- Strict typing required (no `any`, no implicit types).
-- No unchecked null/undefined access. Use optional chaining or explicit null checks.
-- All external inputs must be validated using schemas (e.g., Pydantic, Zod).
-- All async operations must handle failure paths with try/except or catch blocks.
-- No silent error swallowing; always log the error before returning or re-throwing.
+Type errors caught at compile/lint time are free. Type errors caught in production are expensive:
+
+- No `any`, no implicit types — if you don't know the type, figure it out.
+- No unchecked null/undefined access — use optional chaining, explicit guards, or non-null assertions with a comment explaining why it's safe.
+- All external inputs validated at the boundary — nothing from the outside world enters the system unvalidated (use Pydantic, Zod, etc.).
+- All async operations must handle failure paths — unhandled rejections and uncaught exceptions are silent data corruption waiting to happen.
+- Never swallow errors silently — always log before returning or re-throwing.
 
 ---
 
 ## Code Quality
 
-- Functions must be small and single-purpose (ideally < 50 lines).
-- No duplicated logic across modules. Extract common logic into utils or services.
-- Avoid premature abstraction; wait for the third use case.
-- All public functions must have clear, descriptive naming and docstrings/JSDoc.
-- Remove dead code immediately.
+Code is read far more often than it's written. Optimize for the reader:
+
+- Functions < 50 lines, single purpose. If you need a comment to explain what a section does, it should probably be its own function.
+- Extract duplicated logic after the second use (not the first — wait to see the real pattern).
+- Avoid premature abstraction. Write the concrete implementation twice, then abstract.
+- All public functions: descriptive names, docstrings/JSDoc with parameter descriptions.
+- Remove dead code immediately — it misleads readers and adds maintenance burden.
+- No commented-out code in commits — use git history for that.
 
 ---
 
 ## Testing Requirements
 
-- Every new public function or API endpoint MUST have a corresponding unit or integration test.
-- Bug fixes MUST include a regression test that reproduces the failure.
-- No merging if critical paths lack coverage.
-- Tests must validate behavior, not implementation details.
-- Avoid brittle mocks; prefer integration tests with a test database where possible.
+Tests are the proof that code does what it claims:
+
+- Every new public function or API endpoint → at least one unit or integration test.
+- Every bug fix → a regression test that would have caught the bug. This prevents it from silently returning.
+- Tests must validate **behavior** not **implementation** — test what it does, not how it does it. Tests coupled to implementation break on every refactor.
+- Prefer integration tests with a real test database over heavy mocking when the logic involves data persistence.
+- No skipping tests to make CI pass — fix the underlying issue.
 
 ---
 
 ## Performance & Scalability
 
+Performance problems in production are the hardest to debug:
+
 - No blocking operations in async environments.
-- Avoid N+1 queries; use joins or eager loading.
+- No N+1 queries — if you're calling the database in a loop, use a join or eager load.
+- All list-returning endpoints must have pagination (no unbounded queries).
 - Avoid unnecessary allocations in hot paths.
-- All new endpoints must consider load implications and have pagination if returning lists.
 
 ---
 
 ## Security Requirements
 
-- Validate and sanitize all user input.
-- Never log secrets, tokens, or PII.
-- Never hardcode credentials; use environment variables.
-- Enforce least-privilege access patterns.
-- All auth-sensitive changes must include test coverage.
+Security mistakes are often invisible until they're catastrophic:
+
+- Validate and sanitize all user input — never trust external data.
+- Never log secrets, tokens, session IDs, or PII.
+- Never hardcode credentials — use environment variables, referenced in `.env.example`.
+- Enforce least-privilege: components should only have access to what they need.
+- Auth-sensitive changes (login, sessions, permissions) must have test coverage.
 
 ---
 
 ## Change Control
 
-Before modifying code:
+Understand before you change:
 
-- Understand existing architecture by tracing call graphs.
-- Confirm backward compatibility.
-- Avoid breaking public APIs without explicit versioning.
-- Document significant decisions in code comments or README.
+- Read the call graph before modifying — trace from entrypoint to understand blast radius.
+- Confirm backward compatibility before changing public APIs.
+- If breaking a public API, version it explicitly.
+- Document significant decisions with a comment or README update — future maintainers will thank you.
 
 ---
 
-## Self-Correction & Validation
+## CHANGELOG Discipline
 
-Before finalizing any task:
+Every user-visible or behavior-changing commit deserves a CHANGELOG entry:
 
-1.  **Review Standards:** Explicitly check your code against every section of this document.
-2.  **Lint & Type Check:** Run the project's linter and type checker.
-3.  **Test:** Run all relevant tests.
-4.  **Clean Up:** Ensure no unrelated file changes or temporary artifacts remain.
-5.  **Verify Integrity:** Confirm no architectural drift was introduced.
+```markdown
+## [Unreleased]
+
+### Added
+- feat(auth): implement OAuth2 PKCE flow (#42)
+
+### Fixed
+- fix(api): handle null response from upstream (#38)
+
+### Security
+- security(deps): bump axios to 1.6.8 (CVE-2024-xxxxx)
+```
+
+Categories: Added / Fixed / Changed / Removed / Security / Performance / Deprecated
+
+---
+
+## Self-Correction Checklist
+
+Before finalizing any task, explicitly verify:
+
+1. **Architecture**: Does this respect layer boundaries? Any circular deps?
+2. **Types**: Is everything typed? No any? No unsafe null access?
+3. **Tests**: Is new behavior covered? Is the bug regression-tested?
+4. **Lint + Typecheck**: Run both. Fix every warning.
+5. **CHANGELOG**: Updated under [Unreleased]?
+6. **Diff review**: Are all changed files intentional? No temp files?
+7. **Secrets**: No credentials, tokens, or PII in the diff?

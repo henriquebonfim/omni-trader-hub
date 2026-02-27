@@ -2,45 +2,62 @@
 description: /handle-code <short_description>
 ---
 
-# Execution Sequence
+# Handle Code
 
-1. Load Skill:
-   software-engineer-worker
-
-2. Execute:
-   - Discovery
-   - Design
-   - Veto Check
-   - Implementation
-   - Self-Correction & Verification (MANDATORY)
-   - Final Validation
-   - Self-healing loop if required
-
-3. After successful validation:
-   - Ensure code is verified against `software-engineering-standards.md`.
-   - Ensure tests included.
-   - Ensure no unrelated file changes.
-   - Ensure architecture boundaries respected.
+Direct implementation via software-engineer-worker. Use for scoped tasks.
 
 ---
 
-# Abort Conditions
+## Execution Sequence
 
-Abort if:
+### 1 — Load Skill
 
-- Architectural redesign required beyond scope.
-- Requirements unclear.
-- Backward compatibility risk unresolvable.
-- Test suite instability cannot be stabilized safely.
+```
+software-engineer-worker
+```
+
+### 2 — Branch Safety
+
+```bash
+BRANCH=$(git branch --show-current)
+[[ "$BRANCH" == "main" || "$BRANCH" == "master" || "$BRANCH" == "production" ]] \
+  && echo "WARNING: On protected branch — ensure this is intentional"
+```
+
+### 3 — Execute
+
+Run all phases from the skill:
+
+1. Stack Detection (Phase 0)
+2. Thinking Protocol (Phase 1)
+3. Discovery (Phase 2)
+4. Design (Phase 3)
+5. Veto Checkpoint (Phase 4)
+6. Implementation (Phase 5)
+7. Documentation Update — including CHANGELOG (Phase 6)
+8. Self-Correction & Verification (Phase 7) ← MANDATORY
+9. Final Validation (Phase 8)
+10. Self-healing loop if needed
+
+### 4 — Post-Implementation Check
+
+```bash
+git diff --stat HEAD    # Confirm minimal scoped diff
+git status             # Confirm clean
+git log --oneline -3   # Confirm clean history
+```
 
 ---
 
-# Success Condition
+## Abort Conditions
 
-Workflow completes only when:
+- Architectural redesign required beyond scope
+- Requirements unclear after review
+- Test suite cannot be stabilized safely
 
-- Feature or fix implemented cleanly.
-- Tests passing.
-- No lint/type errors.
-- No architectural violations.
-- Diff minimal and scoped.
+## Success Condition
+
+- Feature or fix implemented
+- Build green, tests passing, lint clean
+- CHANGELOG.md updated
+- No unrelated changes in diff

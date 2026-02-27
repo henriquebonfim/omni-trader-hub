@@ -1,291 +1,163 @@
 ---
 trigger: model_decision
-description: This rule governs structured PR implementation workflows with strict scope control, minimal artifacts, runtime validation, and deterministic comment handling.
+description: Governs structured PR implementation workflows. Apply whenever implementing review feedback, fixing PR comments, or modifying code within an active PR.
 ---
 
-# Branch Discipline (With Runtime Validation)
+# PR Code Standards
 
-Always begin with:
+---
 
+## Branch Discipline
+
+Always begin by checking out the PR branch:
+
+```bash
 gh pr checkout <PR_NUMBER>
+```
 
 Then validate:
 
-- Current branch equals PR head branch.
-- Branch is NOT:
-  - main
-  - master
-  - production
+```bash
+BRANCH=$(git branch --show-current)
+EXPECTED=$(gh pr view <PR_NUMBER> --json headRefName --jq .headRefName)
+[[ "$BRANCH" == "$EXPECTED" ]] || echo "WARNING: Branch mismatch"
+[[ "$BRANCH" == "main" || "$BRANCH" == "master" || "$BRANCH" == "production" ]] && echo "ABORT: protected branch" && exit 1
+```
 
-Strict constraints:
-
-- Never force push.
-- Never rebase under active review (unless explicitly approved).
-- Never create new branch.
-- Never amend historical commits.
-- Never modify unrelated files.
-- No drive-by refactors.
-- Keep scope aligned with original PR intent.
-
----
-
-# Runtime & Project Validation (MANDATORY)
-
-After checkout and before ANY code changes:
-
-1. Install dependencies (non-persistent).
-2. Build project.
-3. Run lint (if available).
-4. Run type-check (if available).
-5. Run full test suite.
-6. Attempt application start (if applicable).
-
-Store only summarized status (no logs).
-
-If baseline is already failing:
-→ Mark related comments as ❌ UNSOLVED
-→ Report blocker
-→ Do NOT introduce fixes outside scope
-
-After each commit:
-
-- Re-run build.
-- Re-run tests.
-- Confirm zero regressions.
-- Confirm no new lint/type errors.
+Hard constraints — never:
+- Force push
+- Rebase under active review (unless explicitly approved)
+- Create a new branch
+- Amend historical commits
+- Modify unrelated files
+- Introduce drive-by refactors
 
 ---
 
-# Temporary Artifacts Control (Token Optimized)
+## Runtime Validation (MANDATORY)
 
-All temporary files must live under:
+Before ANY code changes:
 
-.agent/tmp/
+1. Install dependencies
+2. Build project
+3. Run lint
+4. Run type-check
+5. Run full test suite
 
-Allowed files ONLY:
+Store only summarized status in `tmp/runtime-summary.json`:
+```json
+{"build":"PASS|FAIL","lint":"PASS|FAIL|N/A","typecheck":"PASS|FAIL|N/A","tests":"PASS|FAIL|N/A"}
+```
 
-- pr-code-matrix.json
-- task-plan.json
-- runtime-summary.json
+If baseline already failing:
+- Mark affected comments `UNSOLVED` with "baseline already failing"  
+- Do NOT introduce fixes outside scope
 
-No additional ad-hoc files allowed.
+After each commit: re-run build + tests. Zero regressions.
 
-Minimal schemas:
+---
 
-pr-code-matrix.json
+## Temporary Artifacts
 
-[
-{
-comment_id,
-path,
-line,
-classification,
-status,
-commit_sha
-}
-]
+Location: `.agent/skills/pr-code-orchestrator/tmp/`
 
-task-plan.json
-
-[
-{
-task_id,
-related_comment_ids[]
-}
-]
-
-runtime-summary.json
-
-{
-build: "PASS | FAIL",
-lint: "PASS | FAIL | N/A",
-typecheck: "PASS | FAIL | N/A",
-tests: "PASS | FAIL | N/A",
-runtime: "PASS | FAIL | N/A"
-}
+Allowed files:
+- `pr-meta.json`
+- `review-comments.json`
+- `pr-code-matrix.json`
+- `task-plan.json`
+- `runtime-summary.json`
+- `changed-files.txt`
 
 Rules:
-
-- Never store full diffs.
-- Never store full logs.
-- Never store full comment bodies.
-- Only store structured metadata.
-- Skip clean entries.
-- Never commit temp files.
-- `.agent/tmp/` must be in `.gitignore`.
-- Delete `.agent/tmp/*` after workflow completion.
+- Never store full diffs or full comment bodies in artifacts
+- Never commit temp files
+- `.agent/skills/pr-code-orchestrator/tmp/` must be in `.gitignore`
+- Delete all after workflow completion
 
 ---
 
-# Commit Standards (Deterministic + Minimal)
+## Commit Standards
 
 Follow Conventional Commits:
 
-- fix:
-- feat:
-- refactor:
-- test:
-- docs:
-- perf:
-- chore:
+```
+fix(auth): validate null token before decode
 
-Rules:
-
-- One logical change per commit.
-- Never bundle unrelated fixes.
-- Each commit must reference the PR comment URL in body.
-- Never squash without approval.
-
-Example:
-
-fix(auth): validate null token
-
-Addresses PR comment:
+Addresses PR #123 comment:
 https://github.com/org/repo/pull/123#discussion_r456
+```
 
-Commit must be minimal and scoped strictly to affected files.
-
----
-
-# Mandatory Comment Reply Pattern (STRICT)
-
-Every PR comment must receive exactly ONE reply.
-
-Never bundle replies.
-Never close thread silently.
+- One logical change per commit
+- Never bundle unrelated fixes
+- Each commit references the PR comment URL in body
+- Never squash without approval
 
 ---
+
+## Comment Reply Pattern
+
+Every PR comment gets exactly ONE structured reply. Never bundle replies. Never close silently.
 
 ### ✅ SOLVED
+```
+**Status: ✅ SOLVED**
+Commit: `<SHA>`
 
-Status: ✅ SOLVED
-Commit: <SHA>
-
-Summary:
-
+**Summary:**
 - What changed
-- Why it resolves issue
-- Tests added or updated
-- Self-Correction Check passed
-
----
+- Why it resolves the feedback
+- Tests added/updated
+```
 
 ### ❌ UNSOLVED
+```
+**Status: ❌ UNSOLVED**
 
-Status: ❌ UNSOLVED
-
-Reason:
-
-- Clear technical explanation
-- Blocker details
-- What is required to proceed
-
----
+**Reason:** <technical explanation>
+**Blocker:** <what is required to proceed>
+```
 
 ### 🆕 NEW ISSUE
-
-Status: 🆕 NEW ISSUE
+```
+**Status: 🆕 NEW ISSUE**
 Issue: #<number>
 
-Reason:
-
-- Why request exceeds scope
-- Why separation required
-
----
+**Reason:** Exceeds scope of this PR — tracked separately
+```
 
 ### ⏭ SKIPPED
+```
+**Status: ⏭ SKIPPED**
 
-Status: ⏭ SKIPPED
-
-Reason:
-
-- Invalid / outdated / already resolved
-
----
-
-Mandatory:
-
-- One reply per comment thread.
-- No reply before matrix status finalized.
-- Status header must match exactly.
-- Commit SHA required for SOLVED.
+**Reason:** <invalid / outdated / already resolved>
+```
 
 ---
 
-# Mandatory Self-Correction Loop
+## Tooling: gh CLI Only
 
-Before committing or replying:
-
-1. Re-read `software-engineering-standards.md`.
-2. Validate:
-   - Strict typing
-   - Modularity
-   - Test presence
-   - Boundary compliance
-3. Run build + tests.
-4. Fix deviations BEFORE proceeding.
-
-If cannot stabilize:
-→ Mark affected comment ❌ UNSOLVED.
+```bash
+gh pr view <N>             # PR metadata
+gh pr diff <N>             # Changed files + diff
+gh pr checkout <N>         # Branch checkout
+gh pr checks <N>           # CI status
+gh pr comment <N>          # General comment
+gh api repos/.../pulls/comments/<ID>/replies  # Inline reply
+gh issue create            # Create follow-up issues
+```
 
 ---
 
-# Scope Control
-
-Create a NEW ISSUE when:
-
-- Architectural redesign required.
-- Cross-module refactor required.
-- Product clarification required.
-- Significant scope expansion detected.
-
-Never expand scope silently.
-
-Never introduce opportunistic improvements.
-
----
-
-# CLI Enforcement
-
-All GitHub operations must use:
-
-- gh pr view
-- gh pr diff
-- gh pr comment
-- gh pr review
-- gh pr checkout
-- gh issue create
-- gh api
-
-No UI simulation.
-No manual workflow deviations.
-
----
-
-# Final Validation Requirements
+## Final Validation
 
 Before completion:
 
-- Confirm PR branch active.
-- Confirm no protected branch commits.
-- Confirm build passing.
-- Confirm tests passing.
-- Confirm no regressions.
-- Confirm all comments have status reply.
-- Confirm no unrelated file changes.
-- Confirm no force push.
-- Confirm minimal commit set.
-- Confirm `.agent/tmp/` cleaned.
-- Verify via `git status`.
-
----
-
-# Completion Criteria
-
-- All PR comments resolved with structured status.
-- Runtime validated.
-- CI passing.
-- No scope creep.
-- No temp artifacts committed.
-- Deterministic, minimal, reproducible execution.
+- [ ] PR branch active, not protected branch
+- [ ] Build passing
+- [ ] Tests passing, zero regressions
+- [ ] Every comment has exactly one structured reply
+- [ ] No unrelated file changes in diff
+- [ ] No force push
+- [ ] tmp/ cleared
+- [ ] `git status` clean

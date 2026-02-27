@@ -1,141 +1,252 @@
 ---
-name: software-engineer-worker
-description: Structured engineering execution for implementing features, refactors, and bug fixes with architectural discipline
-trigger: when user requests implementation, refactor, feature development, or bug fixing
+name: software-engineer-orchestrator
+description: Full engineering task orchestrator — receives a task, validates scope, auto-detects stack, implements with discipline, validates build/tests/lint, updates CHANGELOG, and commits clean. Use for ANY code task: "implement X", "fix bug Y", "add tests for Z", "refactor module W", "add a field", "fix this error", or any request that results in committed code. Wraps software-engineer-worker with pre-flight branch safety, stack detection, and structured completion reporting. Also triggers for Jules-assigned tasks, batch issue implementations, and PR review followups that require code changes.
 ---
 
-# THINKING PROTOCOL (MANDATORY)
+# Software Engineer Orchestrator
 
-Before writing code:
-
-1. Understand the request precisely.
-2. Identify affected modules.
-3. Identify architectural boundaries.
-4. Determine:
-   - Is this a feature, fix, refactor, or performance task?
-   - Does this impact public APIs?
-   - Does this require migration?
-5. Identify risks:
-   - Breaking changes
-   - Concurrency risks
-   - Performance risks
-   - Security implications
-6. Design minimal solution aligned with standards.
-
-No coding before architecture reasoning is complete.
+Receives a scoped task, validates the environment, executes via `software-engineer-worker`, and delivers a clean validated commit. The enforcement layer that ensures every code change follows standards regardless of where the task came from.
 
 ---
 
-# EXECUTION WORKFLOW
+## Setup Check
 
-## Phase 1 — Discovery
-
-- Inspect relevant modules.
-- Trace call graph.
-- Identify data flow.
-- Identify validation boundaries.
-- Review existing tests.
+```bash
+mkdir -p .agent/skills/software-engineer-orchestrator/tmp
+grep -qxF '.agent/skills/software-engineer-orchestrator/tmp/' .gitignore \
+  || echo '.agent/skills/software-engineer-orchestrator/tmp/' >> .gitignore
+```
 
 ---
 
-## Phase 2 — Design
+## Phase 0 — Branch Safety
 
-Produce internal implementation plan:
+```bash
+BRANCH=$(git branch --show-current)
+echo "Current branch: $BRANCH"
 
-- Files to modify
-- Functions to add/change
-- Data structures impacted
-- Test strategy
-- Backward compatibility strategy
+PROTECTED=("main" "master" "production" "staging")
+for p in "${PROTECTED[@]}"; do
+  if [[ "$BRANCH" == "$p" ]]; then
+    echo "ERROR: Cannot commit directly to protected branch '$p'."
+    echo "Create a feature branch first:"
+    echo "  git checkout -b feature/<task-slug>"
+    exit 1
+  fi
+done
 
-If change is large:
+echo "✅ Branch safe: $BRANCH"
+```
 
-- Break into logical sub-tasks.
-
----
-
-## Phase 3 — Veto Point
-
-Before implementation:
-
-- Does this violate architecture rules?
-- Is abstraction premature?
-- Is solution minimal?
-- Is performance considered?
-- Are security boundaries respected?
-
-If violation detected → redesign before proceeding.
+If called from `/handle-issues` batch flow, the branch is already created. If called directly, confirm with user before creating a branch.
 
 ---
 
-## Phase 4 — Implementation
+## Phase 1 — Stack Auto-Detection
 
-- Write minimal code necessary.
-- Maintain strict typing.
-- Follow naming clarity.
-- Avoid duplication.
-- Respect separation of concerns.
-- Add or update tests.
+Detect and store the project's toolchain before touching any code:
 
-Commit pattern:
+```bash
+# Runtime & package manager
+[ -f package.json ]   && PM="npm"  && RUNTIME="node"
+[ -f pnpm-lock.yaml ] && PM="pnpm"
+[ -f yarn.lock ]      && PM="yarn"
+[ -f pyproject.toml ] && RUNTIME="python"
+[ -f Cargo.toml ]     && RUNTIME="rust"
+[ -f go.mod ]         && RUNTIME="go"
 
-<type>(module): concise description
+# Test framework
+[ -f jest.config.js ]    || [ -f jest.config.ts ]   && TEST_CMD="npx jest"
+[ -f vitest.config.ts ]  || [ -f vitest.config.js ]  && TEST_CMD="npx vitest run"
+[ -f pytest.ini ]        || grep -q "pytest" pyproject.toml 2>/dev/null && TEST_CMD="pytest"
+[ -f Cargo.toml ]        && TEST_CMD="cargo test"
+[ -f go.mod ]            && TEST_CMD="go test ./..."
 
-Example:
+# Linter
+[ -f .eslintrc* ]    || [ -f eslint.config* ] && LINT_CMD="npx eslint ."
+[ -f biome.json ]                              && LINT_CMD="npx biome check ."
+grep -q "ruff" pyproject.toml 2>/dev/null     && LINT_CMD="ruff check ."
 
-feat(auth): add token expiration validation
+# Type checker
+[ -f tsconfig.json ]                            && TYPE_CMD="npx tsc --noEmit"
+grep -q "mypy"   pyproject.toml 2>/dev/null    && TYPE_CMD="mypy ."
+grep -q "pyright" pyproject.toml 2>/dev/null   && TYPE_CMD="pyright"
 
----
+# Build command
+[ -f package.json ] && grep -q '"build"' package.json && BUILD_CMD="npm run build"
+[ -f Cargo.toml ]   && BUILD_CMD="cargo build"
+[ -f go.mod ]       && BUILD_CMD="go build ./..."
 
-## Phase 5 — Self-Correction & Verification (MANDATORY)
+echo "Runtime:  ${RUNTIME:-unknown}"
+echo "Test:     ${TEST_CMD:-not detected}"
+echo "Lint:     ${LINT_CMD:-not detected}"
+echo "Typecheck:${TYPE_CMD:-not detected}"
+echo "Build:    ${BUILD_CMD:-not detected}"
+```
 
-Before finalizing:
+Store as `tmp/stack-context.json`:
 
-1.  **Code Review:** Review your own changes against `.agent/rules/software-engineering-standards.md`.
-2.  **Lint & Type Check:** Run the project's linter and type checker.
-3.  **Test Execution:** Run the full test suite (e.g., `pytest`).
-4.  **Refactor:** If any standard is violated or tests fail, fix them immediately and re-run validation.
-5.  **Documentation:** Ensure public APIs are documented and comments are clear.
-
----
-
-## Phase 6 — Final Validation
-
-- Review diff for unrelated changes.
-- Confirm no architectural drift.
-- Ensure all artifacts are cleaned up.
-
----
-
-# SELF-HEALING LOOP
-
-If:
-
-- Tests fail
-- Type errors occur
-- Lint errors occur
-
-Then:
-
-1. Analyze failure root cause.
-2. Apply minimal corrective patch.
-3. Re-run validation.
-4. Repeat until stable.
-
-If architecture inconsistency discovered:
-
-- Pause.
-- Redesign.
-- Re-validate before committing.
+```json
+{
+  "runtime": "node|python|rust|go",
+  "package_manager": "npm|pnpm|yarn|pip|cargo",
+  "test_cmd": "...",
+  "lint_cmd": "...",
+  "typecheck_cmd": "...",
+  "build_cmd": "..."
+}
+```
 
 ---
 
-# COMPLETION CRITERIA
+## Phase 2 — Baseline Validation
 
-- Code compiles.
-- Tests pass.
-- New logic fully covered.
-- No duplicated logic introduced.
-- No architectural boundary violations.
-- Minimal diff.
-- Standards fully respected.
+Run the full validation suite BEFORE any changes. This establishes what was already broken (not your fault) vs. what you introduced:
+
+```bash
+# Record baseline state
+echo "Running baseline validation..."
+
+BUILD_BEFORE="PASS"
+TEST_BEFORE="PASS"
+LINT_BEFORE="PASS"
+
+$BUILD_CMD 2>&1 || BUILD_BEFORE="FAIL"
+$TEST_CMD  2>&1 || TEST_BEFORE="FAIL"
+$LINT_CMD  2>&1 || LINT_BEFORE="FAIL"
+```
+
+Store in `tmp/baseline.json`:
+
+```json
+{
+  "build": "PASS|FAIL",
+  "tests": "PASS|FAIL",
+  "lint":  "PASS|FAIL|N/A"
+}
+```
+
+If baseline tests are failing — **do not hide pre-existing failures**. Note them in the completion report but do not fix them unless the task explicitly asks for it.
+
+---
+
+## Phase 3 — Load Skill & Execute
+
+```
+software-engineer-worker
+```
+
+Run all 8 phases from the skill:
+
+| Phase | Action |
+|-------|--------|
+| 1 — Thinking Protocol | Restate, trace call graph, classify, assess risk |
+| 2 — Discovery | Read source, trace dependencies, check git log |
+| 3 — Design | Plan: files, signatures, test strategy, compat |
+| 4 — Veto Checkpoint | Architecture, abstraction, scope, security |
+| 5 — Implementation | Strict types, small functions, no duplication |
+| 6 — Documentation | CHANGELOG.md always; README/docstrings if applicable |
+| 7 — Self-Correction | lint → typecheck → tests → build; classify + heal failures |
+| 8 — Final Validation | `git diff --stat`, `git status` |
+
+---
+
+## Phase 4 — Post-Implementation Validation
+
+After the skill completes, run the full suite one final time from the orchestrator level:
+
+```bash
+echo "Running post-implementation validation..."
+
+$LINT_CMD     && echo "✅ Lint" || echo "❌ Lint FAIL"
+$TYPE_CMD     && echo "✅ Typecheck" || echo "❌ Typecheck FAIL"
+$TEST_CMD     && echo "✅ Tests" || echo "❌ Tests FAIL"
+$BUILD_CMD    && echo "✅ Build" || echo "❌ Build FAIL"
+```
+
+Compare against baseline. Any NEW failures introduced by this change are blocking — fix before proceeding.
+
+---
+
+## Phase 5 — Diff Review
+
+```bash
+# Confirm the diff is scoped to the task
+git diff --stat HEAD
+
+# Confirm no unrelated files changed
+git status
+
+# Confirm no temp files staged
+git ls-files --others --exclude-standard | head -10
+```
+
+**Blockers:**
+- Unrelated files in diff → unstage them
+- Temp files staged → remove from staging
+- Empty diff → nothing was committed, report failure
+
+---
+
+## Phase 6 — Commit Audit
+
+```bash
+git log --oneline -5
+```
+
+Every commit in this change must follow the convention:
+
+```
+<type>(<module>): <imperative description>
+
+<body if non-obvious>
+
+Refs: #<issue> | <pr-comment-url>
+```
+
+Valid types: `feat` `fix` `refactor` `perf` `test` `docs` `chore`
+
+If commits are missing the `Refs:` line and the task has an issue/PR comment reference, amend:
+
+```bash
+git commit --amend --no-edit
+```
+
+---
+
+## Phase 7 — Cleanup
+
+```bash
+rm -f .agent/skills/software-engineer-orchestrator/tmp/*.json
+git status  # Must show clean
+```
+
+---
+
+## Completion Report
+
+```
+✅ Task complete
+
+Branch:        <branch-name>
+Type:          feat|fix|refactor|...
+Files changed: N
+Tests:         N added/updated
+CHANGELOG:     Updated under [Unreleased]
+Baseline delta: build PASS→PASS | tests PASS→PASS | lint PASS→PASS
+
+Commits:
+  <sha>  <type(module): description>
+```
+
+---
+
+## Abort Conditions
+
+| Condition | Action |
+|-----------|--------|
+| On protected branch | ABORT — create feature branch first |
+| Requirements ambiguous after reading source | PAUSE — ask user for clarification |
+| Architectural redesign required beyond scope | BLOCK — report, create issue, do not implement |
+| 3+ self-healing iterations on same failure | BLOCK — report exact error + context to user |
+| Test suite introduces regressions after 3 fix attempts | BLOCK — do not skip/comment tests to hide failures |

@@ -1,262 +1,162 @@
 ---
 trigger: model_decision
-description: This rule governs strict, read-only PR reviews with structured per-comment responses, minimal artifact footprint, and runtime verification.
+description: Governs strict, read-only PR reviews. Apply whenever performing code review without making changes.
 ---
 
-# Strict No-Modification Rule
-
-During review:
-
-- No code edits allowed.
-- No commits allowed.
-- No branch pushes allowed.
-- No force push.
-- No branch creation.
-- No file creation outside `.agent/tmp/`.
-- No dependency installation committed.
-- No test files committed.
-- No refactors.
-
-This is a read-only analytical workflow.
-
-If runtime or tests fail:
-→ Report via structured review comment.
-→ Never fix code.
+# PR Review Standards
 
 ---
 
-# Branch Safety
+## Strict No-Modification Rule
 
-Always:
+During review, the following are absolutely forbidden:
 
+- No code edits
+- No commits
+- No branch creation or modification
+- No force push
+- No file creation outside `.agent/*/tmp/`
+- No dependency installs committed
+- No test files committed
+- No refactors
+
+This is a **read-only analytical workflow**. If runtime or tests fail, report via review comment — never fix code.
+
+---
+
+## Branch Safety
+
+```bash
 gh pr checkout <PR_NUMBER>
 
-Constraints:
+# Validate
+EXPECTED=$(gh pr view <PR_NUMBER> --json headRefName --jq .headRefName)
+CURRENT=$(git branch --show-current)
+[[ "$CURRENT" == "main" || "$CURRENT" == "master" ]] && echo "WARNING: On main"
+[[ "$CURRENT" == "$EXPECTED" ]] || echo "WARNING: Branch mismatch"
+```
 
-- Never commit on:
-  - main
-  - master
-  - production
-- Never create new branch.
-- Never rebase.
-- Never amend.
-
-Validate current branch before proceeding.
+Never create a new branch. Never rebase. Never amend.
 
 ---
 
-# Runtime & Functional Validation (MANDATORY)
+## Runtime Validation (MANDATORY)
 
 After checkout:
 
-1. Install dependencies (non-persistent).
-2. Build project.
-3. Run lint (if available).
-4. Run type-check (if available).
-5. Run full test suite.
-6. Attempt project start (if applicable).
+1. Install dependencies (non-persistent)
+2. Build project
+3. Run lint
+4. Run type-check
+5. Run full test suite
 
-Store only summarized results (not logs).
+Store only `PASS|FAIL|N/A` in `tmp/runtime-summary.json`.
 
-If any failure occurs:
-
-- Capture failure type.
-- Identify failing file/module.
-- Report as structured review comment.
-- Classify as:
-  - BUG
-  - ARCH
-  - TEST
-  - PERF
-
-Do NOT patch.
-Do NOT retry with edits.
-Do NOT introduce fixes.
+If failure: capture the failing file/module, report as HIGH severity review comment. Do NOT fix.
 
 ---
 
-# Temporary Artifact Control (Token Optimized)
+## Temporary Artifacts
 
-All review artifacts must live under:
+Location: `.agent/skills/pr-review-orchestrator/tmp/`
 
-.agent/tmp/
-
-Allowed files (minimal schema only):
-
-- review-analysis.json
-- runtime-summary.json
-
-review-analysis.json schema:
-
-[
-{
-path,
-line,
-severity,
-category,
-message
-}
-]
-
-runtime-summary.json schema:
-
-{
-build: "PASS | FAIL",
-lint: "PASS | FAIL | N/A",
-typecheck: "PASS | FAIL | N/A",
-tests: "PASS | FAIL | N/A",
-runtime: "PASS | FAIL | N/A"
-}
+Allowed files:
+- `pr-meta.json`
+- `review-matrix.json`
+- `runtime-summary.json`
+- `review-payload.json`
+- `changed-files.txt`
+- `pr-diff.patch`
 
 Rules:
-
-- Never store full diffs.
-- Never store full logs.
-- Never store entire file contents.
-- Only store detected issues.
-- Skip clean files entirely.
-- Delete `.agent/tmp/*` after completion.
-- `.agent/tmp/` must exist in `.gitignore`.
+- Never store full diffs in matrix (reference file+line only)
+- Never store full comment bodies
+- Never commit temp files
+- Delete all after workflow completion
 
 ---
 
-# Mandatory Per-Comment Review Pattern
+## Review Comment Pattern
 
-Each issue must produce ONE structured comment.
-Never bundle unrelated issues.
-
-Allowed patterns:
-
----
+Each issue produces ONE structured comment. No bundling.
 
 ### ✅ APPROVED
+```
+**Status: ✅ APPROVED**
 
-Status: ✅ APPROVED
-
-Summary:
-
-- Code correct
-- Runtime validated
-- Tests passing
+**Summary:**
+- Code correct for the stated intent
+- All validation passes (build, lint, typecheck, tests)
 - No regressions detected
-
----
+```
 
 ### ⚠️ CHANGES REQUESTED
+```
+**Status: ⚠️ CHANGES REQUESTED**
+**Severity:** HIGH | MEDIUM | LOW
+**Category:** BUG | SAFETY | PERF | SECURITY | ARCH | TEST
 
-Status: ⚠️ CHANGES REQUESTED
-Severity: LOW | MEDIUM | HIGH
-Category: BUG | SAFETY | PERF | SECURITY | ARCH | TEST
+**Problem:**
+<Precise technical issue with file + line context>
 
-Problem:
+**Impact:**
+<What goes wrong if unfixed>
 
-- Precise technical issue
-- File and location
-
-Impact:
-
-- Clear technical consequence
-
-Required Fix:
-
-- Concrete corrective direction
-
----
+**Required Fix:**
+<Concrete corrective direction>
+```
 
 ### ❓ CLARIFICATION REQUIRED
+```
+**Status: ❓ CLARIFICATION REQUIRED**
 
-Status: ❓ CLARIFICATION REQUIRED
-
-Concern:
-
-- What is unclear
-
-Question:
-
-- Explicit request
-
----
+**Concern:** <what is unclear>
+**Question:** <explicit request>
+```
 
 ### 🧪 TESTS MISSING
+```
+**Status: 🧪 TESTS MISSING**
 
-Status: 🧪 TESTS MISSING
-
-Missing Coverage:
-
-- Specific behavior not tested
-
-Required:
-
-- Explicit test requirement
+**Missing Coverage:** <specific behavior not tested>
+**Required:** <explicit test requirement>
+```
 
 ---
 
-# Review Scope (Strict + Optimized)
+## Risk Classification
 
-The review must:
+Classify overall PR after analysis:
 
-- Analyze only changed files.
-- Inspect only modified hunks.
-- Detect:
-  - Runtime failure risks
-  - Null/undefined access
-  - Unsafe async usage
-  - Missing error handling
-  - Architectural boundary violations
-  - Security exposure
-  - Performance regression
-  - Breaking public API changes
-  - Missing test coverage
+| Level | Condition |
+|-------|-----------|
+| `HIGH RISK` | Runtime fails, security issues, data loss risk |
+| `MEDIUM RISK` | Test failures, missing coverage on critical paths |
+| `LOW RISK` | Only LOW-severity findings, all validation passes |
+| `SAFE` | No findings, full validation green |
 
-Additionally:
-
-- Validate project builds successfully.
-- Validate test suite stability.
-- Validate no regression introduced by PR.
-
-Never analyze unrelated files.
+Runtime fails → automatically `HIGH RISK`.
 
 ---
 
-# Risk Classification
+## Tooling: gh CLI Only
 
-After full analysis:
-
-Classify overall PR:
-
-- SAFE
-- LOW RISK
-- MEDIUM RISK
-- HIGH RISK
-
-If runtime fails → automatically HIGH RISK.
-If tests fail → at least MEDIUM RISK.
+```bash
+gh pr checkout <N>          # Branch checkout
+gh pr view <N>              # PR metadata
+gh pr diff <N>              # Changed files + diff
+gh pr diff <N> --name-only  # Changed file list
+gh api repos/.../pulls/<N>/comments     # Existing comments
+gh api repos/.../pulls/<N>/reviews      # Submit review
+```
 
 ---
 
-# Validation Before Posting Review
+## Final Verification
 
-Before finalizing:
-
-- Confirm branch is PR branch.
-- Confirm no commits created.
-- Confirm no files modified.
-- Confirm runtime executed.
-- Confirm tests executed.
-- Confirm all changed files analyzed.
-- Confirm structured comment format respected.
-- Confirm no duplicated comment threads.
-- Confirm `.agent/tmp/` cleaned.
-- Verify via `git status`.
-
----
-
-# Completion Criteria
-
-- All changed files analyzed.
-- Runtime/build/tests validated.
-- Structured per-issue comments posted.
-- Final review decision submitted.
-- No code modified.
-- No artifacts committed.
-- `.agent/tmp/` empty.
+- [ ] No commits made (`git log` unchanged)
+- [ ] No files modified (`git status` clean)  
+- [ ] Review submitted via `gh api`
+- [ ] Risk level stated in review body
+- [ ] All changed files analyzed
+- [ ] tmp/ empty

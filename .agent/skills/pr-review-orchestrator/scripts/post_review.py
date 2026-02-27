@@ -1,4 +1,9 @@
 #!/usr/bin/env python3
+"""
+Submit a batched GitHub pull request review based on the review matrix.
+
+Usage: python3 post_review.py <PR_NUMBER>
+"""
 
 import json
 import subprocess
@@ -8,124 +13,167 @@ from pathlib import Path
 BASE_DIR = Path(".agent/skills/pr-review-orchestrator")
 TMP_DIR = BASE_DIR / "tmp"
 
-MATRIX_FILE = TMP_DIR / "pr-review-orchestrator-matrix.json"
+MATRIX_FILE = TMP_DIR / "review-matrix.json"
 RUNTIME_FILE = TMP_DIR / "runtime-summary.json"
-PAYLOAD_FILE = TMP_DIR / "review_payload.json"
+PAYLOAD_FILE = TMP_DIR / "review-payload.json"
 
 
-def run(cmd):
-    return subprocess.run(cmd, check=True, capture_output=True, text=True)
-
-
-def get_pr_details(pr_number):
-    result = run([
-        "gh", "pr", "view", pr_number,
-        "--json", "headRefOid,author"
-    ])
-    data = json.loads(result.stdout)
-    return data["headRefOid"], data["author"]["login"]
-
-
-def get_current_user():
-    result = run([
-        "gh", "api", "user", "-q", ".login"
-    ])
+def run(cmd: list[str]) -> str:
+    result = subprocess.run(cmd, check=True, capture_output=True, text=True)
     return result.stdout.strip()
 
 
-def load_json(path):
+def load_json(path: Path) -> list | dict | None:
     if not path.exists():
         return None
-    with open(path, "r") as f:
+    with open(path) as f:
         return json.load(f)
 
 
-def build_comment(issue):
-    return {
+def get_pr_details(pr_number: str) -> tuple[str, str]:
+    """Returns (headRefOid, author_login)."""
+    result = run([
+        "gh", "pr", "view", pr_number,
+        "--json", "headRefOid,author",
+        "--jq", "[.headRefOid, .author.login] | join(\"|\")"
+    ])
+    parts = result.split("|")
+    return parts[0], parts[1] if len(parts) > 1 else "unknown"
+
+
+def get_current_user() -> str:
+    return run(["gh", "api", "user", "--jq", ".login"])
+
+
+def classify_overall_risk(issues: list[dict], runtime: dict | None) -> str:
+    if runtime:
+        if runtime.get("build") == "FAIL" or runtime.get("tests") == "FAIL":
+            return "HIGH RISK"
+
+    severities = [i.get("severity", "LOW") for i in issues]
+    if "HIGH" in severities:
+        return "HIGH RISK"
+    if "MEDIUM" in severities:
+        return "MEDIUM RISK"
+    if issues:
+        return "LOW RISK"
+    return "SAFE"
+
+
+def build_inline_comment(issue: dict) -> dict:
+    severity = issue["severity"]
+    category = issue["category"]
+    message = issue["message"]
+
+    body = f"""**Status: ⚠️ CHANGES REQUESTED**
+**Severity:** {severity}
+**Category:** {category}
+
+**Problem:**
+{message}
+
+**Required Fix:**
+Apply corrective change aligned with project standards and engineering guidelines."""
+
+    comment = {
         "path": issue["path"],
-        "line": issue["line"],
         "side": "RIGHT",
-        "body": f"""Status: ⚠️ CHANGES REQUESTED
-Severity: {issue["severity"]}
-Category: {issue["category"]}
-
-Problem:
-- {issue["message"]}
-
-Required Fix:
-- Apply corrective change aligned with project standards."""
+        "body": body,
     }
 
+    # Use 'line' or 'position' depending on what's available
+    if issue.get("line"):
+        comment["line"] = issue["line"]
 
-def build_review_body(runtime_summary, issue_count):
-    lines = []
+    return comment
 
-    if runtime_summary:
-        lines.append("Runtime Validation Summary:")
-        for k, v in runtime_summary.items():
-            lines.append(f"- {k}: {v}")
+
+def build_review_body(runtime: dict | None, issues: list[dict], risk_level: str) -> str:
+    lines = [f"## Code Review\n\n**Overall Risk:** {risk_level}\n"]
+
+    if runtime:
+        lines.append("### Runtime Validation\n")
+        status_emoji = {"PASS": "✅", "FAIL": "❌", "N/A": "⏭"}
+        for key in ("build", "lint", "typecheck", "tests", "runtime"):
+            val = runtime.get(key, "N/A")
+            emoji = status_emoji.get(val, "❓")
+            lines.append(f"- **{key.title()}:** {emoji} {val}")
         lines.append("")
 
-    if issue_count == 0:
-        lines.append("No issues detected in modified files.")
+    if not issues:
+        lines.append("### Summary\n\nNo issues detected in modified files. All validation passes. ✅")
     else:
-        lines.append(f"{issue_count} issue(s) detected in changed files.")
+        count = len(issues)
+        high = sum(1 for i in issues if i.get("severity") == "HIGH")
+        med = sum(1 for i in issues if i.get("severity") == "MEDIUM")
+        low = sum(1 for i in issues if i.get("severity") == "LOW")
+        lines.append(f"### Summary\n\n{count} issue(s) found: {high} HIGH, {med} MEDIUM, {low} LOW\n\nSee inline comments for details.")
 
     return "\n".join(lines)
 
 
-def main():
+def main() -> None:
     if len(sys.argv) != 2:
-        print("Usage: post_review.py <PR_NUMBER>")
+        print("Usage: post_review.py <PR_NUMBER>", file=sys.stderr)
         sys.exit(1)
 
     pr_number = sys.argv[1]
 
     if not MATRIX_FILE.exists():
-        print("Matrix file not found.")
+        print(f"ERROR: Review matrix not found at {MATRIX_FILE}", file=sys.stderr)
         sys.exit(1)
 
     issues = load_json(MATRIX_FILE) or []
-    runtime_summary = load_json(RUNTIME_FILE)
+    runtime = load_json(RUNTIME_FILE)
 
     commit_sha, pr_author = get_pr_details(pr_number)
 
     try:
         current_user = get_current_user()
-    except Exception:
+    except subprocess.CalledProcessError:
         current_user = None
+        print("WARNING: Could not determine current user — using COMMENT event", file=sys.stderr)
 
-    event = "COMMENT"
-    if current_user and pr_author != current_user:
-        if len(issues) > 0:
-            event = "REQUEST_CHANGES"
-        else:
-            event = "APPROVE"
+    # Determine review event
+    # Can't approve/request_changes on own PR
+    own_pr = current_user and (pr_author == current_user)
+    if own_pr:
+        event = "COMMENT"
+    elif issues:
+        event = "REQUEST_CHANGES"
+    else:
+        event = "APPROVE"
 
-    comments = [build_comment(issue) for issue in issues]
+    risk_level = classify_overall_risk(issues, runtime)
+    comments = [build_inline_comment(issue) for issue in issues]
 
     review_payload = {
         "commit_id": commit_sha,
         "event": event,
-        "body": build_review_body(runtime_summary, len(issues)),
-        "comments": comments
+        "body": build_review_body(runtime, issues, risk_level),
+        "comments": comments,
     }
 
     TMP_DIR.mkdir(parents=True, exist_ok=True)
-
     with open(PAYLOAD_FILE, "w") as f:
-        json.dump(review_payload, f)
+        json.dump(review_payload, f, indent=2)
 
-    subprocess.run([
+    print(f"Submitting review for PR #{pr_number} ({event}, {risk_level})...")
+    print(f"  {len(comments)} inline comment(s)")
+
+    run([
         "gh", "api",
-        f"repos/:owner/:repo/pulls/{pr_number}/reviews",
+        f"repos/{{owner}}/{{repo}}/pulls/{pr_number}/reviews",
+        "--method", "POST",
         "--input", str(PAYLOAD_FILE)
-    ], check=True)
+    ])
+
+    print(f"✅ Review submitted — {event}")
 
     # Cleanup
-    for file in [PAYLOAD_FILE, MATRIX_FILE, RUNTIME_FILE]:
-        if file.exists():
-            file.unlink()
+    for f in [PAYLOAD_FILE, MATRIX_FILE, RUNTIME_FILE]:
+        if f.exists():
+            f.unlink()
 
 
 if __name__ == "__main__":
