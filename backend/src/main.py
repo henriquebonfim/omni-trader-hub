@@ -492,6 +492,20 @@ class OmniTrader:
 
             # 4b. Check Black Swan Event (on primary timeframe)
             if self.risk.check_black_swan(primary_ohlcv):
+            # 4a. Check Trend (if enabled)
+            market_trend = "neutral"
+            trend_filter_enabled = getattr(self.config.strategy, "trend_filter_enabled", False)
+            if trend_filter_enabled:
+                trend_tf = getattr(self.config.strategy, "trend_timeframe", "4h")
+                try:
+                    # Fetch enough candles for EMA 200
+                    trend_ohlcv = await self.exchange.fetch_ohlcv(symbol, timeframe=trend_tf, limit=210)
+                    market_trend = self.strategy.check_trend(trend_ohlcv)
+                except Exception as e:
+                    logger.warning("trend_fetch_failed", error=str(e))
+
+            # 4b. Check Black Swan Event
+            if self.risk.check_black_swan(ohlcv):
                 try:
                     if position.is_open:
                         logger.critical("black_swan_flattening_positions")
@@ -522,6 +536,7 @@ class OmniTrader:
                     )
                     result.signal = Signal.HOLD
                     result.reason = f"Regime Mismatch: {current_regime.value}"
+            result = self.strategy.analyze(ohlcv, current_side, market_trend=market_trend)
 
             # Sanitize indicators for JSON serialization (handle numpy types)
             def _sanitize(v):
@@ -554,6 +569,22 @@ class OmniTrader:
             )
 
             # 5c. Broadcast to connected WebSocket clients
+            time_in_trade_s = 0
+            if position.is_open:
+                try:
+                    last_trade = await self.database.get_last_trade(symbol)
+                    # If we have a position, valid open trade should exist
+                    # However, if partial fills or restart, we might need robust logic.
+                    # Simple MVP: If last trade is OPEN, use it.
+                    if last_trade and last_trade["action"] == "OPEN":
+                        entry_dt = datetime.fromisoformat(last_trade["timestamp"])
+                        if entry_dt.tzinfo is None:
+                            entry_dt = entry_dt.replace(tzinfo=timezone.utc)
+                        now_dt = datetime.now(timezone.utc)
+                        time_in_trade_s = max(0, (now_dt - entry_dt).total_seconds())
+                except Exception as e:
+                    logger.warning("time_in_trade_calc_failed", error=str(e))
+
             if self.ws_manager:
                 await self.ws_manager.broadcast(
                     {
@@ -564,8 +595,10 @@ class OmniTrader:
                         "signal": result.signal.value,
                         "regime": current_regime.value,
                         "reason": result.reason,
+                        "market_trend": market_trend,
                         "indicators": sanitized_indicators,
                         "position": current_side,
+                        "time_in_trade": time_in_trade_s,
                         "balance": balance_info["total"],
                         "daily_pnl": self.risk.daily_stats.realized_pnl,
                         "daily_pnl_pct": self.risk.daily_stats.pnl_pct,

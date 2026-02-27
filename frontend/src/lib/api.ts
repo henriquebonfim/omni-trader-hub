@@ -132,4 +132,6 @@ export interface CycleMessage {
   daily_pnl: number
   daily_pnl_pct: number
   circuit_breaker: boolean
+  market_trend?: string
+  time_in_trade?: number
 }

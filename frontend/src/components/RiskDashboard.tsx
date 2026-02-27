@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { fetchStatus, fetchDailySummary } from '../lib/api'
+import { useLiveFeed } from '../lib/ws'
 import PositionMonitor from './PositionMonitor'
 
 function fmt(n: number | undefined | null, decimals = 2) {
@@ -8,6 +9,7 @@ function fmt(n: number | undefined | null, decimals = 2) {
 }
 
 export default function RiskDashboard() {
+  const { message } = useLiveFeed()
   const { data: status } = useQuery({ queryKey: ['status'], queryFn: fetchStatus })
 
   // Get today's date YYYY-MM-DD
@@ -77,6 +79,13 @@ export default function RiskDashboard() {
               <span className="label">Leverage</span>
               <span className="value">
                 {status?.paper_mode ? '3x (Paper)' : '3x (Live)'}
+              </span>
+            </div>
+
+            <div className="stat">
+              <span className="label">Market Trend</span>
+              <span className={`value ${message?.market_trend === 'bullish' ? 'green' : message?.market_trend === 'bearish' ? 'red' : ''}`}>
+                {message?.market_trend?.toUpperCase() || '—'}
               </span>
             </div>
           </div>

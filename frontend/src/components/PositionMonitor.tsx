@@ -7,6 +7,14 @@ function fmt(n: number | null | undefined, decimals = 2): string {
   return n.toLocaleString('en-US', { minimumFractionDigits: decimals, maximumFractionDigits: decimals })
 }
 
+function formatDuration(seconds: number | undefined) {
+  if (seconds === undefined || seconds === null) return '—'
+  const h = Math.floor(seconds / 3600)
+  const m = Math.floor((seconds % 3600) / 60)
+  const s = Math.floor(seconds % 60)
+  return `${h}h ${m}m ${s}s`
+}
+
 export default function PositionMonitor() {
   const { message } = useLiveFeed()
   const price = message?.price
@@ -70,6 +78,11 @@ export default function PositionMonitor() {
         <div className="stat">
           <span className="label">Mark Price</span>
           <span className="value accent">${fmt(price)}</span>
+        </div>
+
+        <div className="stat">
+          <span className="label">Time in Trade</span>
+          <span className="value">{formatDuration(message?.time_in_trade)}</span>
         </div>
 
         <div className="stat">
