@@ -158,10 +158,10 @@ The system never chases profits. It compounds edge while protecting downside.
 | 40 | Order fill verification | BE | ✅ | 🔴 | After every order, verify fill price/qty match expectations. Log drift |
 | 41 | Slippage tracking | BE | ✅ | 🟠 | Log expected vs actual fill price on every order |
 | 42 | Liquidation price monitoring | BE | ✅ | 🔴 | Alert at 50% of distance-to-liquidation, regardless of SL |
-| 43 | Heartbeat / watchdog | BE | ⬜ | 🟠 | External process pings `/api/health` every 30s. 3 failures → Discord alert + restart |
-| 44 | API rate limit tracking | BE | ⬜ | 🟠 | Application-level weight tracking (2400/min limit). Exponential backoff |
-| 45 | Funding rate tracking | BE | ⬜ | 🟡 | Log funding payments per trade. Alert if rate >3× normal |
-| 46 | Database backup | BE | ⬜ | 🟡 | Periodic SQLite backup (daily). Trade history is audit trail |
+| 43 | Heartbeat / watchdog | BE | ✅ | 🟠 | External process pings `/api/health` every 30s. 3 failures → Discord alert + restart |
+| 44 | API rate limit tracking | BE | ✅ | 🟠 | Application-level weight tracking (2400/min limit). Exponential backoff |
+| 45 | Funding rate tracking | BE | ✅ | 🟡 | Log funding payments per trade. Alert if rate >3× normal |
+| 46 | Database backup | BE | ✅ | 🟡 | Periodic SQLite backup (daily). Trade history is audit trail |
 
 ### Backend — Risk Enhancements
 
@@ -170,8 +170,8 @@ The system never chases profits. It compounds edge while protecting downside.
 | 47 | Drawdown size reduction | BE | ✅ | 🟠 | 3 consecutive losses → reduce size 50%. Restore after 2 wins |
 | 48 | Weekly circuit breaker | BE | ✅ | 🟠 | Weekly loss >10% → pause 48h, manual restart only |
 | 49 | Black swan detector | BE | ✅ | 🔴 | >10% BTC move in 1h → flatten all positions immediately |
-| 50 | Auto-deleverage | BE | ⬜ | 🟡 | Reduce leverage to 1x if drawdown >10% |
-| 51 | EMA 200 trend filter | BE | ⬜ | 🟡 | Only trade in direction of EMA 200 on higher TF |
+| 50 | Auto-deleverage | BE | ✅ | 🟡 | Reduce leverage to 1x if drawdown >10% |
+| 51 | EMA 200 trend filter | BE | ✅ | 🟡 | Only trade in direction of EMA 200 on higher TF |
 | 52 | Live trading mode | BE | ⏳ | 🟠 | Switch paper_mode: false, add Binance keys |
 | 53 | Position monitoring | BE | ⏳ | 🟠 | Track open positions, update PnL every cycle |
 
@@ -207,8 +207,8 @@ The system never chases profits. It compounds edge while protecting downside.
 
 | # | Task | Track | Status | Roadmap Priority | Description |
 |---|------|-------|--------|-------------|-------------|
-| 62 | Regime classifier | BE | ⬜ | 🔴 Highest | Classify: trending / ranging / high-vol / chop. **Gates all strategy selection** |
-| 63 | ATR-based stops | BE | ⬜ | 🔴 High | SL = 1.5× ATR(14), TP = 2× ATR. Replaces fixed % stops |
+| 62 | Regime classifier | BE | ✅ | 🔴 Highest | Classify: trending / ranging / high-vol / chop. **Gates all strategy selection** |
+| 63 | ATR-based stops | BE | ✅ | 🔴 High | SL = 1.5× ATR(14), TP = 2× ATR. Replaces fixed % stops |
 | 64 | Confidence score | BE | ⬜ | 🟡 Medium | Normalize all signals to 0-1 score with threshold gate |
 | 65 | Time-based stop | BE | ⬜ | 🟡 Medium | Exit if trade doesn't move >0.5× ATR in 48 candles (thesis decay) |
 

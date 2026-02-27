@@ -24,6 +24,21 @@ services:
       retries: 3
       start_period: 15s
 
+  watchdog:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: omnitrader-watchdog
+    command: python -m src.watchdog
+    volumes:
+      - ./backend/config:/app/config
+    env_file:
+      - .env
+    depends_on:
+      omnitrader:
+        condition: service_healthy
+    restart: unless-stopped
+
   frontend:
     build:
       context: ./frontend

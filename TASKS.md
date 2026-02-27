@@ -5,7 +5,7 @@ This list tracks the structural weak points identified during the Production Rea
 ## 🔴 High Priority (Risk Mitigation)
 
 ### 1. Database Infrastructure Migration
-- [ ] **Migrate to High-Performance Database**
+- [x] **Migrate to High-Performance Database**
     - **Risk Level**: 🔴 High
     - **Issue**: SQLite (single-file) lacks the concurrency needed for high-frequency writes and multi-pair scaling.
     - **Vulnerability**: Potential for database corruption during crashes or high-write volumes.
@@ -15,7 +15,7 @@ This list tracks the structural weak points identified during the Production Rea
         - **QuestDB**: Specialized time-series database for OHLCV, order book snapshots, and trade ticks. *Recommended for performance scaling.*
 
 ### 2. State Persistence Implementation
-- [ ] **Implement "Anti-Amnesia" Persistence Layer**
+- [x] **Implement "Anti-Amnesia" Persistence Layer**
     - **Risk Level**: 🔴 High
     - **Issue**: Trailing stop levels, loss streaks, and daily PnL reset states currently reside partially in memory.
     - **Vulnerability**: Docker restarts or process crashes wipe critical trading state.
