@@ -3,7 +3,7 @@
 Dual-track roadmap: **Backend** (trading engine) + **Frontend** (dashboard).
 Each priority level evolves both tracks in parallel.
 Maps to the 13-module System Architecture spec.
-Aligned with [PRD v1.0](./docs/PRD.md) — risk-first, capital preservation mandate.
+Aligned with [Roadmap v1.0](./docs/ROADMAP.md) — risk-first, capital preservation mandate.
 
 **Stack**: FastAPI (backend) · Vite + React + TypeScript (frontend) · SQLite WAL → Postgres · Docker Compose
 
@@ -25,9 +25,9 @@ The system never chases profits. It compounds edge while protecting downside.
 
 ## Strategy Risk Matrix
 
-> **PRD Assessment**: Not all implemented strategies are safe for live deployment. The table below reflects the PRD's financially rigorous analysis.
+> **Roadmap Assessment**: Not all implemented strategies are safe for live deployment. The table below reflects the Roadmap's financially rigorous analysis.
 
-| Strategy | Live-Ready? | Risk Level | Condition | PRD Recommendation |
+| Strategy | Live-Ready? | Risk Level | Condition | Roadmap Recommendation |
 |----------|-------------|------------|-----------|-------------------|
 | `adx_trend` | ✅ Yes | Medium | Trending markets only | **Primary strategy for live deployment** |
 | `ema_volume` | ⚠️ Conditional | Medium-High | Bleeds in ranging markets | Needs regime filter or ADX gate |
@@ -142,7 +142,7 @@ The system never chases profits. It compounds edge while protecting downside.
 
 *Modules: Risk Engine (full), Monitoring Engine, Infrastructure & Safety*
 
-> **PRD Mandate**: ALL items marked 🔴 CRITICAL must be completed before any live trading with real capital. These are non-negotiable safety requirements identified in the PRD's architecture gap analysis.
+> **Roadmap Mandate**: ALL items marked 🔴 CRITICAL must be completed before any live trading with real capital. These are non-negotiable safety requirements identified in the Roadmap's architecture gap analysis.
 
 ### Backend — Safety Critical (Must Complete Before Live)
 
@@ -191,7 +191,7 @@ The system never chases profits. It compounds edge while protecting downside.
 
 *Modules: Signal Engine (full), Scanner (enhanced)*
 
-> **PRD Warning**: Do NOT deploy Bollinger, Breakout, or Z-Score strategies for live trading without the regime classifier (#60). These strategies are dangerous in the wrong market regime. See Strategy Risk Matrix above.
+> **Roadmap Warning**: Do NOT deploy Bollinger, Breakout, or Z-Score strategies for live trading without the regime classifier (#60). These strategies are dangerous in the wrong market regime. See Strategy Risk Matrix above.
 
 ### Classical Strategies (Done)
 
@@ -203,9 +203,9 @@ The system never chases profits. It compounds edge while protecting downside.
 | 60 | Z-Score strategy | BE | ✅ | Statistical mean reversion. ⚠️ **Dangerous during regime shifts** |
 | 61 | Unit tests | BE | ✅ | Test all strategies (283 lines) |
 
-### Signal Enhancement (PRD Priority: HIGH)
+### Signal Enhancement (Roadmap Priority: HIGH)
 
-| # | Task | Track | Status | PRD Priority | Description |
+| # | Task | Track | Status | Roadmap Priority | Description |
 |---|------|-------|--------|-------------|-------------|
 | 62 | Regime classifier | BE | ⬜ | 🔴 Highest | Classify: trending / ranging / high-vol / chop. **Gates all strategy selection** |
 | 63 | ATR-based stops | BE | ⬜ | 🔴 High | SL = 1.5× ATR(14), TP = 2× ATR. Replaces fixed % stops |
@@ -216,7 +216,7 @@ The system never chases profits. It compounds edge while protecting downside.
 
 *Multi-timeframe is prerequisite for all SMC — without it, setups conflict across timeframes.*
 
-> **PRD Insight**: SMC should be implemented as a **filter/confirmation layer** on top of existing strategies, not a standalone signal generator. Discretionary concepts lose significant edge when mechanized. This mirrors how institutional systematic funds use discretionary insights — as overlays, not primary signals.
+> **Roadmap Insight**: SMC should be implemented as a **filter/confirmation layer** on top of existing strategies, not a standalone signal generator. Discretionary concepts lose significant edge when mechanized. This mirrors how institutional systematic funds use discretionary insights — as overlays, not primary signals.
 
 | # | Task | Track | Status | Description |
 |---|------|-------|--------|-------------|
@@ -593,9 +593,9 @@ Progress: **49/125 (39%)** — P0 complete, P1 safety in progress
 | ✅ | Complete |
 | ⏳ | In Progress |
 | ⬜ | Not Started |
-| 🔴 | Critical severity (PRD) |
-| 🟠 | High severity (PRD) |
-| 🟡 | Medium severity (PRD) |
+| 🔴 | Critical severity (Roadmap) |
+| 🟠 | High severity (Roadmap) |
+| 🟡 | Medium severity (Roadmap) |
 | BE | Backend (Python) |
 | FE | Frontend (React) |
 | INF | Infrastructure (Docker, CI, Cloud) |
@@ -604,13 +604,13 @@ Progress: **49/125 (39%)** — P0 complete, P1 safety in progress
 
 ## Changelog
 
-### 2026-02-24 (Update 5 — PRD Alignment)
-- **PRD v1.0 created**: Full product requirements document with financial risk analysis
+### 2026-02-24 (Update 5 — Roadmap Alignment)
+- **Roadmap v1.0 created**: Full roadmap document with financial risk analysis
 - Added: Risk Hierarchy, Strategy Risk Matrix, KPI Targets (top of roadmap)
 - Added: Anti-Targets (red flags) for monitoring
 - P0 marked **fully complete** (32/32 tasks) — API auth (#20) now done
 - P1 restructured: split into "Safety Critical" and "Risk Enhancements"
-- P1 new tasks from PRD gap analysis:
+- P1 new tasks from Roadmap gap analysis:
   - #39 Position reconciliation (🔴 Critical — was #44)
   - #40 Order fill verification (🔴 Critical — NEW)
   - #42 Liquidation price monitoring (🔴 Critical — NEW)
@@ -621,13 +621,13 @@ Progress: **49/125 (39%)** — P0 complete, P1 safety in progress
   - #48 Weekly circuit breaker (🟠 — NEW)
   - #49 Black swan detector (🔴 Critical — NEW)
   - #50 Auto-deleverage (🟡 — NEW)
-- P1 severity ratings added per PRD architecture gap analysis
+- P1 severity ratings added per Roadmap architecture gap analysis
 - P2 warnings: Bollinger, Breakout, Z-Score marked unsafe without regime classifier
-- P2 #62 Regime classifier marked 🔴 Highest priority (PRD's "single highest-impact feature")
-- P2 #63 ATR-based stops marked 🔴 High (replaces fixed % stops per PRD)
+- P2 #62 Regime classifier marked 🔴 Highest priority (Roadmap's "single highest-impact feature")
+- P2 #63 ATR-based stops marked 🔴 High (replaces fixed % stops per Roadmap)
 - SMC approach note: use as filter/overlay, not standalone signal
 - System failsafe logic updated: added weekly drawdown + black swan rules
-- Task count: 116 → 125 (9 new safety tasks from PRD)
+- Task count: 116 → 125 (9 new safety tasks from Roadmap)
 - Progress: 19/116 (16%) → 43/125 (34%) — P0 complete recounted
 
 ### 2026-02-21 (Update 4)
@@ -684,12 +684,12 @@ Progress: **49/125 (39%)** — P0 complete, P1 safety in progress
 
 | Date | Decision | Rationale |
 |------|----------|-----------|
-| 2026-02-24 | PRD v1.0 as product alignment doc | Professional, financially rigorous analysis of strategy viability and risk |
-| 2026-02-24 | ADX Trend as primary live strategy | PRD assessment: strongest edge, lowest risk of the 5 implemented strategies |
-| 2026-02-24 | Regime classifier as highest priority P2 | PRD: running conflicting strategies without regime awareness is #1 retail bot failure mode |
-| 2026-02-24 | 9 new P1 safety tasks | PRD gap analysis: critical items missing for live trading (reconciliation, fill verification, liquidation monitoring) |
-| 2026-02-24 | ATR-based stops over fixed % | PRD: 2% SL in low-vol ≠ 2% in high-vol. Volatility-adaptive stops are industry standard |
-| 2026-02-24 | Black swan detector mandatory | PRD: >10% BTC move in 1h requires immediate position flattening, not just circuit breaker |
+| 2026-02-24 | Roadmap v1.0 as product alignment doc | Professional, financially rigorous analysis of strategy viability and risk |
+| 2026-02-24 | ADX Trend as primary live strategy | Roadmap assessment: strongest edge, lowest risk of the 5 implemented strategies |
+| 2026-02-24 | Regime classifier as highest priority P2 | Roadmap: running conflicting strategies without regime awareness is #1 retail bot failure mode |
+| 2026-02-24 | 9 new P1 safety tasks | Roadmap gap analysis: critical items missing for live trading (reconciliation, fill verification, liquidation monitoring) |
+| 2026-02-24 | ATR-based stops over fixed % | Roadmap: 2% SL in low-vol ≠ 2% in high-vol. Volatility-adaptive stops are industry standard |
+| 2026-02-24 | Black swan detector mandatory | Roadmap: >10% BTC move in 1h requires immediate position flattening, not just circuit breaker |
 | 2026-02-21 | Dashboard as P0, not P3 | Can't manage a trading bot by editing YAML files — UI is essential |
 | 2026-02-21 | Vite + React over Next.js | SPA sufficient, no SSR needed for personal dashboard |
 | 2026-02-21 | FastAPI alongside async bot | Natural fit — shares event loop, reads bot state directly |

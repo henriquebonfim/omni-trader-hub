@@ -1,4 +1,4 @@
-# OmniTrader — Product Requirements Document (PRD)
+# OmniTrader — Roadmap
 
 **Version**: 1.0
 **Date**: 2026-02-24
@@ -16,7 +16,7 @@ OmniTrader is a **self-hosted, automated BTC/USDT Futures trading bot** targetin
 **Product thesis**: Generate consistent, positive expectancy returns by combining trend-following and mean-reversion strategies with strict risk management, regime awareness, and disciplined position sizing — **not** by promising outsized returns.
 
 > [!CAUTION]
-> **Profit Realism Disclaimer**: Sustained monthly returns above 5–10% risk-adjusted are exceptionally rare in crypto. Any strategy claiming >15–25% monthly returns sustained over 6+ months is either taking extreme hidden risk, is curve-fitted to historical data, or both. This PRD designs for **capital preservation first, growth second**.
+> **Profit Realism Disclaimer**: Sustained monthly returns above 5–10% risk-adjusted are exceptionally rare in crypto. Any strategy claiming >15–25% monthly returns sustained over 6+ months is either taking extreme hidden risk, is curve-fitted to historical data, or both. This Roadmap designs for **capital preservation first, growth second**.
 
 ---
 
@@ -501,13 +501,13 @@ graph TB
 | **Freqtrade** | Open-source, backtesting, mature | Complex config, no built-in UI, steep learning curve | React dashboard, simpler config, faster setup |
 | **Jesse** | Research-grade backtesting | Heavy, no live dashboard | Lighter, real-time dashboard, faster iteration |
 
-**OmniTrader's edge**: Self-hosted with full transparency, React dashboard for real-time monitoring, pluggable strategy architecture, and risk-first design philosophy. The closest competitor is Freqtrade, but OmniTrader has a more accessible UI and simpler configuration.
+**OmniTrader's edge**: Self-hosted with full transparency, React dashboard for real-time monitoring, pluggable strategy architecture, and risk-first development strategy. The closest competitor is Freqtrade, but OmniTrader has a more accessible UI and simpler configuration.
 
 ---
 
 ## 🔹 Immediate Next Steps (Recommended Prioritization)
 
-Based on the current MVP state and this PRD analysis:
+Based on the current MVP state and this Roadmap analysis:
 
 ### Before Any Live Trading
 
