@@ -63,7 +63,7 @@ gh pr list --state open --json number,title,body \
   --jq '.[] | "PR #\(.number): \(.title)"'
 
 # Check if Jules already has active sessions
-jules remote list --session
+COLUMNS=200 jules remote list --session | cat
 ```
 
 Confirm with user which task to assign next, or proceed automatically with #1.
@@ -120,7 +120,7 @@ jules new --repo "${REPO}" --parallel 2 "<task description>"
 
 ```bash
 # Check session status
-jules remote list --session
+COLUMNS=200 jules remote list --session
 
 # When Jules completes and creates a PR:
 gh pr list --state open --json number,title,author \
@@ -221,5 +221,5 @@ gh pr list --state merged \
 ## Abort Conditions
 
 - Protected branch violation detected → stop, investigate, never force-push
-- CI globally broken → fix before assigning new work  
+- CI globally broken → fix before assigning new work
 - Circular task dependencies → resolve with user before scoring

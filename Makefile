@@ -1,18 +1,37 @@
 # OmniTrader Makefile
 # ====================
 
-.PHONY: install run live test clean logs help db-stats dev check
+.PHONY: install run live test clean logs help db-stats dev check docker-up docker-down docker-build docker-logs
 
 # Default target
 help:
 	@echo "OmniTrader Commands:"
-	@echo "  make install    - Create venv and install dependencies"
-	@echo "  make run        - Run in paper trading mode"
-	@echo "  make live       - Run in live trading mode"
-	@echo "  make test       - Run tests"
-	@echo "  make logs       - Tail trade logs"
-	@echo "  make clean      - Remove venv and cache"
-	@echo "  make db-stats   - Show database statistics"
+	@echo "  make install      - Create venv and install dependencies"
+	@echo "  make run          - Run in paper trading mode"
+	@echo "  make live         - Run in live trading mode"
+	@echo "  make test         - Run tests"
+	@echo "  make logs         - Tail trade logs"
+	@echo "  make clean        - Remove venv and cache"
+	@echo "  make db-stats     - Show database statistics"
+	@echo "  make docker-up    - Start full stack with Docker"
+	@echo "  make docker-down  - Stop Docker stack"
+	@echo "  make docker-build - Build Docker images"
+
+# Docker commands
+docker-up:
+	docker compose up -d
+
+docker-down:
+	docker compose down
+
+docker-build:
+	docker compose build
+
+docker-logs:
+	docker compose logs -f
+
+docker-shell:
+	docker compose exec omnitrader bash
 
 # Install dependencies
 install:

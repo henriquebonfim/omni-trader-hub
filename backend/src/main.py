@@ -20,7 +20,7 @@ from src.strategies import Signal, get_strategy
 
 from .analysis.regime import RegimeClassifier
 from .config import get_config, reload_config
-from .database import Database
+from .database import DatabaseFactory
 from .exchange import Exchange
 from .notifier import Notifier
 from .risk import RiskManager
@@ -69,7 +69,7 @@ class OmniTrader:
         self.exchange = Exchange()
         self.risk = RiskManager()
         self.notifier = Notifier()
-        self.database = Database()
+        self.database = DatabaseFactory.get_database(self.config)
         self.regime_classifier = RegimeClassifier()
 
         # Load strategy dynamically

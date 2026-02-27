@@ -255,7 +255,7 @@ Track session IDs:
 
 ```bash
 # List active sessions
-jules remote list --session
+COLUMNS=200 jules remote list --session | cat
 
 # Check session status / pull result
 jules remote pull --session <SESSION_ID>

@@ -1,9 +1,8 @@
 """
-Database module for trade logging.
-
-Uses SQLite for persistent storage of trades and daily summaries.
+SQLite implementation of the database interface.
 """
 
+import json
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
@@ -11,22 +10,24 @@ from typing import Optional
 import aiosqlite
 import structlog
 
+from .base import BaseDatabase
+
 logger = structlog.get_logger()
 
 
-class Database:
+class SqliteDatabase(BaseDatabase):
     """
     SQLite database for trade history and statistics.
     """
 
     def __init__(self, db_path: str = None):
         if db_path is None:
-            project_root = Path(__file__).parent.parent
+            project_root = Path(__file__).parent.parent.parent
             db_path = project_root / "data" / "trades.db"
 
-        self.db_path = Path(db_path)
-        if db_path != ":memory:":
-            self.db_path.parent.mkdir(parents=True, exist_ok=True)
+        self.db_path = str(db_path)
+        if self.db_path != ":memory:":
+            Path(self.db_path).parent.mkdir(parents=True, exist_ok=True)
         self._connection: Optional[aiosqlite.Connection] = None
 
     async def connect(self):
@@ -37,13 +38,13 @@ class Database:
         await self._connection.execute("PRAGMA journal_mode=WAL")
         await self._create_tables()
         await self._migrate_tables()
-        logger.info("database_connected", path=str(self.db_path))
+        logger.info("database_connected", type="sqlite", path=self.db_path)
 
     async def close(self):
         """Close database connection."""
         if self._connection:
             await self._connection.close()
-            logger.info("database_disconnected")
+            logger.info("database_disconnected", type="sqlite")
 
     async def backup_db(self):
         """Create a backup of the database file."""
@@ -53,12 +54,7 @@ class Database:
 
         try:
             timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
-            backup_path = self.db_path.parent / f"trades_backup_{timestamp}.db"
-
-            # Using shutil.copy2 to preserve metadata
-            # Note: SQLite WAL mode might have .wal and .shm files.
-            # For a hot backup, using the SQLite API would be better, but simple file copy is okay if we accept risk or pause.
-            # Ideally use 'VACUUM INTO' which is supported in newer SQLite.
+            backup_path = Path(self.db_path).parent / f"trades_backup_{timestamp}.db"
 
             await self._connection.execute(f"VACUUM INTO '{backup_path}'")
             logger.info("database_backup_created", path=str(backup_path))
@@ -187,20 +183,14 @@ class Database:
         price: float,
         size: float,
         notional: float,
-        stop_loss: float | None,
-        take_profit: float | None,
+        stop_loss: Optional[float],
+        take_profit: Optional[float],
         reason: str = "signal",
-        expected_price: float | None = None,
-        slippage: float | None = None,
-        fee: float | None = None,
-        fee_currency: str | None = None,
+        expected_price: Optional[float] = None,
+        slippage: Optional[float] = None,
+        fee: Optional[float] = None,
+        fee_currency: Optional[str] = None,
     ) -> int:
-        """
-        Log a trade open event.
-
-        Returns:
-            Trade ID
-        """
         cursor = await self._connection.execute(
             """
             INSERT INTO trades (
@@ -233,15 +223,6 @@ class Database:
         return cursor.lastrowid
 
     async def get_open_trade_fee(self, symbol: str) -> float:
-        """
-        Get the fee of the last OPEN trade for a symbol.
-
-        Args:
-            symbol: Trading pair
-
-        Returns:
-            Fee amount (0.0 if not found)
-        """
         cursor = await self._connection.execute(
             "SELECT fee FROM trades WHERE symbol=? AND action='OPEN' ORDER BY timestamp DESC LIMIT 1",
             (symbol,),
@@ -259,17 +240,11 @@ class Database:
         pnl: float,
         pnl_pct: float,
         reason: str = "signal",
-        expected_price: float | None = None,
-        slippage: float | None = None,
-        fee: float | None = None,
-        fee_currency: str | None = None,
+        expected_price: Optional[float] = None,
+        slippage: Optional[float] = None,
+        fee: Optional[float] = None,
+        fee_currency: Optional[str] = None,
     ) -> int:
-        """
-        Log a trade close event.
-
-        Returns:
-            Trade ID
-        """
         cursor = await self._connection.execute(
             """
             INSERT INTO trades (
@@ -310,7 +285,6 @@ class Database:
         wins: int,
         losses: int,
     ):
-        """Save or update daily summary."""
         await self._connection.execute(
             """
             INSERT OR REPLACE INTO daily_summary
@@ -331,15 +305,13 @@ class Database:
         await self._connection.commit()
 
     async def get_recent_trades(self, limit: int = 10) -> list:
-        """Get recent trades."""
         cursor = await self._connection.execute(
             "SELECT * FROM trades ORDER BY timestamp DESC LIMIT ?", (limit,)
         )
         rows = await cursor.fetchall()
         return [dict(row) for row in rows]
 
-    async def get_last_trade(self, symbol: str) -> dict | None:
-        """Get the most recent trade for a symbol."""
+    async def get_last_trade(self, symbol: str) -> Optional[dict]:
         cursor = await self._connection.execute(
             "SELECT * FROM trades WHERE symbol = ? ORDER BY timestamp DESC LIMIT 1",
             (symbol,),
@@ -347,8 +319,7 @@ class Database:
         row = await cursor.fetchone()
         return dict(row) if row else None
 
-    async def get_daily_summary(self, date: str) -> dict | None:
-        """Get daily summary for a specific date."""
+    async def get_daily_summary(self, date: str) -> Optional[dict]:
         cursor = await self._connection.execute(
             "SELECT * FROM daily_summary WHERE date = ?", (date,)
         )
@@ -356,18 +327,6 @@ class Database:
         return dict(row) if row else None
 
     async def get_weekly_pnl(self, start_date: str) -> float:
-        """
-        Get total PnL since start_date (inclusive) directly from closed trades.
-        Using actual trades is more robust than daily summaries which might be stale.
-
-        Args:
-            start_date: Date string (YYYY-MM-DD)
-
-        Returns:
-            Total PnL
-        """
-        # start_date is YYYY-MM-DD. Use SQLite's date() function for robust comparison.
-        # This handles ISO strings with or without time/timezone correctly by truncating to date.
         cursor = await self._connection.execute(
             "SELECT SUM(pnl) as total_pnl FROM trades WHERE action='CLOSE' AND date(timestamp) >= ?",
             (start_date,),
@@ -376,7 +335,6 @@ class Database:
         return row["total_pnl"] if row and row["total_pnl"] is not None else 0.0
 
     async def log_equity_snapshot(self, balance: float) -> None:
-        """Log current balance as an equity snapshot."""
         await self._connection.execute(
             "INSERT INTO equity_snapshots (timestamp, balance) VALUES (?, ?)",
             (datetime.now(timezone.utc).isoformat(), balance),
@@ -384,7 +342,6 @@ class Database:
         await self._connection.commit()
 
     async def get_equity_snapshots(self, limit: int = 200) -> list:
-        """Get recent equity snapshots for charting."""
         cursor = await self._connection.execute(
             "SELECT * FROM equity_snapshots ORDER BY timestamp DESC LIMIT ?", (limit,)
         )
@@ -400,9 +357,6 @@ class Database:
         reason: str,
         indicators: dict,
     ) -> None:
-        """Log a strategy signal with indicator snapshot."""
-        import json
-
         await self._connection.execute(
             """
             INSERT INTO signals_log (timestamp, symbol, price, signal, regime, reason, indicators)
@@ -427,7 +381,6 @@ class Database:
         payment: float,
         position_size: float,
     ) -> None:
-        """Log a funding payment."""
         await self._connection.execute(
             """
             INSERT INTO funding_payments (timestamp, symbol, rate, payment, position_size)

@@ -196,7 +196,7 @@ gh run list --branch main --limit 3 --json status,conclusion
 ```bash
 jules new --repo owner/repo "enriched task description"
 jules new --repo owner/repo --parallel 2 "task"
-jules remote list --session
+COLUMNS=200 jules remote list --session | cat
 jules remote pull --session N
 jules remote pull --session N --apply
 jules teleport SESSION_ID
