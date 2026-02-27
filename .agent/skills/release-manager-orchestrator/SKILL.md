@@ -38,8 +38,8 @@ DIRTY=$(git status --short)
 
 # 3. CI must be green on HEAD
 LAST_SHA=$(git rev-parse HEAD)
-gh run list --commit "$LAST_SHA" --limit 5 \
-  --json status,conclusion,workflowName \
+make gh-run-list ARGS="--commit \"$LAST_SHA\" --limit 5 --json status,conclusion"
+,workflowName \
   --jq '.[] | "\(.workflowName): \(.status)/\(.conclusion)"'
 
 # 4. Count commits since last tag (if 0, nothing to release)
@@ -110,10 +110,7 @@ echo "Current version: $CURRENT_VERSION"
 ## Phase 2 — Generate Release Notes (via script)
 
 ```bash
-python3 .agent/skills/release-manager-orchestrator/scripts/generate_release_notes.py \
-  --commits .agent/skills/release-manager-orchestrator/tmp/commits-since-tag.txt \
-  --current-version "$CURRENT_VERSION" \
-  --output-dir .agent/skills/release-manager-orchestrator/tmp/
+make release-gen ARGS="--commits .agent/skills/release-manager-orchestrator/tmp/commits-since-tag.txt --current-version \"$CURRENT_VERSION\" --output-dir .agent/skills/release-manager-orchestrator/tmp/"
 ```
 
 This produces:
@@ -155,11 +152,7 @@ If user provides custom version, validate it matches `vX.Y.Z` or `X.Y.Z` format.
 Run the automated release script:
 
 ```bash
-python3 .agent/skills/release-manager-orchestrator/scripts/execute_release.py \
-  --version "$NEW_VERSION" \
-  --version-file "$VERSION_FILE" \
-  --changelog-entry .agent/skills/release-manager-orchestrator/tmp/changelog-entry.md \
-  --release-body .agent/skills/release-manager-orchestrator/tmp/release-body.md
+make release-exec ARGS="--version \"$NEW_VERSION\" --version-file \"$VERSION_FILE\" --changelog-entry .agent/skills/release-manager-orchestrator/tmp/changelog-entry.md --release-body .agent/skills/release-manager-orchestrator/tmp/release-body.md"
 ```
 
 The script performs in order:
@@ -168,7 +161,8 @@ The script performs in order:
 
 ```bash
 # package.json
-npm version <patch|minor|major> --no-git-tag-version
+# Using bun to run versioning (or direct JSON edit)
+bun x version-bump <patch|minor|major>
 # OR direct sed for pyproject.toml / Cargo.toml / VERSION
 ```
 
@@ -177,9 +171,7 @@ npm version <patch|minor|major> --no-git-tag-version
 Insert above the previous `## [X.Y.Z]` section (or at top if no previous).
 
 ```bash
-python3 .agent/skills/release-manager-orchestrator/scripts/insert_changelog.py \
-  --version "$NEW_VERSION" \
-  --entry .agent/skills/release-manager-orchestrator/tmp/changelog-entry.md
+make release-insert ARGS="--version \"$NEW_VERSION\" --entry .agent/skills/release-manager-orchestrator/tmp/changelog-entry.md"
 ```
 
 ### 4c — Commit
@@ -202,13 +194,7 @@ git push origin "v${NEW_VERSION}"
 ```bash
 RELEASE_BODY=$(cat .agent/skills/release-manager-orchestrator/tmp/release-body.md)
 
-gh release create "v${NEW_VERSION}" \
-  --title "v${NEW_VERSION}" \
-  --notes "${RELEASE_BODY}" \
-  --latest
-```
-
-For pre-release:
+make gh-release-create ARGS="\"v${NEW_VERSION}\" --title \"Release v${NEW_VERSION}\" --notes-file .agent/skills/release-manager-orchestrator/tmp/release-body.md"
 ```bash
 gh release create "v${NEW_VERSION}-rc.1" \
   --prerelease \

@@ -23,10 +23,10 @@ grep -qxF '.agent/skills/pr-review-orchestrator/tmp/' .gitignore \
 
 ```bash
 # Checkout PR branch WITHOUT modifying anything
-gh pr checkout <PR_NUMBER>
+make gh-pr-checkout ID=<PR_NUMBER>
 
 # Confirm current branch matches PR head
-EXPECTED=$(gh pr view <PR_NUMBER> --json headRefName --jq .headRefName)
+EXPECTED=$(make gh-pr-view ID=<PR_NUMBER> ARGS="--json headRefName --jq .headRefName")
 CURRENT=$(git branch --show-current)
 echo "Expected: $EXPECTED | Current: $CURRENT"
 [[ "$EXPECTED" == "$CURRENT" ]] || echo "WARNING: Branch mismatch"
@@ -45,22 +45,19 @@ Run full validation suite (read-only — detect issues, do NOT fix):
 
 ```bash
 # PR metadata
-gh pr view <PR_NUMBER> \
-  --json number,title,headRefOid,baseRefName,author,additions,deletions,changedFiles \
+make gh-pr-view ID=<PR_NUMBER> ARGS="--json number,title,body,state,baseRefName,headRefName,mergeable,headRefOid,author,additions,deletions,changedFiles" \
   > .agent/skills/pr-review-orchestrator/tmp/pr-meta.json
 
 # Changed files only (analyze these, not the whole repo)
-gh pr diff <PR_NUMBER> --name-only \
+make gh-pr-diff ID=<PR_NUMBER> ARGS="--name-only" \
   > .agent/skills/pr-review-orchestrator/tmp/changed-files.txt
 
 # Full diff for analysis
-gh pr diff <PR_NUMBER> \
+make gh-pr-diff ID=<PR_NUMBER> \
   > .agent/skills/pr-review-orchestrator/tmp/pr-diff.patch
 
 # Existing review threads (avoid duplicating resolved comments)
-gh api \
-  "repos/{owner}/{repo}/pulls/<PR_NUMBER>/comments" \
-  --jq '[.[] | {id:.id, path:.path, line:.line, body:.body, resolved:(.resolved // false)}]' \
+make gh-api ENDPOINT="repos/{owner}/{repo}/pulls/<PR_NUMBER>/comments" ARGS="--jq '[.[] | {id:.id, path:.path, line:.line, body:.body, resolved:(.resolved // false)}]' " \
   > .agent/skills/pr-review-orchestrator/tmp/existing-comments.json
 ```
 
@@ -125,7 +122,7 @@ After full analysis, classify the overall PR:
 Run the batch review script:
 
 ```bash
-python3 .agent/skills/pr-review-orchestrator/scripts/post_review.py <PR_NUMBER>
+make pr-review PR=<PR_NUMBER>
 ```
 
 Or manually compose the review:

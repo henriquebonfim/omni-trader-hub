@@ -105,7 +105,7 @@ done
 
 if [ -n "$COMPOSE_FILE" ]; then
   echo "Building from $COMPOSE_FILE..."
-  docker compose -f "$COMPOSE_FILE" build 2>&1 | tail -20
+  make docker-build COMPOSE_FILE="$COMPOSE_FILE" 2>&1 | tail -20
   DOCKER_STATUS=$?
 
   echo "{\"compose_file\": \"$COMPOSE_FILE\", \"build_status\": \"$([ $DOCKER_STATUS -eq 0 ] && echo PASS || echo FAIL)\"}" \
@@ -116,11 +116,7 @@ else
 fi
 
 # Test suite
-TEST_CMD=""
-[ -f jest.config.js ]   || [ -f jest.config.ts ]   && TEST_CMD="npx jest --passWithNoTests 2>&1"
-[ -f vitest.config.ts ]                              && TEST_CMD="npx vitest run 2>&1"
-[ -f pytest.ini ]                                    && TEST_CMD="pytest -q 2>&1"
-grep -q '"test"' package.json 2>/dev/null            && TEST_CMD="npm test -- --passWithNoTests 2>&1"
+TEST_CMD="make test ARGS=\"2>&1\""
 
 if [ -n "$TEST_CMD" ]; then
   echo "Running: $TEST_CMD"
@@ -189,9 +185,7 @@ echo "App URL: $APP_URL"
 ```bash
 mkdir -p .agent/skills/po-lifecycle-orchestrator/tmp/screenshots
 
-python3 .agent/skills/po-lifecycle-orchestrator/scripts/playwright_review.py \
-  --url "$APP_URL" \
-  --output-dir .agent/skills/po-lifecycle-orchestrator/tmp/screenshots/
+make po-playwright ARGS="--url \"$APP_URL\" --output-dir .agent/skills/po-lifecycle-orchestrator/tmp/screenshots/"
 ```
 
 If server isn't running:
@@ -210,15 +204,14 @@ echo '{"server_reachable": false, "findings": [], "summary": "Static analysis on
 ## Step 7 — Phase 4: Triage
 
 ```bash
-python3 .agent/skills/po-lifecycle-orchestrator/scripts/gather_and_triage.py \
-  --issues  .agent/skills/po-lifecycle-orchestrator/tmp/gh-issues-open.json \
-  --closed  .agent/skills/po-lifecycle-orchestrator/tmp/gh-issues-closed.json \
-  --prs     .agent/skills/po-lifecycle-orchestrator/tmp/open-prs.json \
-  --merged  .agent/skills/po-lifecycle-orchestrator/tmp/merged-prs.json \
-  --docker  .agent/skills/po-lifecycle-orchestrator/tmp/docker-health.json \
-  --tests   .agent/skills/po-lifecycle-orchestrator/tmp/test-health.json \
-  --visual  .agent/skills/po-lifecycle-orchestrator/tmp/visual-review.json \
-  --output-dir .agent/skills/po-lifecycle-orchestrator/tmp/
+make po-triage ARGS="--issues .agent/skills/po-lifecycle-orchestrator/tmp/gh-issues-open.json \
+  --closed .agent/skills/po-lifecycle-orchestrator/tmp/gh-issues-closed.json \
+  --prs .agent/skills/po-lifecycle-orchestrator/tmp/open-prs.json \
+  --merged .agent/skills/po-lifecycle-orchestrator/tmp/merged-prs.json \
+  --docker .agent/skills/po-lifecycle-orchestrator/tmp/docker-health.json \
+  --tests .agent/skills/po-lifecycle-orchestrator/tmp/test-health.json \
+  --visual .agent/skills/po-lifecycle-orchestrator/tmp/visual-review.json \
+  --output-dir .agent/skills/po-lifecycle-orchestrator/tmp/"
 ```
 
 Review output:
@@ -233,8 +226,7 @@ echo "=== BACKLOG.md ===" && head -20 BACKLOG.md
 ## Step 8 — Phase 5: Post to GitHub
 
 ```bash
-python3 .agent/skills/po-lifecycle-orchestrator/scripts/post_triage_comments.py \
-  --matrix .agent/skills/po-lifecycle-orchestrator/tmp/triage-matrix.json
+make po-post ARGS="--matrix .agent/skills/po-lifecycle-orchestrator/tmp/triage-matrix.json"
 ```
 
 Commit the updated planning files:

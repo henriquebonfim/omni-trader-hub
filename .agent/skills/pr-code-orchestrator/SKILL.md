@@ -204,7 +204,7 @@ ISSUE_NUMBER=$(echo $ISSUE_URL | grep -oE '[0-9]+$')
 Run the reply script after matrix is fully finalized:
 
 ```bash
-python3 .agent/skills/pr-code-orchestrator/scripts/post_comment_replies.py <PR_NUMBER>
+make pr-reply PR=<PR_NUMBER>
 ```
 
 Manual format (if running inline):

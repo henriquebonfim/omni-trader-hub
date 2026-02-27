@@ -66,12 +66,11 @@ gh pr list \
 ## Step 3 — Triage (Issues Only)
 
 ```bash
-python3 .agent/skills/po-lifecycle-orchestrator/scripts/gather_and_triage.py \
-  --issues  .agent/skills/po-lifecycle-orchestrator/tmp/gh-issues-open.json \
-  --closed  .agent/skills/po-lifecycle-orchestrator/tmp/gh-issues-closed.json \
-  --prs     .agent/skills/po-lifecycle-orchestrator/tmp/open-prs.json \
-  --merged  .agent/skills/po-lifecycle-orchestrator/tmp/merged-prs.json \
-  --output-dir .agent/skills/po-lifecycle-orchestrator/tmp/
+make po-triage ARGS="--issues .agent/skills/po-lifecycle-orchestrator/tmp/gh-issues-open.json \
+  --closed .agent/skills/po-lifecycle-orchestrator/tmp/gh-issues-closed.json \
+  --prs .agent/skills/po-lifecycle-orchestrator/tmp/open-prs.json \
+  --merged .agent/skills/po-lifecycle-orchestrator/tmp/merged-prs.json \
+  --output-dir .agent/skills/po-lifecycle-orchestrator/tmp/"
 ```
 
 ---
@@ -79,8 +78,7 @@ python3 .agent/skills/po-lifecycle-orchestrator/scripts/gather_and_triage.py \
 ## Step 4 — Post Issue Comments
 
 ```bash
-python3 .agent/skills/po-lifecycle-orchestrator/scripts/post_triage_comments.py \
-  --matrix .agent/skills/po-lifecycle-orchestrator/tmp/triage-matrix.json
+make po-post ARGS="--matrix .agent/skills/po-lifecycle-orchestrator/tmp/triage-matrix.json"
 ```
 
 ---

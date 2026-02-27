@@ -164,19 +164,19 @@ Design-to-code intelligence. Searches design pattern database (style/color/landi
 
 ```bash
 # Issues
-gh issue list --state open --limit 100 --json ...
-gh issue view N --json number,title,body,comments,labels
-gh issue comment N --body "..."
-gh issue close N --reason completed|not-planned
+make gh-issue-list ARGS="--state open --limit 100 --json ..."
+make gh-issue-view ID=N ARGS="--json number,title,body,comments,labels"
+make gh-issue-comment ID=N ARGS="--body \"...\""
+make gh-issue-close ID=N ARGS="--reason completed|not-planned"
 
 # Pull Requests
-gh pr list --state open|merged --json ...
-gh pr view N --json number,title,headRefName,mergeable
-gh pr checkout N
-gh pr diff N --name-only
-gh pr checks N --watch
-gh pr create --title --body --label
-gh pr merge N --merge --delete-branch
+make gh-pr-list ARGS="--state open|merged --json ..."
+make gh-pr-view ID=N ARGS="--json number,title,headRefName,mergeable"
+make gh-pr-checkout ID=N
+make gh-pr-create ARGS="--title \"...\" --body \"...\""
+make gh-api ENDPOINT="repos/{owner}/{repo}/pulls/{N}/checks"
+make gh-pr-create ARGS="--title \"...\" --body \"...\" --label \"...\""
+make gh-api ENDPOINT="repos/{owner}/{repo}/pulls/{N}/merge" ARGS="-X PUT"
 gh pr comment N --body "@jules ..."
 
 # GitHub API (direct)
@@ -194,12 +194,12 @@ gh run list --branch main --limit 3 --json status,conclusion
 ## jules CLI Commands Used
 
 ```bash
-jules new --repo owner/repo "enriched task description"
-jules new --repo owner/repo --parallel 2 "task"
-COLUMNS=200 jules remote list --session | cat
-jules remote pull --session N
-jules remote pull --session N --apply
-jules teleport SESSION_ID
+make j-dispatch ARGS="--repo owner/repo" TASK="enriched task description"
+make j-dispatch ARGS="--repo owner/repo" PARALLEL=1 TASK="task"
+make j-list
+make j-pull ID=N
+make j-pull ID=N # With --apply integrated in j-pull
+make j-teleport ID=SESSION_ID
 ```
 
 ---
@@ -226,4 +226,4 @@ jules teleport SESSION_ID
 → The full `search.py` engine requires the complete skill package. The stub generates a skeleton design system that's still usable.
 
 **Jules session not completing**
-→ Check `jules remote list --session` and `gh pr list --state open` to find the PR Jules created, then proceed with `/handle-pr-review N`.
+→ Check `make j-list` and `gh pr list --state open` to find the PR Jules created, then proceed with `/handle-pr-review N`.

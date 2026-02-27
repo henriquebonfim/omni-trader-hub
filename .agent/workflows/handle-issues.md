@@ -49,7 +49,7 @@ gh pr list --state merged --limit 20 --json number,title,body,mergedAt \
   > .agent/skills/issue-task-orchestrator/tmp/recent-merged.json
 
 # Score and rank
-python3 .agent/skills/issue-task-orchestrator/scripts/score_issues.py
+make issue-score
 ```
 
 ### 5 — Engineering Validation
@@ -63,7 +63,7 @@ For each CONFIRMED issue from the matrix:
 ### 6 — Post Structured Replies
 
 ```bash
-python3 .agent/skills/issue-task-orchestrator/scripts/post_issue_comments.py
+make issue-post
 ```
 
 ### 7 — Implement Confirmed Tasks

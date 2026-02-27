@@ -44,7 +44,7 @@ Read everything before deciding anything:
 [ -f pyproject.toml ]  && grep -E "^(name|version)" pyproject.toml | head -2
 
 # Current milestone/sprint context
-gh api repos/{owner}/{repo}/milestones --jq '.[] | "\(.title): \(.open_issues) open, due \(.due_on // "no date")"' 2>/dev/null || echo "No milestones"
+make gh-api ENDPOINT="repos/{owner}/{repo}/milestones" ARGS="--jq '.[] | \"\\(.title): \\(.open_issues) open, due \\(.due_on // \"no date\")\"'"
 ```
 
 Store project summary in `tmp/project-context.json`:
@@ -68,30 +68,19 @@ Gather every item that might become work:
 
 ```bash
 # All open GitHub issues (full metadata)
-gh issue list \
-  --state open \
-  --limit 200 \
-  --json number,title,body,labels,assignees,milestone,createdAt,updatedAt,comments \
+make gh-issue-list ARGS="--state open --limit 100 --json number,title,labels,updatedAt,assignees,milestone,createdAt,comments" \
   > .agent/skills/po-lifecycle-orchestrator/tmp/gh-issues-open.json
 
 # Recently closed (last 30 days — detect already-done items)
-gh issue list \
-  --state closed \
-  --limit 50 \
-  --json number,title,closedAt,labels \
+make gh-issue-list ARGS="--state closed --limit 50 --json number,title,labels,closedAt" \
   > .agent/skills/po-lifecycle-orchestrator/tmp/gh-issues-closed.json
 
 # Open PRs (in-progress work — don't re-assign)
-gh pr list \
-  --state open \
-  --json number,title,headRefName,author,isDraft,reviewDecision \
+make gh-pr-list ARGS="--state open --json number,title,headRefName,author,isDraft,reviewDecision" \
   > .agent/skills/po-lifecycle-orchestrator/tmp/open-prs.json
 
 # Merged PRs (velocity reference)
-gh pr list \
-  --state merged \
-  --limit 20 \
-  --json number,title,mergedAt \
+make gh-pr-list ARGS="--state merged --limit 20 --json number,title,mergedAt" \
   > .agent/skills/po-lifecycle-orchestrator/tmp/merged-prs.json
 
 echo "Issues collected: $(cat .agent/skills/po-lifecycle-orchestrator/tmp/gh-issues-open.json | python3 -c 'import sys,json; print(len(json.load(sys.stdin)))')"
@@ -115,7 +104,7 @@ if [ -n "$COMPOSE_FILE" ]; then
   echo "Found: $COMPOSE_FILE"
 
   # Attempt to build (don't start — just validate)
-  docker compose -f "$COMPOSE_FILE" build 2>&1 | tail -20
+  make docker-build COMPOSE_FILE="$COMPOSE_FILE" 2>&1 | tail -20
   BUILD_STATUS=$?
 
   # Check if services are already running
@@ -124,7 +113,7 @@ if [ -n "$COMPOSE_FILE" ]; then
   echo "Docker build exit code: $BUILD_STATUS"
 else
   # Try plain Dockerfile
-  [ -f Dockerfile ] && docker build -t po-review-check . 2>&1 | tail -20
+  [ -f Dockerfile ] && make docker-build 2>&1 | tail -20
 fi
 ```
 
@@ -152,7 +141,7 @@ TEST_CMD=""
 [ -f go.mod ]                                        && TEST_CMD="go test ./... 2>&1"
 
 # Also check package.json scripts
-[ -f package.json ] && grep -q '"test"' package.json && TEST_CMD="npm test -- --passWithNoTests 2>&1"
+[ -f package.json ] && grep -q '"test"' package.json && TEST_CMD="bun test 2>&1 || npm test 2>&1 || make test ARGS=\"2>&1\""
 
 if [ -n "$TEST_CMD" ]; then
   echo "Running: $TEST_CMD"
@@ -231,15 +220,10 @@ For each screenshot taken, record findings in `tmp/visual-review.json`:
 
 ```bash
 # Install playwright if needed
-python3 -c "import playwright" 2>/dev/null \
-  || pip install playwright --break-system-packages --quiet \
-  && python3 -m playwright install chromium --quiet
+make install-playwright
 
 # Run the review script
-python3 .agent/skills/po-lifecycle-orchestrator/scripts/playwright_review.py \
-  --url "http://localhost:${APP_PORT:-3000}" \
-  --routes "$(cat .agent/skills/po-lifecycle-orchestrator/tmp/routes.json 2>/dev/null || echo '[]')" \
-  --output-dir .agent/skills/po-lifecycle-orchestrator/tmp/screenshots/
+make po-playwright ARGS="--url \"http://localhost:${APP_PORT:-3000}\" --routes \"$(cat .agent/skills/po-lifecycle-orchestrator/tmp/routes.json 2>/dev/null || echo '[]')\" --output-dir .agent/skills/po-lifecycle-orchestrator/tmp/screenshots/"
 ```
 
 ### 3c — Static Analysis Fallback
@@ -267,16 +251,15 @@ Store findings even without screenshots — note `"browser_available": false` in
 Run the full aggregation and triage script:
 
 ```bash
-python3 .agent/skills/po-lifecycle-orchestrator/scripts/gather_and_triage.py \
-  --issues     .agent/skills/po-lifecycle-orchestrator/tmp/gh-issues-open.json \
-  --closed     .agent/skills/po-lifecycle-orchestrator/tmp/gh-issues-closed.json \
-  --prs        .agent/skills/po-lifecycle-orchestrator/tmp/open-prs.json \
-  --merged     .agent/skills/po-lifecycle-orchestrator/tmp/merged-prs.json \
-  --docker     .agent/skills/po-lifecycle-orchestrator/tmp/docker-health.json \
-  --tests      .agent/skills/po-lifecycle-orchestrator/tmp/test-health.json \
-  --visual     .agent/skills/po-lifecycle-orchestrator/tmp/visual-review.json \
-  --context    .agent/skills/po-lifecycle-orchestrator/tmp/project-context.json \
-  --output-dir .agent/skills/po-lifecycle-orchestrator/tmp/
+make po-triage ARGS="--issues .agent/skills/po-lifecycle-orchestrator/tmp/gh-issues-open.json \
+  --closed .agent/skills/po-lifecycle-orchestrator/tmp/gh-issues-closed.json \
+  --prs .agent/skills/po-lifecycle-orchestrator/tmp/open-prs.json \
+  --merged .agent/skills/po-lifecycle-orchestrator/tmp/merged-prs.json \
+  --docker .agent/skills/po-lifecycle-orchestrator/tmp/docker-health.json \
+  --tests .agent/skills/po-lifecycle-orchestrator/tmp/test-health.json \
+  --visual .agent/skills/po-lifecycle-orchestrator/tmp/visual-review.json \
+  --context .agent/skills/po-lifecycle-orchestrator/tmp/project-context.json \
+  --output-dir .agent/skills/po-lifecycle-orchestrator/tmp/"
 ```
 
 ### Triage Decision Rules
@@ -431,8 +414,7 @@ Items requiring further design, external decisions, or lower priority. Reviewed 
 Post a summary comment on every processed issue:
 
 ```bash
-python3 .agent/skills/po-lifecycle-orchestrator/scripts/post_triage_comments.py \
-  --matrix .agent/skills/po-lifecycle-orchestrator/tmp/triage-matrix.json
+make po-post ARGS="--matrix .agent/skills/po-lifecycle-orchestrator/tmp/triage-matrix.json"
 ```
 
 Per-issue comment format:

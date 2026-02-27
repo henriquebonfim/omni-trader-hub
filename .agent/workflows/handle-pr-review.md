@@ -43,7 +43,7 @@ echo "Expected: $EXPECTED | Current: $CURRENT"
 - Submit batched review via `post_review.py`
 
 ```bash
-python3 .agent/skills/pr-review-orchestrator/scripts/post_review.py <PR_NUMBER>
+make pr-review PR=<PR_NUMBER>
 ```
 
 ### 5 — Verify No Changes Made

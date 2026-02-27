@@ -131,13 +131,13 @@ Release body requirements:
 
 | File | Tool/method |
 |------|-------------|
-| `package.json` | `npm version patch|minor|major --no-git-tag-version` OR direct JSON edit |
+| `package.json` | `bun x version-bump patch|minor|major` OR direct JSON edit |
 | `pyproject.toml` | `sed` regex on `^version = "..."` |
 | `Cargo.toml` | `sed` regex on first `^version = "..."` |
 | `VERSION` | Direct file write |
 
 Rules:
-- NEVER use `npm version` without `--no-git-tag-version` (creates its own tag)
+- NEVER use `npm version` (creates its own tag by default)
 - Only bump the version file — don't edit lockfiles manually
 - Commit version file + CHANGELOG.md together in one release commit
 
