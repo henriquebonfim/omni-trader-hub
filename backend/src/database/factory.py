@@ -5,6 +5,7 @@ Factory for creating database instances based on configuration.
 from .base import BaseDatabase
 from .sqlite import SqliteDatabase
 from .postgres import PostgresDatabase
+from .redis_store import RedisStore
 from ..config import Config
 
 class DatabaseFactory:
@@ -16,7 +17,7 @@ class DatabaseFactory:
     def get_database(config: Config) -> BaseDatabase:
         """
         Get database instance based on config.
-        
+
         Config structure expected:
         database:
           type: "sqlite" | "postgres"
@@ -37,3 +38,11 @@ class DatabaseFactory:
             # SQLite default
             path = getattr(db_type, "path", None) if db_type else None
             return SqliteDatabase(path)
+
+    @staticmethod
+    def get_redis_store(config: Config) -> RedisStore:
+        """Get Redis store instance based on config."""
+        # Check for redis config, fallback to env/default
+        db_config = getattr(config, "database", None)
+        redis_url = getattr(db_config, "redis_url", None) if db_config else None
+        return RedisStore(url=redis_url)

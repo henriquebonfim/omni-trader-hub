@@ -1,5 +1,6 @@
 import datetime
-
+import pytest
+from unittest.mock import AsyncMock, patch
 from src.risk import RiskManager
 
 
@@ -15,31 +16,44 @@ def test_drawdown_sizing():
     size = risk.calculate_position_size(10000.0, 1.0)
     assert size == 100.0
 
-def test_consecutive_losses_reset():
-    risk = RiskManager()
-    risk.consecutive_losses = 5
+@pytest.mark.asyncio
+async def test_consecutive_losses_reset():
+    with patch("src.database.factory.DatabaseFactory.get_redis_store") as mock_get_store:
+        mock_get_store.return_value = AsyncMock()
 
-    # Simulate trade win
-    risk.record_trade(100.0)
-    assert risk.consecutive_losses == 0
+        risk = RiskManager()
+        risk.consecutive_losses = 5
 
-    # Simulate trade loss
-    risk.record_trade(-100.0)
-    assert risk.consecutive_losses == 1
+        # Simulate trade win
+        await risk.record_trade(100.0)
+        assert risk.consecutive_losses == 0
 
-def test_daily_reset_clears_streak(monkeypatch):
-    risk = RiskManager()
-    risk.consecutive_losses = 3
+        # Simulate trade loss
+        await risk.record_trade(-100.0)
+        assert risk.consecutive_losses == 1
 
-    # Trigger new day reset
-    tomorrow = datetime.date.today() + datetime.timedelta(days=1)
+@pytest.mark.asyncio
+async def test_daily_reset_clears_streak(monkeypatch):
+    with patch("src.database.factory.DatabaseFactory.get_redis_store") as mock_get_store:
+        mock_get_store.return_value = AsyncMock()
 
-    class MockDate(datetime.date):
-        @classmethod
-        def today(cls):
-            return tomorrow
+        risk = RiskManager()
+        risk.consecutive_losses = 3
 
-    monkeypatch.setattr("src.risk.date", MockDate)
-    risk.initialize_daily_stats(10000.0)
+        # Trigger new day reset
+        tomorrow = datetime.date.today() + datetime.timedelta(days=1)
 
-    assert risk.consecutive_losses == 0
+        class MockDate(datetime.date):
+            @classmethod
+            def today(cls):
+                return tomorrow
+
+            # Allow creating date objects from date(Y, M, D) calls inside RiskManager if needed
+            # But RiskManager uses date.today() which we patched on the class.
+            # However, datetime.date is immutable type, so we need care.
+            # But the monkeypatch below targets src.risk.date which is imported as 'date'.
+
+        monkeypatch.setattr("src.risk.date", MockDate)
+        await risk.initialize_daily_stats(10000.0)
+
+        assert risk.consecutive_losses == 0
