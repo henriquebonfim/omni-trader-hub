@@ -1,8 +1,11 @@
-import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
 from datetime import datetime, timezone
-from src.main import OmniTrader
+from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
+
 from src.exchange import Position
+from src.main import OmniTrader
+
 
 @pytest.fixture
 def bot():
@@ -13,9 +16,9 @@ def bot():
         mock_config.return_value.exchange.paper_mode = True
 
         # Mock dependencies
-        with patch("src.main.Exchange") as MockExchange, \
-             patch("src.main.Database") as MockDatabase, \
-             patch("src.main.RiskManager") as MockRisk, \
+        with patch("src.main.Exchange"), \
+             patch("src.main.Database"), \
+             patch("src.main.RiskManager"), \
              patch("src.main.Notifier") as MockNotifier, \
              patch("src.main.get_strategy") as mock_get_strategy:
 

@@ -8,8 +8,12 @@ from unittest.mock import MagicMock
 import pandas as pd
 import pytest
 
-from src.strategies.smc.structure import MarketStructure, Swing, SwingType, Trend, StructureEvent
 from src.strategies.smc.analysis import SMCAnalyzer
+from src.strategies.smc.structure import (
+    MarketStructure,
+    SwingType,
+    Trend,
+)
 
 
 @pytest.fixture
@@ -28,23 +32,31 @@ def sample_ohlcv_bullish():
     prices = [100] * 20
 
     # Ramp up 0-5
-    for i in range(6): prices[i] = 100 + i*2 # 100, 102, 104, 106, 108, 110
+    for i in range(6):
+        prices[i] = 100 + i * 2  # 100, 102, 104, 106, 108, 110
     # Ramp down 5-10
-    for i in range(6, 11): prices[i] = 110 - (i-5) # 109, 108, 107, 106, 105
+    for i in range(6, 11):
+        prices[i] = 110 - (i - 5)  # 109, 108, 107, 106, 105
     # Ramp up 10-15
-    for i in range(11, 16): prices[i] = 105 + (i-10)*2 # 107, 109, 111, 113, 115
+    for i in range(11, 16):
+        prices[i] = 105 + (i - 10) * 2  # 107, 109, 111, 113, 115
     # Ramp down 15-20
-    for i in range(16, 20): prices[i] = 115 - (i-15) # 114, 113, 112, 111
+    for i in range(16, 20):
+        prices[i] = 115 - (i - 15)  # 114, 113, 112, 111
 
-    df = pd.DataFrame({
-        "open": prices,
-        "high": prices,
-        "low": prices,
-        "close": prices,
-        "volume": [1000] * 20
-    }, index=dates)
+    df = pd.DataFrame(
+        {
+            "open": prices,
+            "high": prices,
+            "low": prices,
+            "close": prices,
+            "volume": [1000] * 20,
+        },
+        index=dates,
+    )
 
     return df
+
 
 def test_detect_swings(sample_ohlcv_bullish):
     # Use window=2
@@ -78,6 +90,7 @@ def test_detect_swings(sample_ohlcv_bullish):
     assert h2.type == SwingType.HIGH
     assert h2.price == 115
 
+
 def test_structure_bos():
     """Test Break of Structure logic."""
     # Scenario:
@@ -89,18 +102,28 @@ def test_structure_bos():
     prices = [90] * 30
 
     # 0-5: Ramp to 100 (High at 5)
-    for i in range(6): prices[i] = 90 + i*2 # 90..100
+    for i in range(6):
+        prices[i] = 90 + i * 2  # 90..100
     # 5-10: Drop to 90 (Low at 10)
-    for i in range(6, 11): prices[i] = 100 - (i-5)*2 # 98..90
+    for i in range(6, 11):
+        prices[i] = 100 - (i - 5) * 2  # 98..90
     # 10-20: Rally to 110 (Break 100 at ~15)
-    for i in range(11, 21): prices[i] = 90 + (i-10)*2 # 92..110
+    for i in range(11, 21):
+        prices[i] = 90 + (i - 10) * 2  # 92..110
 
     # BOS should happen when price > 100.
     # Index 15: price 100. Index 16: price 102 -> BOS.
 
-    df = pd.DataFrame({
-        "open": prices, "high": prices, "low": prices, "close": prices, "volume": 1000
-    }, index=dates)
+    df = pd.DataFrame(
+        {
+            "open": prices,
+            "high": prices,
+            "low": prices,
+            "close": prices,
+            "volume": 1000,
+        },
+        index=dates,
+    )
 
     ms = MarketStructure(swing_window=2)
     result = ms.analyze_structure(df)
@@ -112,6 +135,7 @@ def test_structure_bos():
     assert bos.type == "BOS"
     assert bos.trend == Trend.BULLISH
     assert bos.price > 100
+
 
 def test_structure_choch():
     """Test Change of Character logic."""
@@ -126,17 +150,28 @@ def test_structure_choch():
     prices = [90.0] * 40
 
     # 0-5: 90->100
-    for i in range(6): prices[i] = 90 + i*2
+    for i in range(6):
+        prices[i] = 90 + i * 2
     # 5-10: 100->95
-    for i in range(6, 11): prices[i] = 100 - (i-5)
+    for i in range(6, 11):
+        prices[i] = 100 - (i - 5)
     # 10-15: 95->105
-    for i in range(11, 16): prices[i] = 95 + (i-10)*2
+    for i in range(11, 16):
+        prices[i] = 95 + (i - 10) * 2
     # 15-25: 105->85 (Crosses 95 at 20)
-    for i in range(16, 26): prices[i] = 105 - (i-15)*2
+    for i in range(16, 26):
+        prices[i] = 105 - (i - 15) * 2
 
-    df = pd.DataFrame({
-        "open": prices, "high": prices, "low": prices, "close": prices, "volume": 1000
-    }, index=dates)
+    df = pd.DataFrame(
+        {
+            "open": prices,
+            "high": prices,
+            "low": prices,
+            "close": prices,
+            "volume": 1000,
+        },
+        index=dates,
+    )
 
     ms = MarketStructure(swing_window=2)
     result = ms.analyze_structure(df)
@@ -154,6 +189,7 @@ def test_structure_choch():
     assert last_choch.trend == Trend.BEARISH
     assert last_choch.price < 95
 
+
 def test_smc_analyzer():
     """Test Multi-Timeframe Analyzer coordinator."""
     # Create minimal DF
@@ -163,7 +199,9 @@ def test_smc_analyzer():
     analyzer = SMCAnalyzer(swing_window=2)
 
     # Mock the internal analyzer to avoid running complex logic on empty data
-    analyzer.structure_analyzer.analyze_structure = MagicMock(return_value="MOCKED_RESULT")
+    analyzer.structure_analyzer.analyze_structure = MagicMock(
+        return_value="MOCKED_RESULT"
+    )
 
     results = analyzer.analyze(data)
 

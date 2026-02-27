@@ -4,10 +4,9 @@ Database module for trade logging.
 Uses SQLite for persistent storage of trades and daily summaries.
 """
 
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
-import shutil
 
 import aiosqlite
 import structlog
@@ -53,7 +52,7 @@ class Database:
             return
 
         try:
-            timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+            timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
             backup_path = self.db_path.parent / f"trades_backup_{timestamp}.db"
 
             # Using shutil.copy2 to preserve metadata
@@ -211,7 +210,7 @@ class Database:
             VALUES (?, ?, ?, 'OPEN', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
-                datetime.utcnow().isoformat(),
+                datetime.now(timezone.utc).isoformat(),
                 symbol,
                 side.upper(),
                 price,
@@ -280,7 +279,7 @@ class Database:
             VALUES (?, ?, ?, 'CLOSE', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
-                datetime.utcnow().isoformat(),
+                datetime.now(timezone.utc).isoformat(),
                 symbol,
                 side.upper(),
                 price,
@@ -380,7 +379,7 @@ class Database:
         """Log current balance as an equity snapshot."""
         await self._connection.execute(
             "INSERT INTO equity_snapshots (timestamp, balance) VALUES (?, ?)",
-            (datetime.utcnow().isoformat(), balance),
+            (datetime.now(timezone.utc).isoformat(), balance),
         )
         await self._connection.commit()
 
@@ -410,7 +409,7 @@ class Database:
             VALUES (?, ?, ?, ?, ?, ?, ?)
             """,
             (
-                datetime.utcnow().isoformat(),
+                datetime.now(timezone.utc).isoformat(),
                 symbol,
                 price,
                 signal,
@@ -435,7 +434,7 @@ class Database:
             VALUES (?, ?, ?, ?, ?)
             """,
             (
-                datetime.utcnow().isoformat(),
+                datetime.now(timezone.utc).isoformat(),
                 symbol,
                 rate,
                 payment,

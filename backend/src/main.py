@@ -11,7 +11,7 @@ import asyncio
 import logging
 import signal
 import sys
-from datetime import datetime, timezone, timedelta, date
+from datetime import date, datetime, timedelta, timezone
 
 import structlog
 import uvicorn
@@ -291,7 +291,6 @@ class OmniTrader:
             open_price = position.entry_price
             slippage = None
             expected_price = None
-            found_open_trade = False
 
             try:
                 trades = await self.exchange.fetch_my_trades(symbol, limit=lookback)
@@ -313,7 +312,6 @@ class OmniTrader:
                     # Let's assume the most recent one is the entry.
                     latest_trade = matching_trades[0]
                     open_price = latest_trade["price"]
-                    found_open_trade = True
                     logger.info("reconciliation_found_open_trade", price=open_price, timestamp=latest_trade["timestamp"])
 
             except Exception as e:
@@ -483,15 +481,13 @@ class OmniTrader:
             ]
             results = await asyncio.gather(*fetch_tasks)
 
-            for tf, df in zip(required_timeframes, results):
+            for tf, df in zip(required_timeframes, results, strict=False):
                 market_data[tf] = df
 
             # Get primary OHLCV for price and risk checks
             primary_ohlcv = market_data[primary_tf]
             current_price = float(primary_ohlcv["close"].iloc[-1])
 
-            # 4b. Check Black Swan Event (on primary timeframe)
-            if self.risk.check_black_swan(primary_ohlcv):
             # 4a. Check Trend (if enabled)
             market_trend = "neutral"
             trend_filter_enabled = getattr(self.config.strategy, "trend_filter_enabled", False)
@@ -505,23 +501,22 @@ class OmniTrader:
                     logger.warning("trend_fetch_failed", error=str(e))
 
             # 4b. Check Black Swan Event
-            if self.risk.check_black_swan(ohlcv):
+            if self.risk.check_black_swan(primary_ohlcv):
                 try:
                     if position.is_open:
                         logger.critical("black_swan_flattening_positions")
                         await self._close_position(position, current_price, "black_swan_emergency_exit")
                 except Exception as e:
                     logger.error("black_swan_close_failed", error=str(e))
-                finally:
-                    await self.notifier.send("🚨 **BLACK SWAN DETECTED**: >10% move in 1h. Positions flattened. Bot stopping.")
-                    await self.stop("Black Swan Event")
-                    return
+                await self.notifier.send("🚨 **BLACK SWAN DETECTED**: >10% move in 1h. Positions flattened. Bot stopping.")
+                await self.stop("Black Swan Event")
+                return
 
             # 5. Analyze with strategy
-            result = self.strategy.analyze(market_data, current_side)
+            result = self.strategy.analyze(market_data, current_side, market_trend=market_trend)
 
             # 5a. Determine Market Regime
-            current_regime = self.regime_classifier.analyze(ohlcv)
+            current_regime = self.regime_classifier.analyze(primary_ohlcv)
 
             # 5b. Regime Gating
             # If current regime is not in strategy's valid regimes, force HOLD for entries.
@@ -536,7 +531,6 @@ class OmniTrader:
                     )
                     result.signal = Signal.HOLD
                     result.reason = f"Regime Mismatch: {current_regime.value}"
-            result = self.strategy.analyze(ohlcv, current_side, market_trend=market_trend)
 
             # Sanitize indicators for JSON serialization (handle numpy types)
             def _sanitize(v):
@@ -713,6 +707,10 @@ class OmniTrader:
             entry_price = float(fill_details["average_price"] or order.get("average", current_price))
             total_fee = fill_details["total_fee"]
             fee_currency = fill_details["fee_currency"]
+            is_confirmed = fill_details.get("confirmed", False)
+
+            if not is_confirmed:
+                logger.warning("order_fill_not_confirmed", order_id=order["id"], symbol=symbol)
 
             notional = risk_check.position_size * entry_price
 
@@ -817,6 +815,10 @@ class OmniTrader:
             exit_price = float(fill_details["average_price"] or order.get("average") or order.get("price") or current_price)
             total_fee = fill_details["total_fee"]
             fee_currency = fill_details["fee_currency"]
+            is_confirmed = fill_details.get("confirmed", False)
+
+            if not is_confirmed:
+                logger.warning("close_order_fill_not_confirmed", order_id=order["id"], symbol=symbol)
 
             # Calculate Slippage (Positive = Bad, Negative = Good)
             # Long Exit (Sell): Expected - Actual

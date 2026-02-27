@@ -381,7 +381,6 @@ class Exchange:
                 "average": price,
                 "filled": amount,
                 "status": "closed",
-                "average": price,
                 "fees": [{"cost": amount * price * 0.0004, "currency": "USDT"}],  # 0.04% fee simulation
             }
 
@@ -455,7 +454,6 @@ class Exchange:
                 "average": price,
                 "filled": amount,
                 "status": "closed",
-                "average": price,
                 "fees": [{"cost": amount * price * 0.0004, "currency": "USDT"}],
             }
 
@@ -527,7 +525,6 @@ class Exchange:
                 "filled": position.size,
                 "status": "closed",
                 "pnl": pnl,
-                "average": exit_price,
                 "fees": [{"cost": position.notional * 0.0004, "currency": "USDT"}],
             }
 
@@ -893,7 +890,8 @@ class Exchange:
                 return {
                     "average_price": average_price,
                     "total_fee": total_fee,
-                    "fee_currency": fee_currency
+                    "fee_currency": fee_currency,
+                    "confirmed": True
                 }
 
             except Exception as e:
@@ -902,4 +900,4 @@ class Exchange:
 
         # Fallback if verification fails
         logger.error("order_verification_timeout", order_id=order_id)
-        return {"average_price": 0.0, "total_fee": 0.0, "fee_currency": None}
+        return {"average_price": 0.0, "total_fee": 0.0, "fee_currency": None, "confirmed": False}

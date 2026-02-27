@@ -13,6 +13,8 @@ strategy:
   volume_threshold: 1.5
   trend_filter_enabled: false
   trend_timeframe: 4h
+  bias_confirmation: true
+  bias_timeframe: 4h
 
 risk:
   stop_loss_pct: 2.0

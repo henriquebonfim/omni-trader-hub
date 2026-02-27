@@ -1,9 +1,12 @@
 from unittest.mock import AsyncMock, MagicMock
+
+import pytest
+
+from src.exchange import Position
 from src.main import OmniTrader
 from src.risk import RiskManager
-from src.exchange import Position
 from src.strategies.base import Signal
-import pytest
+
 
 @pytest.mark.asyncio
 async def test_liquidation_risk_trigger():
@@ -84,6 +87,7 @@ async def test_liquidation_risk_trigger():
 
     # Mock database fee query
     bot.database.get_open_trade_fee = AsyncMock(return_value=2.0)
+    bot.database.get_weekly_pnl = AsyncMock(return_value=0.0)
 
     # Run Cycle
     await bot.run_cycle()
@@ -149,6 +153,7 @@ async def test_liquidation_risk_safe():
         "leverage": 10
     })
     bot.exchange.get_position.return_value = position
+    bot.database.get_weekly_pnl = AsyncMock(return_value=0.0)
 
     # Run Cycle
     await bot.run_cycle()

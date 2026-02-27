@@ -8,6 +8,7 @@ notify the administrator of the failure.
 """
 import os
 import time
+
 import httpx
 import structlog
 from dotenv import load_dotenv

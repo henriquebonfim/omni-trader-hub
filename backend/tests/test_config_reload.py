@@ -1,6 +1,9 @@
+from unittest.mock import AsyncMock, MagicMock
+
 import pytest
-from unittest.mock import MagicMock, AsyncMock
+
 from src.main import OmniTrader
+
 
 @pytest.mark.asyncio
 async def test_reload_config_updates_components(monkeypatch):

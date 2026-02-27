@@ -6,7 +6,7 @@ that can be run alongside the trading loop via asyncio.gather().
 """
 
 import os
-from datetime import datetime
+from datetime import datetime, timezone
 
 import structlog
 from fastapi import FastAPI
@@ -36,7 +36,7 @@ def create_api(bot_instance) -> FastAPI:
 
     # Store bot reference — accessible in routes via request.app.state.bot
     app.state.bot = bot_instance
-    app.state.started_at = datetime.utcnow()
+    app.state.started_at = datetime.now(timezone.utc)
 
     # CORS — allow local dashboard dev servers
     app.add_middleware(

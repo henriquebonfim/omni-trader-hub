@@ -58,7 +58,7 @@ async def update_discord_config(payload: DiscordWebhookPayload, request: Request
 
         logger = structlog.get_logger()
         logger.error("discord_config_persist_failed", error=str(e))
-        raise HTTPException(status_code=500, detail="Failed to persist config")
+        raise HTTPException(status_code=500, detail="Failed to persist config") from e
 
     return {"ok": True, "message": "Discord config updated and saved"}
 

@@ -2,7 +2,7 @@
 Status, balance, and position routes.
 """
 
-from datetime import datetime
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, Request
 
@@ -12,7 +12,7 @@ router = APIRouter(tags=["status"])
 @router.get("/health")
 async def health_check():
     """Health check endpoint for watchdogs."""
-    return {"status": "ok", "timestamp": datetime.utcnow().isoformat()}
+    return {"status": "ok", "timestamp": datetime.now(timezone.utc).isoformat()}
 
 
 @router.get("/status")
@@ -21,7 +21,7 @@ async def get_status(request: Request):
     bot = request.app.state.bot
     started_at: datetime = request.app.state.started_at
 
-    uptime_seconds = (datetime.utcnow() - started_at).total_seconds()
+    uptime_seconds = (datetime.now(timezone.utc) - started_at).total_seconds()
 
     ws_clients = 0
     if bot.ws_manager:

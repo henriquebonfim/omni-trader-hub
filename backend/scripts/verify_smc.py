@@ -11,7 +11,7 @@ sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
 
 from src.exchange import Exchange
 from src.strategies.smc.analysis import SMCAnalyzer
-from src.config import get_config
+
 
 async def main():
     print("Initializing Exchange...")
@@ -35,9 +35,10 @@ async def main():
             print(f"  Failed to fetch {tf}: {e}")
             print("  Generating synthetic data instead...")
 
-            import pandas as pd
-            import numpy as np
             from datetime import datetime, timedelta
+
+            import numpy as np
+            import pandas as pd
 
             # Generate synthetic uptrend
             dates = [datetime.now() - timedelta(hours=i) for i in range(200)]

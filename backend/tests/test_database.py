@@ -1,6 +1,4 @@
 import asyncio
-from datetime import datetime
-
 import json
 from datetime import datetime, timezone
 
@@ -114,7 +112,7 @@ async def test_get_last_trade(db):
 
 @pytest.mark.asyncio
 async def test_daily_summary(db):
-    today = datetime.utcnow().date().isoformat()
+    today = datetime.now(timezone.utc).date().isoformat()
     await db.save_daily_summary(
         date=today,
         starting_balance=10000.0,
@@ -170,6 +168,7 @@ async def test_log_signal(db):
         symbol="BTC/USDT",
         price=52000.0,
         signal="SELL",
+        regime="bull",
         reason="rsi_overbought",
         indicators=indicators
     )

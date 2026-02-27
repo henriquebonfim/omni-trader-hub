@@ -95,9 +95,15 @@ class BaseStrategy(ABC):
     def required_timeframes(self) -> list[str]:
         """
         List of timeframes required by the strategy.
-        Defaults to the configured trading timeframe.
+        Defaults to the configured trading timeframe + bias confirmation TF.
         """
-        return [self.config.trading.timeframe]
+        tfs = [self.config.trading.timeframe]
+        bias_enabled = getattr(self.config.strategy, "bias_confirmation", False)
+        if bias_enabled:
+            bias_tf = getattr(self.config.strategy, "bias_timeframe", "4h")
+            if bias_tf not in tfs:
+                tfs.append(bias_tf)
+        return tfs
 
     @abstractmethod
     def update(self, ohlcv: pd.DataFrame, current_position: str | None = None):
@@ -187,6 +193,22 @@ class BaseStrategy(ABC):
                 else:
                     signal = Signal.SHORT
                     reason = "Strategy Entry Short"
+
+        # Apply Bias Confirmation (Higher Timeframe)
+        bias_enabled = getattr(self.config.strategy, "bias_confirmation", False)
+        if bias_enabled and signal in (Signal.LONG, Signal.SHORT):
+            bias_tf = getattr(self.config.strategy, "bias_timeframe", "4h")
+            bias_ohlcv = market_data.get(bias_tf)
+            if bias_ohlcv is not None:
+                bias = self.check_trend(bias_ohlcv)
+                if signal == Signal.LONG and bias != "bullish":
+                    logger.info("bias_confirmation_rejected", signal="LONG", bias=bias, tf=bias_tf)
+                    signal = Signal.HOLD
+                    reason = f"Bias Filter ({bias_tf}: {bias}) blocked Long"
+                elif signal == Signal.SHORT and bias != "bearish":
+                    logger.info("bias_confirmation_rejected", signal="SHORT", bias=bias, tf=bias_tf)
+                    signal = Signal.HOLD
+                    reason = f"Bias Filter ({bias_tf}: {bias}) blocked Short"
 
         elif current_position == "long":
             if self.should_exit():

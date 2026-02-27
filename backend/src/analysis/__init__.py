@@ -1,3 +1,3 @@
-from .regime import RegimeClassifier, MarketRegime
+from .regime import MarketRegime, RegimeClassifier
 
 __all__ = ["RegimeClassifier", "MarketRegime"]
