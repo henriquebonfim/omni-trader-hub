@@ -13,3 +13,4 @@ venv/
 node_modules/
 *.db*
 frontend/dist/
+.agent/skills/po-lifecycle-orchestrator/tmp/
