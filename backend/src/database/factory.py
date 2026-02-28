@@ -2,11 +2,12 @@
 Factory for creating database instances based on configuration.
 """
 
+from ..config import Config
 from .base import BaseDatabase
-from .sqlite import SqliteDatabase
 from .postgres import PostgresDatabase
 from .redis_store import RedisStore
-from ..config import Config
+from .sqlite import SqliteDatabase
+
 
 class DatabaseFactory:
     """

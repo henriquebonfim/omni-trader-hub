@@ -2,10 +2,13 @@
 Tests for database backup functionality.
 """
 
-import pytest
 import subprocess
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
+
+import pytest
+
 from src.database.postgres import PostgresDatabase
+
 
 @pytest.mark.asyncio
 async def test_backup_db_success():

@@ -71,7 +71,7 @@ async def test_close_position_slippage(bot):
     bot.database.get_open_trade_fee = AsyncMock(return_value=2.0)
 
     bot.database.log_trade_close = AsyncMock()
-    bot.risk.record_trade = MagicMock()
+    bot.risk.record_trade = AsyncMock()
     bot.notifier.trade_closed = AsyncMock()
     bot.risk.check_circuit_breaker = MagicMock(return_value=False)
     bot.exchange.cancel_all_orders = AsyncMock()
@@ -115,7 +115,7 @@ async def test_reconcile_positions_with_trades(bot):
     bot.database.log_trade_close = AsyncMock()
     bot.notifier.send = AsyncMock()
     bot.exchange.get_ticker = AsyncMock() # Should not be called if trade found
-    bot.risk.record_trade = MagicMock()
+    bot.risk.record_trade = AsyncMock()
 
     # Execute
     await bot._reconcile_positions("BTC/USDT", position)
@@ -153,7 +153,7 @@ async def test_reconcile_positions_fallback(bot):
 
     bot.database.log_trade_close = AsyncMock()
     bot.notifier.send = AsyncMock()
-    bot.risk.record_trade = MagicMock()
+    bot.risk.record_trade = AsyncMock()
 
     # Execute
     await bot._reconcile_positions("BTC/USDT", position)

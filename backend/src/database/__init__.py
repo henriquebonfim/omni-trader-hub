@@ -1,7 +1,7 @@
 from .base import BaseDatabase
-from .sqlite import SqliteDatabase
-from .postgres import PostgresDatabase
 from .factory import DatabaseFactory
+from .postgres import PostgresDatabase
+from .sqlite import SqliteDatabase
 
 # Backward compatibility alias - will default to Sqlite if instantiated directly
 # However, the old usage was `Database(path)`. 

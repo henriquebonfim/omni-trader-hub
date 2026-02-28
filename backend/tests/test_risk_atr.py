@@ -2,11 +2,14 @@
 Tests for ATR-based stops logic in RiskManager.
 """
 
-import pytest
-import pandas as pd
 from datetime import datetime, timedelta
-from src.risk import RiskManager
+
+import pandas as pd
+import pytest
+
 from src.config import Config
+from src.risk import RiskManager
+
 
 @pytest.fixture
 def mock_ohlcv():

@@ -1,6 +1,8 @@
 import datetime
-import pytest
 from unittest.mock import AsyncMock, patch
+
+import pytest
+
 from src.risk import RiskManager
 
 

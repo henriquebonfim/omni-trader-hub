@@ -1,3 +1,4 @@
+import pytest
 from datetime import timedelta
 
 import pandas as pd
@@ -5,7 +6,8 @@ import pandas as pd
 from src.risk import RiskManager
 
 
-def test_weekly_circuit_breaker_triggered():
+@pytest.mark.asyncio
+async def test_weekly_circuit_breaker_triggered():
     # Setup
     risk = RiskManager()
     risk.max_weekly_loss_pct = 10.0
@@ -14,19 +16,20 @@ def test_weekly_circuit_breaker_triggered():
     weekly_pnl = -1100.0 # Started with ~10100. Loss > 10%
 
     # check_weekly_circuit_breaker(weekly_pnl, current_balance)
-    triggered = risk.check_weekly_circuit_breaker(weekly_pnl, current_balance)
+    triggered = await risk.check_weekly_circuit_breaker(weekly_pnl, current_balance)
 
     assert triggered is True
     assert risk._weekly_circuit_breaker_active is True
 
-def test_weekly_circuit_breaker_not_triggered():
+@pytest.mark.asyncio
+async def test_weekly_circuit_breaker_not_triggered():
     risk = RiskManager()
     risk.max_weekly_loss_pct = 10.0
 
     current_balance = 9500.0
     weekly_pnl = -500.0 # Started with 10000. Loss 5%
 
-    triggered = risk.check_weekly_circuit_breaker(weekly_pnl, current_balance)
+    triggered = await risk.check_weekly_circuit_breaker(weekly_pnl, current_balance)
     assert triggered is False
 
 def test_black_swan_detector():

@@ -11,7 +11,7 @@ async def test_reconcile_positions_db_open_exchange_flat():
     bot = OmniTrader()
     bot.database = AsyncMock()
     bot.exchange = AsyncMock()
-    bot.risk = MagicMock()
+    bot.risk = AsyncMock()
     bot.notifier = AsyncMock()
     bot.config = MagicMock()
     bot.config.risk.reconciliation_lookback_trades = 50
@@ -64,7 +64,7 @@ async def test_reconcile_positions_db_close_exchange_open():
     bot = OmniTrader()
     bot.database = AsyncMock()
     bot.exchange = AsyncMock()
-    bot.risk = MagicMock()
+    bot.risk = AsyncMock()
     bot.notifier = AsyncMock()
     bot.config = MagicMock()
     bot.config.risk.reconciliation_lookback_trades = 50

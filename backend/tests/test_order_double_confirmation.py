@@ -1,8 +1,11 @@
+from unittest.mock import AsyncMock, MagicMock, patch
+
 import pytest
-from unittest.mock import AsyncMock, patch, MagicMock
+
+from src.config import Config
 from src.exchange import Exchange
 from src.main import OmniTrader
-from src.config import Config
+
 
 @pytest.mark.asyncio
 async def test_order_fill_confirmation_success():
@@ -59,7 +62,7 @@ async def test_order_fill_confirmation_timeout():
 async def test_bot_logs_warning_on_unconfirmed_fill():
     # Setup bot with mocked exchange
     with patch("src.main.Exchange") as MockExchange, \
-         patch("src.main.Database"), \
+         patch("src.main.DatabaseFactory"), \
          patch("src.main.RiskManager") as MockRiskManager, \
          patch("src.main.Notifier") as MockNotifier, \
          patch("src.main.get_config") as mock_get_config, \

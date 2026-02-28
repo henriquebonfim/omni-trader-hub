@@ -1,8 +1,10 @@
-import pytest
 import pandas as pd
-from src.strategies.base import Signal, BaseStrategy
-from src.config import Config
+import pytest
+
 from src.analysis.regime import MarketRegime
+from src.config import Config
+from src.strategies.base import BaseStrategy, Signal
+
 
 class MockStrategy(BaseStrategy):
     @property
