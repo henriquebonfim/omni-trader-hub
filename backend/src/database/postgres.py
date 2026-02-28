@@ -4,6 +4,7 @@ PostgreSQL implementation of the database interface using asyncpg.
 
 import json
 import os
+import subprocess
 from datetime import datetime, timezone
 from typing import Optional
 
@@ -21,13 +22,14 @@ class PostgresDatabase(BaseDatabase):
     """
 
     def __init__(self, connection_string: str = None):
+        self.user = os.getenv("POSTGRES_USER", "omnitrader")
+        self.password = os.getenv("POSTGRES_PASSWORD", "omnitrader_password")
+        self.db_name = os.getenv("POSTGRES_DB", "trades_db")
+        self.host = os.getenv("POSTGRES_HOST", "localhost")
+        self.port = os.getenv("POSTGRES_PORT", "5432")
+        
         if connection_string is None:
-            user = os.getenv("POSTGRES_USER", "omnitrader")
-            password = os.getenv("POSTGRES_PASSWORD", "omnitrader_password")
-            db = os.getenv("POSTGRES_DB", "trades_db")
-            host = os.getenv("POSTGRES_HOST", "localhost")
-            port = os.getenv("POSTGRES_PORT", "5432")
-            connection_string = f"postgresql://{user}:{password}@{host}:{port}/{db}"
+            connection_string = f"postgresql://{self.user}:{self.password}@{self.host}:{self.port}/{self.db_name}"
 
         self.dsn = connection_string
         self._pool: Optional[asyncpg.Pool] = None
@@ -54,15 +56,46 @@ class PostgresDatabase(BaseDatabase):
 
     async def backup_db(self):
         """
-        Create a backup of the database.
-        
-        Note: For Postgres, this usually involves calling pg_dump via subprocess.
+        Create a backup of the database using pg_dump.
         """
         try:
             timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
-            # This requires pg_dump to be installed and accessible
-            # Implementing this fully requires system calls, which we might skip for MVP or log warning
-            logger.warning("postgres_backup_not_implemented_via_app", hint="use pg_dump externally")
+            backup_file = f"backup_{self.db_name}_{timestamp}.sql"
+            backup_path = os.path.join("data", "backups")
+            
+            # Ensure backup directory exists
+            os.makedirs(backup_path, exist_ok=True)
+            full_path = os.path.join(backup_path, backup_file)
+
+            # Construct pg_dump command
+            # PGPASSWORD env var is needed for non-interactive auth
+            env = os.environ.copy()
+            env["PGPASSWORD"] = self.password
+
+            cmd = [
+                "pg_dump",
+                "-h", self.host,
+                "-p", self.port,
+                "-U", self.user,
+                "-d", self.db_name,
+                "-f", full_path
+            ]
+
+            logger.info("starting_database_backup", file=full_path)
+            
+            # Run pg_dump
+            result = subprocess.run(
+                cmd, 
+                env=env, 
+                check=True, 
+                capture_output=True, 
+                text=True
+            )
+
+            logger.info("database_backup_successful", file=full_path)
+
+        except subprocess.CalledProcessError as e:
+            logger.error("database_backup_failed_subprocess", error=str(e), stderr=e.stderr)
         except Exception as e:
             logger.error("database_backup_failed", error=str(e))
 
@@ -367,15 +400,6 @@ class PostgresDatabase(BaseDatabase):
         reason: str,
         indicators: dict,
     ) -> None:
-        # asyncpg handles JSON/JSONB automatically if indicators is passed as a string 
-        # OR if we configure a type codec. But simplest is often to pass as string for generic JSONB
-        # However, asyncpg can map dict to jsonb automatically.
-        # Let's verify: usually we need to json.dumps it if we haven't set up codecs, 
-        # OR just pass string. 
-        # Safe bet: pass json.dumps(indicators) and let Postgres parse it if column is JSONB.
-        # But wait, if column is JSONB, asyncpg usually expects a string unless we set_type_codec.
-        # Let's try passing the string representation.
-        
         async with self._pool.acquire() as conn:
             await conn.execute(
                 """

@@ -35,30 +35,10 @@ Triggers for:
 
 ---
 
-## Step 2 — Fetch Issues
+## Step 2 — Aggregate Issues
 
 ```bash
-mkdir -p .agent/skills/po-lifecycle-orchestrator/tmp
-
-gh issue list \
-  --state open --limit 200 \
-  --json number,title,body,labels,assignees,milestone,createdAt,updatedAt \
-  > .agent/skills/po-lifecycle-orchestrator/tmp/gh-issues-open.json
-
-gh issue list \
-  --state closed --limit 30 \
-  --json number,title,closedAt,labels \
-  > .agent/skills/po-lifecycle-orchestrator/tmp/gh-issues-closed.json
-
-gh pr list \
-  --state open \
-  --json number,title,headRefName \
-  > .agent/skills/po-lifecycle-orchestrator/tmp/open-prs.json
-
-gh pr list \
-  --state merged --limit 15 \
-  --json number,title,mergedAt,body \
-  > .agent/skills/po-lifecycle-orchestrator/tmp/merged-prs.json
+echo "Skipping bash gh CLI — data is now fetched natively in Python."
 ```
 
 ---
@@ -66,11 +46,7 @@ gh pr list \
 ## Step 3 — Triage (Issues Only)
 
 ```bash
-make po-triage ARGS="--issues .agent/skills/po-lifecycle-orchestrator/tmp/gh-issues-open.json \
-  --closed .agent/skills/po-lifecycle-orchestrator/tmp/gh-issues-closed.json \
-  --prs .agent/skills/po-lifecycle-orchestrator/tmp/open-prs.json \
-  --merged .agent/skills/po-lifecycle-orchestrator/tmp/merged-prs.json \
-  --output-dir .agent/skills/po-lifecycle-orchestrator/tmp/"
+make po-triage ARGS="--output-dir .agent/tmp/"
 ```
 
 ---
@@ -78,7 +54,7 @@ make po-triage ARGS="--issues .agent/skills/po-lifecycle-orchestrator/tmp/gh-iss
 ## Step 4 — Post Issue Comments
 
 ```bash
-make po-post ARGS="--matrix .agent/skills/po-lifecycle-orchestrator/tmp/triage-matrix.json"
+make po-post ARGS="--matrix .agent/tmp/triage-matrix.json"
 ```
 
 ---
@@ -95,7 +71,7 @@ git commit -m "chore(po): triage $(date +%Y-%m-%d)" 2>/dev/null || echo "No chan
 ## Step 6 — Cleanup
 
 ```bash
-rm -f .agent/skills/po-lifecycle-orchestrator/tmp/*.json
+make clean-tmp
 ```
 
 ---

@@ -1,6 +1,5 @@
 import pytest
-import asyncio
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, patch
 import json
 import os
 import sys
@@ -9,7 +8,7 @@ import sys
 sys.path.append(os.path.join(os.path.dirname(__file__), '../'))
 
 from src.database.redis_store import RedisStore
-from src.risk import RiskManager, DailyStats
+from src.risk import RiskManager
 from datetime import date
 
 @pytest.mark.asyncio

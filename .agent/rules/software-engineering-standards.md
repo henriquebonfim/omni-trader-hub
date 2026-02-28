@@ -77,6 +77,17 @@ All agents, workflows, and skills operate under a mandatory observability mandat
 
 ---
 
+## Pipeline Control (Sequential-Thinking Mandatory)
+
+All multi-step tasks MUST use the `sequential-thinking` MCP tool:
+
+- **Before implementation**: Break the task into numbered thoughts. Assess scope, trace call graph, plan changes.
+- **At phase gates**: Validate prerequisites before transitioning to the next phase.
+- **On failure**: Use a revision thought to reassess approach before retrying.
+- **Never skip**: Even "simple" tasks benefit from structured reasoning. The overhead is trivial; the cost of a wrong approach is not.
+
+---
+
 ## Performance & Scalability
 
 Performance problems in production are the hardest to debug:
@@ -85,6 +96,17 @@ Performance problems in production are the hardest to debug:
 - No N+1 queries — if you're calling the database in a loop, use a join or eager load.
 - All list-returning endpoints must have pagination (no unbounded queries).
 - Avoid unnecessary allocations in hot paths.
+
+---
+
+## UI/UX Pro Max Mandate (Frontend/UI Only)
+
+For any task involving user interface creation or modification (React, Tailwind, HTML, etc.):
+
+- **Pre-Code Vibe Check**: Before writing any implementation code, you MUST query the Design Intelligence engine to establish the styling baseline.
+- **Run**: `python3 .agent/skills/ui-ux-pro-max/scripts/search.py "<keywords>" --design-system`
+- **Persistence**: If initiating a new feature, use the `--persist` flag to generate/update `.agent/design-system/MASTER.md`. Subsequent frontend tasks must read this file to guarantee styling consistency.
+- **Never Hardcode**: Use established semantic tokens (e.g., `bg-primary`, `text-slate-900`) and standard spacing scales instead of ad-hoc hex codes or arbitrary margins.
 
 ---
 

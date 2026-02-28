@@ -72,7 +72,7 @@ No web UI simulation. No manual workarounds.
 
 ## Temporary Artifacts
 
-All temp files in `.agent/skills/issue-task-orchestrator/tmp/`:
+All temp files in `.agent/tmp/`:
 
 - `raw-issues.json` — fetched from gh API
 - `open-prs.json` — active PRs for duplicate detection
@@ -80,7 +80,7 @@ All temp files in `.agent/skills/issue-task-orchestrator/tmp/`:
 - `issue-matrix.json` — scored classification matrix
 
 Rules:
-- `.agent/skills/issue-task-orchestrator/tmp/` must be in `.gitignore`
+- `.agent/tmp/` must be in `.gitignore`
 - Never commit temp files
 - Delete all after workflow completion
 

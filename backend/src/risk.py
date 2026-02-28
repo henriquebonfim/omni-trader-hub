@@ -10,14 +10,14 @@ Handles:
 """
 
 from dataclasses import dataclass, field, asdict
-from datetime import date, datetime
+from datetime import date
 from typing import Optional
 
 import pandas as pd
+import pandas_ta as ta
 import structlog
 
 from .config import get_config
-from .database.redis_store import RedisStore
 
 logger = structlog.get_logger()
 
@@ -94,6 +94,12 @@ class RiskManager:
         self.auto_deleverage_threshold = getattr(config.risk, "auto_deleverage_threshold_pct", 10.0)
 
         self.liquidation_buffer_pct = getattr(config.risk, "liquidation_buffer_pct", 0.5)
+
+        # ATR Stops Config
+        self.use_atr_stops = getattr(config.risk, "use_atr_stops", False)
+        self.atr_period = getattr(config.risk, "atr_period", 14)
+        self.atr_multiplier_sl = getattr(config.risk, "atr_multiplier_sl", 1.5)
+        self.atr_multiplier_tp = getattr(config.risk, "atr_multiplier_tp", 2.0)
 
         # Trailing Stop Config
         self.trailing_stop_activation_pct = getattr(
@@ -187,6 +193,12 @@ class RiskManager:
 
         self.liquidation_buffer_pct = getattr(config.risk, "liquidation_buffer_pct", 0.5)
 
+        # Update ATR stops config
+        self.use_atr_stops = getattr(config.risk, "use_atr_stops", False)
+        self.atr_period = getattr(config.risk, "atr_period", 14)
+        self.atr_multiplier_sl = getattr(config.risk, "atr_multiplier_sl", 1.5)
+        self.atr_multiplier_tp = getattr(config.risk, "atr_multiplier_tp", 2.0)
+
         self.trailing_stop_activation_pct = getattr(
             config.risk, "trailing_stop_activation_pct", 1.0
         )
@@ -201,6 +213,7 @@ class RiskManager:
             take_profit_pct=self.take_profit_pct,
             max_daily_loss_pct=self.max_daily_loss_pct,
             liquidation_buffer_pct=self.liquidation_buffer_pct,
+            use_atr_stops=self.use_atr_stops
         )
 
     async def initialize_daily_stats(self, current_balance: float):
@@ -287,7 +300,7 @@ class RiskManager:
 
     def calculate_stop_loss(self, entry_price: float, side: str) -> float:
         """
-        Calculate stop loss price.
+        Calculate stop loss price based on fixed percentage.
 
         Args:
             entry_price: Position entry price
@@ -303,7 +316,7 @@ class RiskManager:
 
     def calculate_take_profit(self, entry_price: float, side: str) -> float:
         """
-        Calculate take profit price.
+        Calculate take profit price based on fixed percentage.
 
         Args:
             entry_price: Position entry price
@@ -317,8 +330,56 @@ class RiskManager:
         else:  # short
             return entry_price * (1 - self.take_profit_pct / 100)
 
+    def calculate_atr_stops(self, entry_price: float, side: str, ohlcv: pd.DataFrame) -> tuple[float, float]:
+        """
+        Calculate Stop Loss and Take Profit using ATR.
+
+        Args:
+            entry_price: Position entry price
+            side: "long" or "short"
+            ohlcv: OHLCV DataFrame for ATR calculation
+
+        Returns:
+            Tuple (stop_loss, take_profit)
+        """
+        if ohlcv is None or ohlcv.empty:
+            # Fallback to fixed percentage
+            logger.warning("atr_stops_fallback_no_data")
+            return (
+                self.calculate_stop_loss(entry_price, side),
+                self.calculate_take_profit(entry_price, side)
+            )
+
+        try:
+            atr = ta.atr(ohlcv["high"], ohlcv["low"], ohlcv["close"], length=self.atr_period)
+            if atr is None or atr.empty:
+                logger.warning("atr_stops_fallback_calc_failed")
+                return (
+                    self.calculate_stop_loss(entry_price, side),
+                    self.calculate_take_profit(entry_price, side)
+                )
+
+            current_atr = atr.iloc[-1]
+
+            if side == "long":
+                stop_loss = entry_price - (current_atr * self.atr_multiplier_sl)
+                take_profit = entry_price + (current_atr * self.atr_multiplier_tp)
+            else:  # short
+                stop_loss = entry_price + (current_atr * self.atr_multiplier_sl)
+                take_profit = entry_price - (current_atr * self.atr_multiplier_tp)
+
+            return stop_loss, take_profit
+
+        except Exception as e:
+            logger.error("atr_stops_calculation_failed", error=str(e))
+            # Fallback
+            return (
+                self.calculate_stop_loss(entry_price, side),
+                self.calculate_take_profit(entry_price, side)
+            )
+
     def validate_trade(
-        self, side: str, balance: float, entry_price: float, current_positions: int = 0
+        self, side: str, balance: float, entry_price: float, current_positions: int = 0, ohlcv: pd.DataFrame = None
     ) -> RiskCheck:
         """
         Validate a potential trade against risk rules.
@@ -328,6 +389,7 @@ class RiskManager:
             balance: Available balance
             entry_price: Expected entry price
             current_positions: Number of open positions
+            ohlcv: OHLCV DataFrame for dynamic stop calculations
 
         Returns:
             RiskCheck with approval status and calculated values
@@ -355,8 +417,13 @@ class RiskManager:
 
         # Calculate position parameters
         position_size = self.calculate_position_size(balance, entry_price)
-        stop_loss = self.calculate_stop_loss(entry_price, side)
-        take_profit = self.calculate_take_profit(entry_price, side)
+
+        if self.use_atr_stops and ohlcv is not None:
+            stop_loss, take_profit = self.calculate_atr_stops(entry_price, side, ohlcv)
+            logger.info("using_atr_stops", sl=stop_loss, tp=take_profit)
+        else:
+            stop_loss = self.calculate_stop_loss(entry_price, side)
+            take_profit = self.calculate_take_profit(entry_price, side)
 
         # Validate position size
         min_size = 0.001  # Minimum BTC size

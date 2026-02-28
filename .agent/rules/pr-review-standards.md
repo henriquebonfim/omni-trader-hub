@@ -58,7 +58,7 @@ If failure: capture the failing file/module, report as HIGH severity review comm
 
 ## Temporary Artifacts
 
-Location: `.agent/skills/pr-review-orchestrator/tmp/`
+Location: `.agent/tmp/`
 
 Allowed files:
 - `pr-meta.json`
@@ -124,6 +124,19 @@ Each issue produces ONE structured comment. No bundling.
 
 ---
 
+## UI/UX Verification (Frontend Only)
+
+If the PR modifies user interface files (React components, HTML, CSS), you MUST verify against `ui-ux-pro-max` standards:
+
+- **Semantic Tokens**: Reject hardcoded hex colors or arbitrary px margins if semantic Tailwind classes (`bg-primary`, `p-4`) exist.
+- **Icon Integrity**: Reject emojis used as UI icons. Force SVGs (from Heroicons/Lucide).
+- **Interaction Quality**: Verify hover states do not cause layout shifts.
+- **Reference**: To check specific best practices during review, query the Design Intelligence engine (e.g., `python3 .agent/skills/ui-ux-pro-max/scripts/search.py "accessibility form" --domain ux`).
+
+If UI violations are found, issue a `⚠️ CHANGES REQUESTED` with category `UI/UX`.
+
+---
+
 ## Risk Classification
 
 Classify overall PR after analysis:
@@ -155,7 +168,7 @@ gh api repos/.../pulls/<N>/reviews      # Submit review
 ## Final Verification
 
 - [ ] No commits made (`git log` unchanged)
-- [ ] No files modified (`git status` clean)  
+- [ ] No files modified (`git status` clean)
 - [ ] Review submitted via `gh api`
 - [ ] Risk level stated in review body
 - [ ] All changed files analyzed

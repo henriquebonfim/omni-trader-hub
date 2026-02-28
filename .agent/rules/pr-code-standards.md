@@ -59,7 +59,7 @@ After each commit: re-run build + tests. Zero regressions.
 
 ## Temporary Artifacts
 
-Location: `.agent/skills/pr-code-orchestrator/tmp/`
+Location: `.agent/tmp/`
 
 Allowed files:
 - `pr-meta.json`
@@ -72,7 +72,7 @@ Allowed files:
 Rules:
 - Never store full diffs or full comment bodies in artifacts
 - Never commit temp files
-- `.agent/skills/pr-code-orchestrator/tmp/` must be in `.gitignore`
+- `.agent/tmp/` must be in `.gitignore`
 - Delete all after workflow completion
 
 ---

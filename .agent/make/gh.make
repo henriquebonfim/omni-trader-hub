@@ -5,13 +5,16 @@ gh-help:
 	@echo "  gh-issue-list ARGS=\"...\"        List issues"
 	@echo "  gh-issue-view ID=123             View issue"
 	@echo "  gh-issue-comment ID=123 ARGS=\"...\" Post issue comment"
+	@echo "  gh-issue-comment-file ID=123 BODY_FILE=\"...\" Post issue comment from file"
 	@echo "  gh-issue-close ID=123 ARGS=\"...\"   Close issue"
 	@echo "  gh-pr-list ARGS=\"...\"           List PRs"
 	@echo "  gh-pr-view ID=123                View PR"
 	@echo "  gh-pr-checkout ID=123            Checkout PR"
 	@echo "  gh-pr-create ARGS=\"...\"         Create PR"
+	@echo "  gh-pr-create-file BODY_FILE=\"...\" Create PR from file"
 	@echo "  gh-pr-diff ID=123 ARGS=\"...\"     View PR diff"
 	@echo "  gh-api ENDPOINT=\"...\" ARGS=\"...\" Call GitHub API"
+	@echo "  gh-api-input ENDPOINT=\"...\" INPUT_FILE=\"...\" Call GitHub API with file input"
 	@echo "  gh-release-create ARGS=\"...\"    Create a release"
 	@echo "  gh-run-list ARGS=\"...\"          List GitHub Actions runs"
 
@@ -23,6 +26,9 @@ gh-issue-view:
 
 gh-issue-comment:
 	gh issue comment $(ID) $(ARGS)
+
+gh-issue-comment-file:
+	gh issue comment $(ID) --body-file $(BODY_FILE)
 
 gh-issue-close:
 	gh issue close $(ID) $(ARGS)
@@ -39,6 +45,9 @@ gh-pr-checkout:
 gh-pr-create:
 	gh pr create $(ARGS)
 
+gh-pr-create-file:
+	gh pr create --body-file $(BODY_FILE) $(ARGS)
+
 gh-pr-diff:
 	gh pr diff $(ID) $(ARGS)
 
@@ -50,3 +59,6 @@ gh-run-list:
 
 gh-api:
 	gh api $(ENDPOINT) $(ARGS)
+
+gh-api-input:
+	gh api $(ENDPOINT) --method POST --input $(INPUT_FILE) $(ARGS)

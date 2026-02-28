@@ -6,7 +6,7 @@ Usage:
   python3 generate_release_notes.py \
     --commits <path-to-commits-since-tag.txt> \
     --current-version 1.3.0 \
-    --output-dir .agent/skills/release-manager-orchestrator/tmp/
+    --output-dir .agent/tmp/
 """
 
 import argparse

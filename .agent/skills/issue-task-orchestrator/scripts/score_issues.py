@@ -9,10 +9,11 @@ Usage: python3 score_issues.py
 import json
 import re
 import sys
+import subprocess
 from pathlib import Path
 
 BASE_DIR = Path(".agent/skills/issue-task-orchestrator")
-TMP_DIR = BASE_DIR / "tmp"
+TMP_DIR = Path(".agent/tmp")
 
 
 def load_json(path: Path) -> list | dict:
@@ -21,6 +22,14 @@ def load_json(path: Path) -> list | dict:
         return []
     with open(path) as f:
         return json.load(f)
+
+def fetch_gh_json(command: list[str]) -> list | dict:
+    try:
+        result = subprocess.run(command, capture_output=True, text=True, check=True)
+        return json.loads(result.stdout)
+    except (subprocess.CalledProcessError, json.JSONDecodeError) as e:
+        print(f"Error fetching data with {' '.join(command)}: {e}")
+        return []
 
 
 def detect_classification(issue: dict) -> str:
@@ -111,9 +120,12 @@ def is_in_active_pr(issue_number: int, open_prs: list) -> bool:
 
 
 def main() -> None:
-    raw_issues = load_json(TMP_DIR / "raw-issues.json")
-    open_prs = load_json(TMP_DIR / "open-prs.json")
-    recent_merged = load_json(TMP_DIR / "recent-merged.json")
+    TMP_DIR.mkdir(parents=True, exist_ok=True)
+
+    print("Fetching repository data. This replaces bash CLI steps...")
+    raw_issues = fetch_gh_json(["gh", "issue", "list", "--state", "open", "--limit", "200", "--json", "number,title,body,labels,assignees,milestone,createdAt,updatedAt"])
+    open_prs = fetch_gh_json(["gh", "pr", "list", "--state", "open", "--json", "number,title,body"])
+    recent_merged = fetch_gh_json(["gh", "pr", "list", "--state", "merged", "--limit", "20", "--json", "number,title,mergedAt,body"])
 
     # Build set of recently-resolved issue numbers from merged PR bodies
     resolved_refs = set()

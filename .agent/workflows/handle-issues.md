@@ -13,9 +13,9 @@ Full issue triage, implementation, and PR creation pipeline.
 ### 1 — Environment Setup
 
 ```bash
-mkdir -p .agent/skills/issue-task-orchestrator/tmp
-grep -qxF '.agent/skills/issue-task-orchestrator/tmp/' .gitignore \
-  || echo '.agent/skills/issue-task-orchestrator/tmp/' >> .gitignore
+mkdir -p .agent/tmp
+grep -qxF '.agent/tmp/' .gitignore \
+  || echo '.agent/tmp/' >> .gitignore
 ```
 
 ### 2 — Load Skill
@@ -36,17 +36,8 @@ fi
 ### 4 — Fetch & Score Issues
 
 ```bash
-# Fetch raw issues
-gh issue list --state open --limit 100 \
-  --json number,title,body,labels,assignees,milestone,createdAt,updatedAt \
-  > .agent/skills/issue-task-orchestrator/tmp/raw-issues.json
-
-# Detect already-in-progress work
-gh pr list --state open --json number,title,body,headRefName \
-  > .agent/skills/issue-task-orchestrator/tmp/open-prs.json
-
-gh pr list --state merged --limit 20 --json number,title,body,mergedAt \
-  > .agent/skills/issue-task-orchestrator/tmp/recent-merged.json
+# Fetching, scoring, and ranking is handled natively in Python
+make issue-score
 
 # Score and rank
 make issue-score
@@ -79,28 +70,13 @@ Each commit must include `Closes #<N>`.
 ### 8 — Generate TASKS.md
 
 ```bash
-python3 -c "
-import json
-matrix = json.load(open('.agent/skills/issue-task-orchestrator/tmp/issue-matrix.json'))
-confirmed = [i for i in matrix if i['status'] == 'CONFIRMED']
-lines = ['# Tasks\n', f'Generated: $(date)\n\n']
-for i, task in enumerate(confirmed, 1):
-    lines.append(f'## {i}. Issue #{task[\"issue_number\"]}: {task[\"title\"]}')
-    lines.append(f'- Priority Score: {task[\"priority_score\"]}')
-    lines.append(f'- Classification: {task[\"classification\"]}')
-    lines.append('')
-print('\n'.join(lines))
-" > TASKS.md
+make issue-tasks
 ```
 
 ### 9 — Create Batch PR
 
 ```bash
-ISSUE_CLOSES=$(python3 -c "
-import json
-m = json.load(open('.agent/skills/issue-task-orchestrator/tmp/issue-matrix.json'))
-print('\n'.join(f'Closes #{i[\"issue_number\"]}' for i in m if i['status']=='CONFIRMED'))
-")
+ISSUE_CLOSES=$(jq -r '.[] | select(.status=="CONFIRMED") | "Closes #\(.issue_number)"' .agent/tmp/issue-matrix.json 2>/dev/null || true)
 
 gh pr create \
   --title "feat: resolve confirmed issues batch $(date +%Y-%m-%d)" \
@@ -120,7 +96,7 @@ $(git log origin/main..HEAD --oneline --no-merges)
 ### 10 — Cleanup
 
 ```bash
-rm -f .agent/skills/issue-task-orchestrator/tmp/*.json
+make clean-tmp
 ```
 
 ### 11 — Final Validation

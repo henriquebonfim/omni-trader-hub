@@ -9,6 +9,8 @@ services:
     volumes:
       - ./backend/config:/app/config
       - ./backend/data:/app/data
+      - ./backend/src:/app/src
+      - ./backend/tests:/app/tests
     env_file:
       - .env
     depends_on:
@@ -24,6 +26,21 @@ services:
       retries: 3
       start_period: 15s
 
+  watchdog:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: omnitrader-watchdog
+    command: python -m src.watchdog
+    volumes:
+      - ./backend/config:/app/config
+    env_file:
+      - .env
+    depends_on:
+      omnitrader:
+        condition: service_healthy
+    restart: unless-stopped
+
   frontend:
     build:
       context: ./frontend
@@ -31,6 +48,10 @@ services:
     container_name: omnitrader-frontend
     ports:
       - "3000:80"
+    volumes:
+      - ./frontend/src:/app/src
+      - ./frontend/package.json:/app/package.json
+      - ./frontend/bun.lockb:/app/bun.lockb
     depends_on:
       omnitrader:
         condition: service_healthy

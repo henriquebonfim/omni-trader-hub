@@ -81,8 +81,7 @@ git log --oneline -3  # Confirm merge commit present
 
 ```bash
 # Clear any tmp files from the PR workflow
-rm -f .agent/skills/pr-code-orchestrator/tmp/*
-rm -f .agent/skills/pr-review-orchestrator/tmp/*
+make clean-tmp
 ```
 
 ---
