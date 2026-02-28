@@ -11,6 +11,7 @@ j-help:
 	@echo "  j-dispatch TASK=\"...\" ARGS=\"--repo ...\" PARALLEL=1"
 	@echo "  j-list                 List all remote sessions"
 	@echo "  j-status ID=<id>       Check status of a specific session"
+	@echo "  j-poll ID=<id>         Poll session until completion"
 	@echo "  j-pull ID=<id>         Pull and apply changes from session ID"
 	@echo "  j-teleport ID=<id>     Teleport to session ID"
 	@echo "  j-clean                Clear local session markers"
@@ -39,6 +40,10 @@ j-dispatch:
 j-status:
 	@if [ -z "$(ID)" ]; then echo "Usage: make j-status ID=<id>"; exit 1; fi
 	@COLUMNS=200 jules remote list --session | grep "$(ID)" || echo "Session $(ID) not found or completed."
+
+j-poll:
+	@if [ -z "$(ID)" ]; then echo "Usage: make j-poll ID=<id>"; exit 1; fi
+	@python3 .agent/scripts/jules_poll.py --id $(ID) --interval 60 --timeout 1800
 
 j-pull:
 	@if [ -z "$(ID)" ]; then echo "Usage: make j-pull ID=<id>"; exit 1; fi

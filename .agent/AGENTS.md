@@ -88,9 +88,10 @@ Issues → Triage → Score → Branch → Implement → PR → Review → Merge
 ## Jules Discipline
 
 1. **Branch First**: `git checkout -b feature/...` before pulling
-2. **Pull with Apply**: `make j-pull ID=<id>` (uses `--apply`)
-3. **Docker Verify**: `make test && make lint` after pull
-4. **Self-Correct**: If Jules breaks patterns, fix before committing
+2. **Poll for Completion**: `make j-poll ID=<id>` (async wait for remote session)
+3. **Pull with Apply**: `make j-pull ID=<id>` (uses `--apply`)
+4. **Docker Verify**: `make test && make lint` after pull
+5. **Self-Correct**: If Jules breaks patterns, fix before committing
 
 ---
 
@@ -108,4 +109,4 @@ Issues → Triage → Score → Branch → Implement → PR → Review → Merge
 
 - **"ABORT: protected branch"** → `git checkout -b feature/<name>`
 - **Wrong test command** → Edit `.agent/make/stack.make`
-- **Jules not completing** → `make j-list` then `/handle-pr-review <N>`
+- **Jules not completing** → `make j-poll ID=<id>` or `make j-list`

@@ -53,24 +53,25 @@ cat TASKS.md | head -50
 
 ---
 
-## Step 4 — Jules Dispatch (ReAct Loop)
+## Step 4 — Jules Dispatch & Poll
 
-> **sequential-thinking**: Think → Dispatch → Observe → Think → Pull → Verify
+> **sequential-thinking**: Think → Dispatch → Poll → Pull → Verify. Polling is async to avoid blocking.
 
-**Think**: Build enriched task description from TASKS.md item.
+**Think**: Build enriched task description from TASKS.md item. Include context, constraints, and acceptance criteria.
 
 ```bash
 make j-dispatch ARGS="--repo <owner>/<repo>" TASK="<enriched task>"
 ```
 
-**Observe**: Monitor session.
+**Poll**: Monitor session for completion. This can be run in the background if needed.
 
 ```bash
-make j-list
 make j-status ID=<id>
+# Or use the polling script for automated wait
+make j-poll ID=<id>
 ```
 
-**Pull + Verify**: When complete.
+**Pull + Verify**: Once the status indicates completion (or the session is no longer in the active list).
 
 ```bash
 git checkout -b feature/<task-slug>

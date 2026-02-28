@@ -44,6 +44,9 @@ Issues → Triage → Score → Branch → Implement → PR → Review → Merge
 │   ├── gh.make          ← GitHub CLI targets
 │   └── jules.make       ← Jules CLI targets
 │
+├── scripts/
+│   └── jules_poll.py    ← Async polling engine
+│
 ├── skills/              ← Execution logic (scoring, review, release, etc.)
 ├── workflows/           ← Pipeline steps (thin dispatchers → skills)
 ├── rules/               ← Governance (architecture, security, testing)
