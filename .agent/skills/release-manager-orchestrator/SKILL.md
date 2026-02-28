@@ -15,9 +15,9 @@ Automated release lifecycle from merged commits to published GitHub release. Wra
 gh --version
 git --version
 
-mkdir -p .agent/skills/release-manager-orchestrator/tmp
-grep -qxF '.agent/skills/release-manager-orchestrator/tmp/' .gitignore \
-  || echo '.agent/skills/release-manager-orchestrator/tmp/' >> .gitignore
+mkdir -p .agent/tmp
+grep -qxF '.agent/tmp/' .gitignore \
+  || echo '.agent/tmp/' >> .gitignore
 ```
 
 ---
@@ -75,13 +75,13 @@ echo "Last release: $LAST_TAG"
 # All commits since tag (written to tmp for script processing)
 if [ "$LAST_TAG" != "NONE" ]; then
   git log ${LAST_TAG}..HEAD --oneline --no-merges \
-    > .agent/skills/release-manager-orchestrator/tmp/commits-since-tag.txt
+    > .agent/tmp/commits-since-tag.txt
 else
   git log --oneline --no-merges | head -50 \
-    > .agent/skills/release-manager-orchestrator/tmp/commits-since-tag.txt
+    > .agent/tmp/commits-since-tag.txt
 fi
 
-cat .agent/skills/release-manager-orchestrator/tmp/commits-since-tag.txt
+cat .agent/tmp/commits-since-tag.txt
 
 # Detect version file and current version
 VERSION_FILE=""
@@ -89,7 +89,7 @@ CURRENT_VERSION=""
 
 if [ -f package.json ]; then
   VERSION_FILE="package.json"
-  CURRENT_VERSION=$(cat package.json | python3 -c "import sys,json; print(json.load(sys.stdin).get('version','0.0.0'))")
+  CURRENT_VERSION=$(jq -r '.version // "0.0.0"' package.json 2>/dev/null || echo "0.0.0")
 elif [ -f pyproject.toml ]; then
   VERSION_FILE="pyproject.toml"
   CURRENT_VERSION=$(grep "^version" pyproject.toml | head -1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+')
@@ -110,7 +110,7 @@ echo "Current version: $CURRENT_VERSION"
 ## Phase 2 — Generate Release Notes (via script)
 
 ```bash
-make release-gen ARGS="--commits .agent/skills/release-manager-orchestrator/tmp/commits-since-tag.txt --current-version \"$CURRENT_VERSION\" --output-dir .agent/skills/release-manager-orchestrator/tmp/"
+make release-gen ARGS="--commits .agent/tmp/commits-since-tag.txt --current-version \"$CURRENT_VERSION\" --output-dir .agent/tmp/"
 ```
 
 This produces:
@@ -152,7 +152,7 @@ If user provides custom version, validate it matches `vX.Y.Z` or `X.Y.Z` format.
 Run the automated release script:
 
 ```bash
-make release-exec ARGS="--version \"$NEW_VERSION\" --version-file \"$VERSION_FILE\" --changelog-entry .agent/skills/release-manager-orchestrator/tmp/changelog-entry.md --release-body .agent/skills/release-manager-orchestrator/tmp/release-body.md"
+make release-exec ARGS="--version \"$NEW_VERSION\" --version-file \"$VERSION_FILE\" --changelog-entry .agent/tmp/changelog-entry.md --release-body .agent/tmp/release-body.md"
 ```
 
 The script performs in order:
@@ -160,10 +160,8 @@ The script performs in order:
 ### 4a — Bump Version File
 
 ```bash
-# package.json
-# Using bun to run versioning (or direct JSON edit)
-bun x version-bump <patch|minor|major>
-# OR direct sed for pyproject.toml / Cargo.toml / VERSION
+# package.json — direct JSON edit (update "version" field)
+# pyproject.toml / Cargo.toml / VERSION — sed regex or direct edit
 ```
 
 ### 4b — Insert CHANGELOG Entry
@@ -171,7 +169,7 @@ bun x version-bump <patch|minor|major>
 Insert above the previous `## [X.Y.Z]` section (or at top if no previous).
 
 ```bash
-make release-insert ARGS="--version \"$NEW_VERSION\" --entry .agent/skills/release-manager-orchestrator/tmp/changelog-entry.md"
+make release-insert ARGS="--version \"$NEW_VERSION\" --entry .agent/tmp/changelog-entry.md"
 ```
 
 ### 4c — Commit
@@ -192,9 +190,9 @@ git push origin "v${NEW_VERSION}"
 ### 4e — Create GitHub Release
 
 ```bash
-RELEASE_BODY=$(cat .agent/skills/release-manager-orchestrator/tmp/release-body.md)
+RELEASE_BODY=$(cat .agent/tmp/release-body.md)
 
-make gh-release-create ARGS="\"v${NEW_VERSION}\" --title \"Release v${NEW_VERSION}\" --notes-file .agent/skills/release-manager-orchestrator/tmp/release-body.md"
+make gh-release-create ARGS="\"v${NEW_VERSION}\" --title \"Release v${NEW_VERSION}\" --notes-file .agent/tmp/release-body.md"
 ```bash
 gh release create "v${NEW_VERSION}-rc.1" \
   --prerelease \
@@ -219,7 +217,7 @@ git status
 
 # Store verification result
 echo "{\"version\": \"v${NEW_VERSION}\", \"status\": \"PUBLISHED\"}" \
-  > .agent/skills/release-manager-orchestrator/tmp/release-result.json
+  > .agent/tmp/release-result.json
 ```
 
 ---
@@ -227,9 +225,7 @@ echo "{\"version\": \"v${NEW_VERSION}\", \"status\": \"PUBLISHED\"}" \
 ## Phase 6 — Cleanup
 
 ```bash
-rm -f .agent/skills/release-manager-orchestrator/tmp/*.json
-rm -f .agent/skills/release-manager-orchestrator/tmp/*.md
-rm -f .agent/skills/release-manager-orchestrator/tmp/*.txt
+make clean-tmp
 ```
 
 ---

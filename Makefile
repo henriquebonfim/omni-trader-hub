@@ -1,38 +1,24 @@
+# Root Makefile — thin dispatcher
+# All stack commands defined in .agent/make/stack.make
+# All agent orchestration in .agent/make/agents.make
 
-.PHONY: help test docker-build docker-ps
+.PHONY: help docker-ps
 
 help:
-	@echo "Available commands:"
-	@$(MAKE) -f .agent/make/agents.make agent-help
+	@echo "=== Project Commands ==="
+	@$(MAKE) --no-print-directory -f .agent/make/stack.make stack-info
 	@echo ""
-	@$(MAKE) -f .agent/make/jules.make j-help
+	@echo "=== Agent Commands ==="
+	@$(MAKE) --no-print-directory -f .agent/make/agents.make agent-help
 	@echo ""
-	@$(MAKE) -f .agent/make/gh.make gh-help
+	@$(MAKE) --no-print-directory -f .agent/make/jules.make j-help
 	@echo ""
-	@echo "Infrastructure commands:"
-	@echo "  test                Run project tests (pytest or bun test)"
-	@echo "  docker-build        Build docker containers"
-	@echo "  docker-ps           Show docker container status"
+	@$(MAKE) --no-print-directory -f .agent/make/gh.make gh-help
 
+include .agent/make/stack.make
 include .agent/make/agents.make
 include .agent/make/jules.make
 include .agent/make/gh.make
-
-test:
-	@if [ -f pytest.ini ] || [ -f pyproject.toml ]; then \
-		pytest -q $(ARGS); \
-	elif [ -f package.json ]; then \
-		bun test $(ARGS); \
-	fi
-
-docker-build:
-	@if [ -n "$(COMPOSE_FILE)" ]; then \
-		docker compose -f $(COMPOSE_FILE) build; \
-	elif [ -f docker-compose.yml ]; then \
-		docker compose build; \
-	elif [ -f Dockerfile ]; then \
-		docker build -t app-check .; \
-	fi
 
 docker-ps:
 	docker compose ps

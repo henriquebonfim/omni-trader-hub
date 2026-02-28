@@ -10,7 +10,7 @@ import sys
 from pathlib import Path
 
 BASE_DIR = Path(".agent/skills/issue-task-orchestrator")
-TMP_DIR = BASE_DIR / "tmp"
+TMP_DIR = Path(".agent/tmp")
 MATRIX_FILE = TMP_DIR / "issue-matrix.json"
 
 

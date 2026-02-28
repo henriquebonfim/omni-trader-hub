@@ -16,9 +16,9 @@ Implements all actionable review comments on a PR, validates the result, and pos
 gh --version
 git --version
 
-mkdir -p .agent/skills/pr-code-orchestrator/tmp
-grep -qxF '.agent/skills/pr-code-orchestrator/tmp/' .gitignore \
-  || echo '.agent/skills/pr-code-orchestrator/tmp/' >> .gitignore
+mkdir -p .agent/tmp
+grep -qxF '.agent/tmp/' .gitignore \
+  || echo '.agent/tmp/' >> .gitignore
 ```
 
 ---
@@ -58,7 +58,7 @@ If baseline is already failing → mark all comments `UNSOLVED` with `"Baseline 
 # Fetch PR metadata
 gh pr view <PR_NUMBER> \
   --json number,title,headRefName,baseRefName,author,additions,deletions \
-  > .agent/skills/pr-code-orchestrator/tmp/pr-meta.json
+  > .agent/tmp/pr-meta.json
 
 # Fetch ALL review comments (inline + general)
 gh api \
@@ -72,17 +72,17 @@ gh api \
     author: .user.login,
     resolved: (.resolved // false)
   }]' \
-  > .agent/skills/pr-code-orchestrator/tmp/review-comments.json
+  > .agent/tmp/review-comments.json
 
 # Fetch review-level (non-inline) comments
 gh api \
   "repos/{owner}/{repo}/pulls/<PR_NUMBER>/reviews" \
   --jq '[.[] | {id:.id, state:.state, body:.body, author:.user.login}]' \
-  >> .agent/skills/pr-code-orchestrator/tmp/review-comments.json
+  >> .agent/tmp/review-comments.json
 
 # Get changed files only
 gh pr diff <PR_NUMBER> --name-only \
-  > .agent/skills/pr-code-orchestrator/tmp/changed-files.txt
+  > .agent/tmp/changed-files.txt
 ```
 
 ---
@@ -282,8 +282,7 @@ Verify:
 ## Phase 8 — Cleanup
 
 ```bash
-rm -f .agent/skills/pr-code-orchestrator/tmp/*.json
-rm -f .agent/skills/pr-code-orchestrator/tmp/*.txt
+make clean-tmp
 ```
 
 ---

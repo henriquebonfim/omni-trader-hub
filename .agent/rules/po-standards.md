@@ -41,37 +41,28 @@ Override mechanism: apply GitHub labels `triage:tasks`, `triage:todo`, or `triag
 
 ---
 
-## Docker Health Requirements
+## Docker Health
 
-Before any PO review is considered complete, document Docker status:
+Before any PO review:
 
 ```bash
-# Build check (not start — just validate)
-docker compose build 2>&1 | tail -20
-
-# If build fails → TASKS.md immediately, block engineering pipeline until fixed
+make build 2>&1 | tail -20
 ```
 
-Docker failures are TASKS-level blockers. Engineers cannot work without a functioning local environment.
+Docker failures are TASKS-level blockers.
 
 ---
 
-## Visual Review Requirements
+## Visual Review
 
-Every PO review must capture the product state visually:
+Use browser-agent for live review. Minimum routes:
+- `/` — Landing
+- Auth entry point
+- Main feature route
+- Dashboard
+- Any previously broken route
 
-- Use Antigravity integrated browser when available (preferred — real browser, JS rendered)
-- Fall back to Playwright headless if no browser tool in session
-- Fall back to static analysis if server not running (note `browser_available: false`)
-
-Minimum routes to review:
-- `/` — Home/landing
-- `/login` or `/signin` — Auth entry point
-- Main feature route (from README)
-- `/dashboard` or main app route
-- Any route flagged broken in previous review
-
-Visual findings that show broken states → create items in TASKS.md (core routes) or TODO.md (secondary routes).
+Broken core routes → TASKS.md. Secondary issues → TODO.md.
 
 ---
 

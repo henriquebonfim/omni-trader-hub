@@ -13,9 +13,9 @@ Read-only code review with runtime validation. No code changes.
 ### 1 — Setup
 
 ```bash
-mkdir -p .agent/skills/pr-review-orchestrator/tmp
-grep -qxF '.agent/skills/pr-review-orchestrator/tmp/' .gitignore \
-  || echo '.agent/skills/pr-review-orchestrator/tmp/' >> .gitignore
+mkdir -p .agent/tmp
+grep -qxF '.agent/tmp/' .gitignore \
+  || echo '.agent/tmp/' >> .gitignore
 ```
 
 ### 2 — Load Skill
@@ -56,7 +56,7 @@ git log --oneline -3  # Must be unchanged from checkout
 ### 6 — Cleanup
 
 ```bash
-rm -f .agent/skills/pr-review-orchestrator/tmp/*
+make clean-tmp
 ```
 
 ---

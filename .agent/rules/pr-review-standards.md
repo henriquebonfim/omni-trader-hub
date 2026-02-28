@@ -58,7 +58,7 @@ If failure: capture the failing file/module, report as HIGH severity review comm
 
 ## Temporary Artifacts
 
-Location: `.agent/skills/pr-review-orchestrator/tmp/`
+Location: `.agent/tmp/`
 
 Allowed files:
 - `pr-meta.json`

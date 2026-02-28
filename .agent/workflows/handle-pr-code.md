@@ -13,9 +13,9 @@ Implement all actionable review comments, validate CI, post structured replies.
 ### 1 — Setup
 
 ```bash
-mkdir -p .agent/skills/pr-code-orchestrator/tmp
-grep -qxF '.agent/skills/pr-code-orchestrator/tmp/' .gitignore \
-  || echo '.agent/skills/pr-code-orchestrator/tmp/' >> .gitignore
+mkdir -p .agent/tmp
+grep -qxF '.agent/tmp/' .gitignore \
+  || echo '.agent/tmp/' >> .gitignore
 ```
 
 ### 2 — Load Skill
@@ -42,14 +42,14 @@ BRANCH=$(git branch --show-current)
 
 ```bash
 gh pr view <PR_NUMBER> --json number,title,headRefName,baseRefName \
-  > .agent/skills/pr-code-orchestrator/tmp/pr-meta.json
+  > .agent/tmp/pr-meta.json
 
 gh api "repos/{owner}/{repo}/pulls/<PR_NUMBER>/comments" \
   --jq '[.[] | {id:.id, url:.html_url, path:.path, line:(.line // .original_line), body:.body}]' \
-  > .agent/skills/pr-code-orchestrator/tmp/review-comments.json
+  > .agent/tmp/review-comments.json
 
 gh pr diff <PR_NUMBER> --name-only \
-  > .agent/skills/pr-code-orchestrator/tmp/changed-files.txt
+  > .agent/tmp/changed-files.txt
 ```
 
 ### 5 — Build & Execute Matrix
@@ -83,7 +83,7 @@ git status                            # Clean tree
 ### 9 — Cleanup
 
 ```bash
-rm -f .agent/skills/pr-code-orchestrator/tmp/*
+make clean-tmp
 ```
 
 ---

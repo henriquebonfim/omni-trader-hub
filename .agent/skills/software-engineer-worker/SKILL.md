@@ -1,21 +1,11 @@
 ---
-name: software-engineer-orchestrator
-description: Full engineering task orchestrator — receives a task, validates scope, auto-detects stack, implements with discipline, validates build/tests/lint, updates CHANGELOG, and commits clean. Use for ANY code task: "implement X", "fix bug Y", "add tests for Z", "refactor module W", "add a field", "fix this error", or any request that results in committed code. Wraps software-engineer-worker with pre-flight branch safety, stack detection, and structured completion reporting. Also triggers for Jules-assigned tasks, batch issue implementations, and PR review followups that require code changes.
+name: software-engineer-worker
+description: Engineering task executor. Branch safety → baseline → implement → validate → commit. Uses strict Makefile targets — never guesses package managers. Mandatory sequential-thinking MCP for design decisions.
 ---
 
-# Software Engineer Orchestrator
+# Software Engineer Worker
 
-Receives a scoped task, validates the environment, executes via `software-engineer-worker`, and delivers a clean validated commit. The enforcement layer that ensures every code change follows standards regardless of where the task came from.
-
----
-
-## Setup Check
-
-```bash
-mkdir -p .agent/skills/software-engineer-orchestrator/tmp
-grep -qxF '.agent/skills/software-engineer-orchestrator/tmp/' .gitignore \
-  || echo '.agent/skills/software-engineer-orchestrator/tmp/' >> .gitignore
-```
+Receives a scoped task. Validates environment. Implements. Validates. Commits clean.
 
 ---
 
@@ -23,203 +13,137 @@ grep -qxF '.agent/skills/software-engineer-orchestrator/tmp/' .gitignore \
 
 ```bash
 BRANCH=$(git branch --show-current)
-echo "Current branch: $BRANCH"
-
 PROTECTED=("main" "master" "production" "staging")
 for p in "${PROTECTED[@]}"; do
-  if [[ "$BRANCH" == "$p" ]]; then
-    echo "ERROR: Cannot commit directly to protected branch '$p'."
-    echo "Create a feature branch first:"
-    echo "  git checkout -b feature/<task-slug>"
-    exit 1
-  fi
+  [[ "$BRANCH" == "$p" ]] && echo "ABORT: protected branch '$p'" && exit 1
 done
-
-echo "✅ Branch safe: $BRANCH"
+echo "✅ Branch: $BRANCH"
 ```
-
-If called from `/handle-issues` batch flow, the branch is already created. If called directly, confirm with user before creating a branch.
 
 ---
 
-## Phase 1 — Stack Auto-Detection
+## Phase 1 — Thinking Protocol (sequential-thinking MCP)
 
-Detect and store the project's toolchain before touching any code:
+**MANDATORY**: Before writing any code, use the `sequential-thinking` MCP tool:
 
-```bash
-# Runtime & package manager
-[ -f package.json ]   && PM="npm"  && RUNTIME="node"
-[ -f pnpm-lock.yaml ] && PM="pnpm"
-[ -f yarn.lock ]      && PM="yarn"
-[ -f pyproject.toml ] && RUNTIME="python"
-[ -f Cargo.toml ]     && RUNTIME="rust"
-[ -f go.mod ]         && RUNTIME="go"
-
-# Test framework
-[ -f jest.config.js ]    || [ -f jest.config.ts ]   && TEST_CMD="npx jest"
-[ -f vitest.config.ts ]  || [ -f vitest.config.js ]  && TEST_CMD="npx vitest run"
-[ -f pytest.ini ]        || grep -q "pytest" pyproject.toml 2>/dev/null && TEST_CMD="pytest"
-[ -f Cargo.toml ]        && TEST_CMD="cargo test"
-[ -f go.mod ]            && TEST_CMD="go test ./..."
-
-# Linter
-[ -f .eslintrc* ]    || [ -f eslint.config* ] && LINT_CMD="npx eslint ."
-[ -f biome.json ]                              && LINT_CMD="npx biome check ."
-grep -q "ruff" pyproject.toml 2>/dev/null     && LINT_CMD="ruff check ."
-
-# Type checker
-[ -f tsconfig.json ]                            && TYPE_CMD="npx tsc --noEmit"
-grep -q "mypy"   pyproject.toml 2>/dev/null    && TYPE_CMD="mypy ."
-grep -q "pyright" pyproject.toml 2>/dev/null   && TYPE_CMD="pyright"
-
-# Build command
-[ -f package.json ] && grep -q '"build"' package.json && BUILD_CMD="npm run build"
-[ -f Cargo.toml ]   && BUILD_CMD="cargo build"
-[ -f go.mod ]       && BUILD_CMD="go build ./..."
-
-echo "Runtime:  ${RUNTIME:-unknown}"
-echo "Test:     ${TEST_CMD:-not detected}"
-echo "Lint:     ${LINT_CMD:-not detected}"
-echo "Typecheck:${TYPE_CMD:-not detected}"
-echo "Build:    ${BUILD_CMD:-not detected}"
+```
+Thought 1: Restate the task in one sentence
+Thought 2: Trace the call graph — which files/functions are affected?
+Thought 3: Classify — feat | fix | refactor | test | docs
+Thought 4: Risk assessment — what could break?
+Thought 5: Test strategy — what tests to add/update?
+Thought 6: Plan — ordered list of changes
 ```
 
-Store as `tmp/stack-context.json`:
-
-```json
-{
-  "runtime": "node|python|rust|go",
-  "package_manager": "npm|pnpm|yarn|pip|cargo",
-  "test_cmd": "...",
-  "lint_cmd": "...",
-  "typecheck_cmd": "...",
-  "build_cmd": "..."
-}
-```
+Set `totalThoughts: 6`, adjust up if complexity warrants.
 
 ---
 
 ## Phase 2 — Baseline Validation
 
-Run the full validation suite BEFORE any changes. This establishes what was already broken (not your fault) vs. what you introduced:
+Run BEFORE any changes. Establishes what was already broken vs. what you introduce:
 
 ```bash
-# Record baseline state
-echo "Running baseline validation..."
-
-BUILD_BEFORE="PASS"
-TEST_BEFORE="PASS"
-LINT_BEFORE="PASS"
-
-$BUILD_CMD 2>&1 || BUILD_BEFORE="FAIL"
-$TEST_CMD  2>&1 || TEST_BEFORE="FAIL"
-$LINT_CMD  2>&1 || LINT_BEFORE="FAIL"
+make test  2>&1 | tail -20;  echo "Test exit: $?"
+make lint  2>&1 | tail -10;  echo "Lint exit: $?"
+make build 2>&1 | tail -10;  echo "Build exit: $?"
 ```
 
-Store in `tmp/baseline.json`:
+> **STRICT**: Use `make` targets only. Never run raw `pytest`, `npm`, `bun`, `pnpm`, or `npx` commands.
 
-```json
-{
-  "build": "PASS|FAIL",
-  "tests": "PASS|FAIL",
-  "lint":  "PASS|FAIL|N/A"
-}
-```
-
-If baseline tests are failing — **do not hide pre-existing failures**. Note them in the completion report but do not fix them unless the task explicitly asks for it.
+If baseline is already failing — note it. Do NOT fix unless the task explicitly asks.
 
 ---
 
-## Phase 3 — Load Skill & Execute
-
-```
-software-engineer-worker
-```
-
-Run all 8 phases from the skill:
-
-| Phase | Action |
-|-------|--------|
-| 1 — Thinking Protocol | Restate, trace call graph, classify, assess risk |
-| 2 — Discovery | Read source, trace dependencies, check git log |
-| 3 — Design | Plan: files, signatures, test strategy, compat |
-| 4 — Veto Checkpoint | Architecture, abstraction, scope, security |
-| 5 — Implementation | Strict types, small functions, no duplication |
-| 6 — Documentation | CHANGELOG.md always; README/docstrings if applicable |
-| 7 — Self-Correction | lint → typecheck → tests → build; classify + heal failures |
-| 8 — Final Validation | `git diff --stat`, `git status` |
-
----
-
-## Phase 4 — Post-Implementation Validation
-
-After the skill completes, run the full suite one final time from the orchestrator level:
+## Phase 3 — Discovery
 
 ```bash
-echo "Running post-implementation validation..."
-
-$LINT_CMD     && echo "✅ Lint" || echo "❌ Lint FAIL"
-$TYPE_CMD     && echo "✅ Typecheck" || echo "❌ Typecheck FAIL"
-$TEST_CMD     && echo "✅ Tests" || echo "❌ Tests FAIL"
-$BUILD_CMD    && echo "✅ Build" || echo "❌ Build FAIL"
-```
-
-Compare against baseline. Any NEW failures introduced by this change are blocking — fix before proceeding.
-
----
-
-## Phase 5 — Diff Review
-
-```bash
-# Confirm the diff is scoped to the task
-git diff --stat HEAD
-
-# Confirm no unrelated files changed
-git status
-
-# Confirm no temp files staged
-git ls-files --others --exclude-standard | head -10
-```
-
-**Blockers:**
-- Unrelated files in diff → unstage them
-- Temp files staged → remove from staging
-- Empty diff → nothing was committed, report failure
-
----
-
-## Phase 6 — Commit Audit
-
-```bash
-git log --oneline -5
-```
-
-Every commit in this change must follow the convention:
-
-```
-<type>(<module>): <imperative description>
-
-<body if non-obvious>
-
-Refs: #<issue> | <pr-comment-url>
-```
-
-Valid types: `feat` `fix` `refactor` `perf` `test` `docs` `chore`
-
-If commits are missing the `Refs:` line and the task has an issue/PR comment reference, amend:
-
-```bash
-git commit --amend --no-edit
+# Read source files related to the task
+# Trace dependencies and imports
+# Check git log for recent changes to affected files
+git log --oneline -10 -- <affected_files>
 ```
 
 ---
 
-## Phase 7 — Cleanup
+## Phase 4 — Design
+
+Use `sequential-thinking` MCP if the change touches >2 files or has architectural implications:
+
+- Files to create/modify (exact paths)
+- Function signatures
+- Test cases to add
+- Backward compatibility check
+
+---
+
+## Phase 5 — Veto Checkpoint
+
+Before writing code, verify:
+
+- [ ] Respects layer boundaries (no controller logic in services, etc.)
+- [ ] No premature abstraction
+- [ ] Scope matches task — no drive-by refactors
+- [ ] No security regressions
+
+If any fail → PAUSE. Ask user or create issue.
+
+---
+
+## Phase 6 — Implementation
+
+Rules:
+- Strict types everywhere (no `any`, no implicit)
+- Functions < 50 lines, single purpose
+- No duplicated logic
+- All public functions documented
+- No commented-out code
+
+---
+
+## Phase 7 — Documentation
+
+- `CHANGELOG.md` — always update under `[Unreleased]`
+- README / docstrings — update if public API changed
+
+---
+
+## Phase 8 — Self-Correction & Verification
+
+Run full validation after implementation:
 
 ```bash
-rm -f .agent/skills/software-engineer-orchestrator/tmp/*.json
-git status  # Must show clean
+make lint      && echo "✅ Lint"      || echo "❌ Lint FAIL"
+make typecheck && echo "✅ Typecheck" || echo "❌ Typecheck FAIL"
+make test      && echo "✅ Test"      || echo "❌ Test FAIL"
+make build     && echo "✅ Build"     || echo "❌ Build FAIL"
 ```
+
+> **STRICT**: Use `make` targets only. Compare against Phase 2 baseline. Any NEW failures are blocking — fix before proceeding.
+
+### Self-Healing Loop (max 3 iterations)
+
+If a check fails:
+1. Classify: syntax | type | logic | dependency | environment
+2. Fix the root cause (not symptoms)
+3. Re-run the failing check
+4. After 3 failures on the same issue → BLOCK and report to user
+
+---
+
+## Phase 9 — Final Validation
+
+```bash
+git diff --stat HEAD    # Scoped diff only
+git status              # Clean tree
+git log --oneline -3    # Clean history
+```
+
+---
+
+## Phase 10 — O11y Check
+
+Record any technical hurdles encountered during this task in `.agent/logs/FRICTION.md`.
 
 ---
 
@@ -227,17 +151,12 @@ git status  # Must show clean
 
 ```
 ✅ Task complete
-
-Branch:        <branch-name>
-Type:          feat|fix|refactor|...
-Files changed: N
-Tests:         N added/updated
-CHANGELOG:     Updated under [Unreleased]
-O11y:          Record any technical hurdles in .agent/logs/FRICTION.md
-Baseline delta: build PASS→PASS | tests PASS→PASS | lint PASS→PASS
-
-Commits:
-  <sha>  <type(module): description>
+Branch:     <branch>
+Type:       feat|fix|refactor
+Files:      N changed
+Tests:      N added/updated
+CHANGELOG:  Updated
+Baseline Δ: test PASS→PASS | lint PASS→PASS | build PASS→PASS
 ```
 
 ---
@@ -246,9 +165,8 @@ Commits:
 
 | Condition | Action |
 |-----------|--------|
-| On protected branch | ABORT — create feature branch first |
-| Requirements ambiguous after reading source | PAUSE — ask user for clarification |
-| Architectural redesign required beyond scope | BLOCK — report, create issue, do not implement |
-| 3+ self-healing iterations on same failure | BLOCK — report exact error + context to user |
-| Test suite introduces regressions after 3 fix attempts | BLOCK — do not skip/comment tests to hide failures |
-| Environment or tool failure blocks progress | LOG in FRICTION.md — report to user |
+| Protected branch | ABORT |
+| Requirements ambiguous | PAUSE — ask user |
+| Architectural redesign beyond scope | BLOCK — create issue |
+| 3+ self-healing iterations same failure | BLOCK — report to user |
+| Environment failure | LOG in FRICTION.md — report |

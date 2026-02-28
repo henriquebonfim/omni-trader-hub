@@ -4,60 +4,40 @@ description: /handle-code <short_description>
 
 # Handle Code
 
-Direct implementation via software-engineer-worker. Use for scoped tasks.
+Direct implementation via software-engineer-worker.
 
 ---
 
-## Execution Sequence
+## Execution
 
-### 1 — Load Skill
+### 1 — Think First
 
-```
-software-engineer-worker
-```
+> **sequential-thinking** (MANDATORY): Restate task → assess scope → trace affected files → plan changes → evaluate risk.
 
 ### 2 — Branch Safety
 
 ```bash
 BRANCH=$(git branch --show-current)
-[[ "$BRANCH" == "main" || "$BRANCH" == "master" || "$BRANCH" == "production" ]] \
-  && echo "WARNING: On protected branch — ensure this is intentional"
+[[ "$BRANCH" == "main" || "$BRANCH" == "master" ]] \
+  && echo "WARNING: On protected branch"
 ```
 
-### 3 — Execute
+### 3 — Load Skill & Execute
 
-Run all phases from the skill:
+```
+software-engineer-worker (all phases)
+```
 
-1. Stack Detection (Phase 0)
-2. Thinking Protocol (Phase 1)
-3. Discovery (Phase 2)
-4. Design (Phase 3)
-5. Veto Checkpoint (Phase 4)
-6. Implementation (Phase 5)
-7. Documentation Update — including CHANGELOG (Phase 6)
-8. Self-Correction & Verification (Phase 7) ← MANDATORY
-9. Final Validation (Phase 8)
-10. Self-healing loop if needed
-
-### 4 — Post-Implementation Check
+### 4 — Verify
 
 ```bash
-git diff --stat HEAD    # Confirm minimal scoped diff
-git status             # Confirm clean
-git log --oneline -3   # Confirm clean history
+git diff --stat HEAD
+git status
+git log --oneline -3
 ```
 
 ---
 
-## Abort Conditions
+## Abort: Architectural redesign required · Requirements unclear · Test suite unstable
 
-- Architectural redesign required beyond scope
-- Requirements unclear after review
-- Test suite cannot be stabilized safely
-
-## Success Condition
-
-- Feature or fix implemented
-- Build green, tests passing, lint clean
-- CHANGELOG.md updated
-- No unrelated changes in diff
+## Success: Feature/fix implemented · `make test` green · CHANGELOG updated · Clean diff

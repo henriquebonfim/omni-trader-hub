@@ -131,7 +131,7 @@ Release body requirements:
 
 | File | Tool/method |
 |------|-------------|
-| `package.json` | `bun x version-bump patch|minor|major` OR direct JSON edit |
+| `package.json` | Direct JSON edit (update `"version"` field) |
 | `pyproject.toml` | `sed` regex on `^version = "..."` |
 | `Cargo.toml` | `sed` regex on first `^version = "..."` |
 | `VERSION` | Direct file write |
@@ -155,7 +155,7 @@ This is the only change in the release commit. No code changes mixed in.
 
 ## Temporary Artifacts
 
-Location: `.agent/skills/release-manager-orchestrator/tmp/`
+Location: `.agent/tmp/`
 
 Files created during release:
 - `preflight.json` — pre-flight check results

@@ -12,9 +12,9 @@ Deterministic, read-only code review. Validates runtime, analyzes every changed 
 ## Setup Check
 
 ```bash
-mkdir -p .agent/skills/pr-review-orchestrator/tmp
-grep -qxF '.agent/skills/pr-review-orchestrator/tmp/' .gitignore \
-  || echo '.agent/skills/pr-review-orchestrator/tmp/' >> .gitignore
+mkdir -p .agent/tmp
+grep -qxF '.agent/tmp/' .gitignore \
+  || echo '.agent/tmp/' >> .gitignore
 ```
 
 ---
@@ -46,19 +46,19 @@ Run full validation suite (read-only — detect issues, do NOT fix):
 ```bash
 # PR metadata
 make gh-pr-view ID=<PR_NUMBER> ARGS="--json number,title,body,state,baseRefName,headRefName,mergeable,headRefOid,author,additions,deletions,changedFiles" \
-  > .agent/skills/pr-review-orchestrator/tmp/pr-meta.json
+  > .agent/tmp/pr-meta.json
 
 # Changed files only (analyze these, not the whole repo)
 make gh-pr-diff ID=<PR_NUMBER> ARGS="--name-only" \
-  > .agent/skills/pr-review-orchestrator/tmp/changed-files.txt
+  > .agent/tmp/changed-files.txt
 
 # Full diff for analysis
 make gh-pr-diff ID=<PR_NUMBER> \
-  > .agent/skills/pr-review-orchestrator/tmp/pr-diff.patch
+  > .agent/tmp/pr-diff.patch
 
 # Existing review threads (avoid duplicating resolved comments)
 make gh-api ENDPOINT="repos/{owner}/{repo}/pulls/<PR_NUMBER>/comments" ARGS="--jq '[.[] | {id:.id, path:.path, line:.line, body:.body, resolved:(.resolved // false)}]' " \
-  > .agent/skills/pr-review-orchestrator/tmp/existing-comments.json
+  > .agent/tmp/existing-comments.json
 ```
 
 ---
@@ -139,12 +139,12 @@ CURRENT_USER=$(gh api user --jq .login)
 # If clean → APPROVE
 
 # Build review body
-RUNTIME_SUMMARY=$(cat .agent/skills/pr-review-orchestrator/tmp/runtime-summary.json 2>/dev/null || echo '{}')
+RUNTIME_SUMMARY=$(cat .agent/tmp/runtime-summary.json 2>/dev/null || echo '{}')
 
 gh api \
   "repos/{owner}/{repo}/pulls/<PR_NUMBER>/reviews" \
   --method POST \
-  --input .agent/skills/pr-review-orchestrator/tmp/review-payload.json
+  --input .agent/tmp/review-payload.json
 ```
 
 **Review body template:**
@@ -197,9 +197,7 @@ git status
 git log --oneline -3
 
 # Clean tmp
-rm -f .agent/skills/pr-review-orchestrator/tmp/*.json
-rm -f .agent/skills/pr-review-orchestrator/tmp/*.patch
-rm -f .agent/skills/pr-review-orchestrator/tmp/*.txt
+make clean-tmp
 
 # Final check
 git status  # Must show clean working tree

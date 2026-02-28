@@ -21,6 +21,7 @@ Usage:
 import argparse
 import json
 import re
+import subprocess
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -37,6 +38,16 @@ def load_json(path: str | None, default=None):
         return json.loads(p.read_text())
     except Exception:
         return default
+
+
+def fetch_gh_json(command: list[str]) -> list | dict:
+    """Run a gh CLI command and parse its JSON output."""
+    try:
+        result = subprocess.run(command, capture_output=True, text=True, check=True)
+        return json.loads(result.stdout)
+    except (subprocess.CalledProcessError, json.JSONDecodeError) as e:
+        print(f"Error fetching data with {' '.join(command)}: {e}")
+        return []
 
 
 def now_str() -> str:
@@ -468,10 +479,6 @@ def _format_backlog_item(item: dict) -> list[str]:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="PO triage engine")
-    parser.add_argument("--issues",     required=True)
-    parser.add_argument("--closed",     default=None)
-    parser.add_argument("--prs",        default=None)
-    parser.add_argument("--merged",     default=None)
     parser.add_argument("--docker",     default=None)
     parser.add_argument("--tests",      default=None)
     parser.add_argument("--visual",     default=None)
@@ -482,11 +489,14 @@ def main() -> None:
     output_dir = Path(args.output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    # Load inputs
-    issues       = load_json(args.issues, [])
-    closed       = load_json(args.closed, [])
-    open_prs     = load_json(args.prs, [])
-    merged_prs   = load_json(args.merged, [])
+    print("Fetching live repository data from GitHub...")
+    # Fetch data directly via gh CLI
+    issues     = fetch_gh_json(["gh", "issue", "list", "--state", "open", "--limit", "200", "--json", "number,title,body,labels,assignees,milestone,createdAt,updatedAt"])
+    closed     = fetch_gh_json(["gh", "issue", "list", "--state", "closed", "--limit", "50", "--json", "number,title,closedAt,labels"])
+    open_prs   = fetch_gh_json(["gh", "pr", "list", "--state", "open", "--json", "number,title,headRefName"])
+    merged_prs = fetch_gh_json(["gh", "pr", "list", "--state", "merged", "--limit", "20", "--json", "number,title,mergedAt,body"])
+
+    # Load local health/context inputs
     docker       = load_json(args.docker, {"build_status": "SKIPPED"})
     tests        = load_json(args.tests, {"status": "SKIPPED"})
     visual_raw   = load_json(args.visual, [])

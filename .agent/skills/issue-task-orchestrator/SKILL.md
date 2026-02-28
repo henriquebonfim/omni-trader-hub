@@ -17,9 +17,9 @@ gh --version
 make j-version
 
 # Ensure tmp/ exists and is gitignored
-mkdir -p .agent/skills/issue-task-orchestrator/tmp
-grep -qxF '.agent/skills/issue-task-orchestrator/tmp/' .gitignore \
-  || echo '.agent/skills/issue-task-orchestrator/tmp/' >> .gitignore
+mkdir -p .agent/tmp
+grep -qxF '.agent/tmp/' .gitignore \
+  || echo '.agent/tmp/' >> .gitignore
 ```
 
 ---
@@ -30,7 +30,7 @@ Fetch all open issues with full metadata in one call:
 
 ```bash
 make gh-issue-list ARGS="--state open --limit 100 --json number,title,body,labels,assignees,milestone,comments,createdAt,updatedAt" \
-  > .agent/skills/issue-task-orchestrator/tmp/raw-issues.json
+  > .agent/tmp/raw-issues.json
 ```
 
 Check for issues already in active PRs (avoid duplicate work):
@@ -40,7 +40,7 @@ gh pr list \
   --state open \
   --json number,title,body,headRefName \
   --jq '[.[] | {number,title,body,branch:.headRefName}]' \
-  > .agent/skills/issue-task-orchestrator/tmp/open-prs.json
+  > .agent/tmp/open-prs.json
 ```
 
 Check recent merged work to detect already-resolved issues:
@@ -48,7 +48,7 @@ Check recent merged work to detect already-resolved issues:
 ```bash
 make gh-pr-list ARGS="--state merged --limit 20 --json number,title,body,mergedAt" \
   --jq '[.[] | {number,title,body,mergedAt}]' \
-  > .agent/skills/issue-task-orchestrator/tmp/recent-merged.json
+  > .agent/tmp/recent-merged.json
 ```
 
 ---
@@ -58,7 +58,7 @@ make gh-pr-list ARGS="--state merged --limit 20 --json number,title,body,mergedA
 Analyse each issue and write the matrix to tmp/:
 
 ```bash
-# Schema: .agent/skills/issue-task-orchestrator/tmp/issue-matrix.json
+# Schema: .agent/tmp/issue-matrix.json
 ```
 
 ```json
@@ -289,7 +289,7 @@ EOF
 ## Phase 9 — Cleanup
 
 ```bash
-rm -f .agent/skills/issue-task-orchestrator/tmp/*.json
+make clean-tmp
 git status  # Confirm nothing staged accidentally
 ```
 

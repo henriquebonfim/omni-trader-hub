@@ -1,6 +1,6 @@
 ---
 name: po-lifecycle-orchestrator
-description: Complete Product Owner lifecycle orchestrator. Aggregates GitHub issues, TASKS.md, TODO.md, BACKLOG.md, runs Docker + test suite, visually reviews the product via Antigravity integrated browser or Playwright screenshots, then triages every item into the correct planning file: BACKLOG.md (long-term), TODO.md (next sprint), TASKS.md (immediate priority). Use for "PO review", "triage the backlog", "product review", "what should we work on next", "update the backlog", "run the full product review", "review product health", or any request to organize and prioritize work. Also triggers at the start of any sprint or planning session.
+description: Complete Product Owner lifecycle orchestrator. Aggregates GitHub issues, TASKS.md, TODO.md, BACKLOG.md, runs Docker + test suite via `make build` and `make test`, visually reviews the product via browser-agent live review, then triages every item into the correct planning file: BACKLOG.md (long-term), TODO.md (next sprint), TASKS.md (immediate priority). Use for "PO review", "triage the backlog", "product review", "what should we work on next", "update the backlog", "run the full product review", "review product health", or any request to organize and prioritize work. Also triggers at the start of any sprint or planning session.
 ---
 
 # PO Lifecycle Orchestrator
@@ -17,9 +17,9 @@ git --version
 docker --version || echo "Docker not available — skipping container checks"
 python3 --version
 
-mkdir -p .agent/skills/po-lifecycle-orchestrator/tmp
-grep -qxF '.agent/skills/po-lifecycle-orchestrator/tmp/' .gitignore \
-  || echo '.agent/skills/po-lifecycle-orchestrator/tmp/' >> .gitignore
+mkdir -p .agent/tmp
+grep -qxF '.agent/tmp/' .gitignore \
+  || echo '.agent/tmp/' >> .gitignore
 ```
 
 ---
@@ -40,7 +40,7 @@ Read everything before deciding anything:
 [ -f BACKLOG.md ]   && cat BACKLOG.md
 
 # Package.json / pyproject for product name + version
-[ -f package.json ]    && cat package.json | python3 -c "import sys,json; d=json.load(sys.stdin); print(f\"Product: {d.get('name')} v{d.get('version')}\")"
+[ -f package.json ]    && jq -r '"Product: \(.name) v\(.version)"' package.json
 [ -f pyproject.toml ]  && grep -E "^(name|version)" pyproject.toml | head -2
 
 # Current milestone/sprint context
@@ -67,23 +67,7 @@ Store project summary in `tmp/project-context.json`:
 Gather every item that might become work:
 
 ```bash
-# All open GitHub issues (full metadata)
-make gh-issue-list ARGS="--state open --limit 100 --json number,title,labels,updatedAt,assignees,milestone,createdAt,comments" \
-  > .agent/skills/po-lifecycle-orchestrator/tmp/gh-issues-open.json
-
-# Recently closed (last 30 days — detect already-done items)
-make gh-issue-list ARGS="--state closed --limit 50 --json number,title,labels,closedAt" \
-  > .agent/skills/po-lifecycle-orchestrator/tmp/gh-issues-closed.json
-
-# Open PRs (in-progress work — don't re-assign)
-make gh-pr-list ARGS="--state open --json number,title,headRefName,author,isDraft,reviewDecision" \
-  > .agent/skills/po-lifecycle-orchestrator/tmp/open-prs.json
-
-# Merged PRs (velocity reference)
-make gh-pr-list ARGS="--state merged --limit 20 --json number,title,mergedAt" \
-  > .agent/skills/po-lifecycle-orchestrator/tmp/merged-prs.json
-
-echo "Issues collected: $(cat .agent/skills/po-lifecycle-orchestrator/tmp/gh-issues-open.json | python3 -c 'import sys,json; print(len(json.load(sys.stdin)))')"
+echo "Native Python Github fetching active."
 ```
 
 ---
@@ -93,75 +77,34 @@ echo "Issues collected: $(cat .agent/skills/po-lifecycle-orchestrator/tmp/gh-iss
 ### 2a — Docker
 
 ```bash
-# Detect docker-compose or compose.yml
-COMPOSE_FILE=""
-[ -f docker-compose.yml ]      && COMPOSE_FILE="docker-compose.yml"
-[ -f docker-compose.yaml ]     && COMPOSE_FILE="docker-compose.yaml"
-[ -f compose.yml ]             && COMPOSE_FILE="compose.yml"
-[ -f compose.yaml ]            && COMPOSE_FILE="compose.yaml"
-
-if [ -n "$COMPOSE_FILE" ]; then
-  echo "Found: $COMPOSE_FILE"
-
-  # Attempt to build (don't start — just validate)
-  make docker-build COMPOSE_FILE="$COMPOSE_FILE" 2>&1 | tail -20
-  BUILD_STATUS=$?
-
-  # Check if services are already running
-  docker compose -f "$COMPOSE_FILE" ps 2>/dev/null
-
-  echo "Docker build exit code: $BUILD_STATUS"
-else
-  # Try plain Dockerfile
-  [ -f Dockerfile ] && make docker-build 2>&1 | tail -20
-fi
+make build 2>&1 | tail -20
+BUILD_STATUS=$?
+echo "Docker build exit code: $BUILD_STATUS"
 ```
 
 Store in `tmp/docker-health.json`:
 ```json
 {
-  "compose_file": "docker-compose.yml",
   "build_status": "PASS|FAIL|SKIPPED",
-  "services_running": [],
   "build_errors": []
 }
 ```
 
 ### 2b — Test Suite
 
-Auto-detect and run:
-
 ```bash
-# Detect test command (same logic as software-engineer-orchestrator)
-TEST_CMD=""
-[ -f jest.config.js ]    || [ -f jest.config.ts ]   && TEST_CMD="npx jest --passWithNoTests 2>&1"
-[ -f vitest.config.ts ]                              && TEST_CMD="npx vitest run 2>&1"
-[ -f pytest.ini ]        || [ -f pyproject.toml ] && grep -q pytest pyproject.toml && TEST_CMD="pytest -q 2>&1"
-[ -f Cargo.toml ]                                    && TEST_CMD="cargo test 2>&1"
-[ -f go.mod ]                                        && TEST_CMD="go test ./... 2>&1"
-
-# Also check package.json scripts
-[ -f package.json ] && grep -q '"test"' package.json && TEST_CMD="bun test 2>&1 || npm test 2>&1 || make test ARGS=\"2>&1\""
-
-if [ -n "$TEST_CMD" ]; then
-  echo "Running: $TEST_CMD"
-  eval "$TEST_CMD" | tail -30
-  TEST_EXIT=$?
-  echo "Exit: $TEST_EXIT"
-else
-  echo "No test command detected"
-  TEST_EXIT=-1
-fi
+make test 2>&1 | tail -30
+TEST_EXIT=$?
+echo "Test exit: $TEST_EXIT"
 ```
+
+> **STRICT**: Use `make test` only. Never run raw `pytest`, `npm test`, `bun test`, or `npx` commands.
 
 Store in `tmp/test-health.json`:
 ```json
 {
-  "test_cmd": "...",
   "exit_code": 0,
-  "status": "PASS|FAIL|SKIPPED",
-  "summary": "42 passed, 0 failed",
-  "failing_tests": []
+  "status": "PASS|FAIL|SKIPPED"
 }
 ```
 
@@ -189,16 +132,8 @@ Extract app URL:
 grep -A2 "ports:" "$COMPOSE_FILE" | grep -oE '[0-9]+:[0-9]+' | head -1
 
 # From package.json dev server
-cat package.json | python3 -c "
-import sys, json, re
-d = json.load(sys.stdin)
-scripts = d.get('scripts', {})
-for k,v in scripts.items():
-    m = re.search(r'--port\s+(\d+)|:(\d+)', v)
-    if m:
-        print(f'Port found in scripts.{k}: {m.group(1) or m.group(2)}')
-        break
-" 2>/dev/null
+grep -oE '(--port\s*[:=]?\s*|localhost:)([0-9]{4,5})' package.json 2>/dev/null | grep -oE '[0-9]+' | head -1 | awk '{print "Port found in package.json:", $1}'
+
 
 # From .env files
 grep -E "PORT=|VITE_PORT=|NEXT_PUBLIC_PORT=" .env .env.local .env.development 2>/dev/null | head -3
@@ -216,17 +151,7 @@ For each review session, record findings in `tmp/visual-review.json`:
 ]
 ```
 
-### 3b — Playwright (fallback / CI mode)
-
-```bash
-# Install playwright if needed
-make install-playwright
-
-# Run the review script
-make po-playwright ARGS="--url \"http://localhost:${APP_PORT:-3000}\" --routes \"$(cat .agent/skills/po-lifecycle-orchestrator/tmp/routes.json 2>/dev/null || echo '[]')\" --output-dir .agent/skills/po-lifecycle-orchestrator/tmp/screenshots/"
-```
-
-### 3c — Static Analysis Fallback
+### 3b — Static Analysis Fallback
 
 If no running server is available:
 
@@ -242,7 +167,7 @@ find ./src -name "page.*" -o -name "Page.*" -o -name "*.view.*" -o -name "*View.
 grep -r "ErrorBoundary\|Suspense\|loading\|skeleton" src/ --include="*.tsx" --include="*.jsx" -l 2>/dev/null | wc -l
 ```
 
-Store findings even without screenshots — note `"browser_available": false` in visual review.
+Store findings without live review — note `"browser_available": false` in visual review.
 
 ---
 
@@ -251,15 +176,11 @@ Store findings even without screenshots — note `"browser_available": false` in
 Run the full aggregation and triage script:
 
 ```bash
-make po-triage ARGS="--issues .agent/skills/po-lifecycle-orchestrator/tmp/gh-issues-open.json \
-  --closed .agent/skills/po-lifecycle-orchestrator/tmp/gh-issues-closed.json \
-  --prs .agent/skills/po-lifecycle-orchestrator/tmp/open-prs.json \
-  --merged .agent/skills/po-lifecycle-orchestrator/tmp/merged-prs.json \
-  --docker .agent/skills/po-lifecycle-orchestrator/tmp/docker-health.json \
-  --tests .agent/skills/po-lifecycle-orchestrator/tmp/test-health.json \
-  --visual .agent/skills/po-lifecycle-orchestrator/tmp/visual-review.json \
-  --context .agent/skills/po-lifecycle-orchestrator/tmp/project-context.json \
-  --output-dir .agent/skills/po-lifecycle-orchestrator/tmp/"
+make po-triage ARGS="--docker .agent/tmp/docker-health.json \
+  --tests .agent/tmp/test-health.json \
+  --visual .agent/tmp/visual-review.json \
+  --context .agent/tmp/project-context.json \
+  --output-dir .agent/tmp/"
 ```
 
 ### Triage Decision Rules
@@ -414,7 +335,7 @@ Items requiring further design, external decisions, or lower priority. Reviewed 
 Post a summary comment on every processed issue:
 
 ```bash
-make po-post ARGS="--matrix .agent/skills/po-lifecycle-orchestrator/tmp/triage-matrix.json"
+make po-post ARGS="--matrix .agent/tmp/triage-matrix.json"
 ```
 
 Per-issue comment format:
@@ -473,8 +394,7 @@ Next step:
 ## Phase 8 — Cleanup
 
 ```bash
-rm -f .agent/skills/po-lifecycle-orchestrator/tmp/*.json
-rm -f .agent/skills/po-lifecycle-orchestrator/tmp/screenshots/*.png
+make clean-tmp
 # Keep TASKS.md, TODO.md, BACKLOG.md — these are project artifacts, not tmp
 ```
 

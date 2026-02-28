@@ -754,10 +754,14 @@
   <a href="#handle-pr-code"><span class="dot" style="background:#fbbf24"></span> /handle-pr-code</a>
   <a href="#handle-close-pr"><span class="dot" style="background:#f472b6"></span> /handle-close-pr</a>
   <a href="#handle-release"><span class="dot" style="background:#2dd4bf"></span> /handle-release</a>
+  <a href="#handle-po-review"><span class="dot" style="background:#fb923c"></span> /handle-po-review</a>
+  <a href="#handle-backlog-triage"><span class="dot" style="background:#a78bfa"></span> /handle-backlog-triage</a>
 
-  <div class="sidebar-section">Integrations</div>
+  <div class="sidebar-section">Architecture</div>
+  <a href="#mandates"><span class="dot" style="background:#22c55e"></span> Three Mandates</a>
   <a href="#gh-cli"><span class="dot" style="background:#e2e8f0"></span> gh CLI</a>
-  <a href="#jules-cli"><span class="dot" style="background:#fbbf24"></span> jules CLI</a>
+  <a href="#jules-cli"><span class="dot" style="background:#fbbf24"></span> Jules CLI</a>
+  <a href="#makefile"><span class="dot" style="background:#2dd4bf"></span> Makefile</a>
 
   <div class="sidebar-section">Rules</div>
   <a href="#rules"><span class="dot" style="background:#f87171"></span> Standards</a>
@@ -770,7 +774,7 @@
   <div class="hero">
     <div class="hero-badge">● ANTIGRAVITY IDE · AGENT PIPELINE</div>
     <h1>How the <em>Pipeline</em><br>Actually Works</h1>
-    <p class="hero-sub">A complete walkthrough of every component, data flow, CLI integration, and decision point — from open issue to shipped release.</p>
+    <p class="hero-sub">A complete walkthrough of every component, data flow, CLI integration, and decision point — from open issue to shipped release. Built on three mandates: strict Makefile commands, sequential-thinking MCP, and Docker-first execution.</p>
   </div>
 
   <div class="content">
@@ -780,7 +784,7 @@
     <!-- ═══════════════════════════════════════════════════ -->
     <section id="overview">
       <h2>The Full Pipeline</h2>
-      <p class="section-intro">8 stages. Issues in, shipped releases out. Every stage is automated, validated, and traceable.</p>
+      <p class="section-intro">8 stages. Issues in, shipped releases out. Every stage is automated, validated, and traceable. All commands go through <code style="color:var(--teal);font-family:JetBrains Mono;font-size:12px">make</code> targets — never raw package managers.</p>
 
       <div class="pipeline-track">
 
@@ -827,9 +831,9 @@
             <div class="step-title">Jules Handoff (async tasks)</div>
             <p class="step-desc">Complex or parallel tasks are handed to Jules with an enriched description: problem context, acceptance criteria, constraints, and definition of done. Jules gets the top-ranked task from TASKS.md — not a vague one-liner.</p>
             <div class="step-tags">
-              <span class="tag" style="background:var(--yellow-dim);color:var(--yellow);border:1px solid #d9770630">jules new --repo</span>
-              <span class="tag" style="background:var(--yellow-dim);color:var(--yellow);border:1px solid #d9770630">jules remote list</span>
-              <span class="tag" style="background:var(--yellow-dim);color:var(--yellow);border:1px solid #d9770630">jules teleport</span>
+              <span class="tag" style="background:var(--yellow-dim);color:var(--yellow);border:1px solid #d9770630">make j-dispatch</span>
+              <span class="tag" style="background:var(--yellow-dim);color:var(--yellow);border:1px solid #d9770630">make j-list</span>
+              <span class="tag" style="background:var(--yellow-dim);color:var(--yellow);border:1px solid #d9770630">make j-pull</span>
             </div>
           </div>
         </div>
@@ -887,7 +891,7 @@
       </div>
 
       <div class="callout info">
-        <p>The pipeline is a loop — after Step 8, return to Step 3 (priority scoring) and assign the next task. Velocity data from completed cycles informs future scheduling.</p>
+        <p>The pipeline is a loop — after Step 8, return to Step 3 (priority scoring) and assign the next task. Every phase gate uses the <strong>sequential-thinking MCP</strong> for structured reasoning: Assess → Decide → Act → Verify.</p>
       </div>
     </section>
 
@@ -898,7 +902,7 @@
     <!-- ═══════════════════════════════════════════════════ -->
     <section id="components">
       <h2>All Components</h2>
-      <p class="section-intro">6 skills, 7 workflows, 4 rules, and 5 Python scripts. Here's what each one does and where it lives.</p>
+      <p class="section-intro">7 skills, 9 workflows, 6 rules, 5 Python scripts, and 4 Makefiles. Here's what each one does and where it lives.</p>
 
       <h3>Skills — in <code style="color:var(--teal);font-family:JetBrains Mono;font-size:12px">.agent/skills/</code></h3>
 
@@ -944,7 +948,7 @@
               <div class="card-type">skill</div>
             </div>
           </div>
-          <p>The implementation engine. Auto-detects stack (runtime, test framework, lint, typecheck commands). Enforces architecture discipline, strict typing, test coverage. Always updates CHANGELOG.md. Self-healing loop on failures.</p>
+          <p>The implementation engine. Uses strict <code style="color:var(--teal);font-family:JetBrains Mono;font-size:11px">make</code> targets for all test/lint/build commands — never guesses package managers. Mandates sequential-thinking MCP for design decisions. Self-healing loop (max 3 iterations) on failures.</p>
         </div>
 
         <div class="card">
@@ -1048,6 +1052,16 @@
             <td><span class="mono">/handle-release</span></td>
             <td>release-manager</td>
             <td>Full release: classify commits → version → CHANGELOG → tag → GitHub release</td>
+          </tr>
+          <tr>
+            <td><span class="mono">/handle-po-review</span></td>
+            <td>po-lifecycle-orchestrator</td>
+            <td>Full product health check — Docker, tests, live visual review, triage to planning files</td>
+          </tr>
+          <tr>
+            <td><span class="mono">/handle-backlog-triage</span></td>
+            <td>po-lifecycle-orchestrator</td>
+            <td>Lightweight issue triage — no Docker or visual review, just issues into TASKS/TODO/BACKLOG</td>
           </tr>
         </tbody>
       </table>
@@ -1386,15 +1400,15 @@
         <div class="phase-item">
           <div class="phase-num">0</div>
           <div class="phase-content">
-            <div class="phase-title">Stack Auto-Detection</div>
-            <p class="phase-detail">Detects: runtime (Node/Python/Go/Rust), package manager (npm/pnpm/yarn/pip/cargo), test framework (jest/vitest/pytest/cargo test), linter (eslint/ruff/biome), type checker (tsc/mypy/pyright), CI workflows. Stores as internal commands: test_cmd, lint_cmd, typecheck_cmd, build_cmd.</p>
+            <div class="phase-title">Branch Safety</div>
+            <p class="phase-detail">Validates current branch is NOT protected (main/master/production). Aborts immediately on violation.</p>
           </div>
         </div>
         <div class="phase-item">
           <div class="phase-num">1</div>
           <div class="phase-content">
-            <div class="phase-title">Thinking Protocol</div>
-            <p class="phase-detail">Restates the request, traces the call graph (reads actual source), classifies as feat/fix/refactor/perf/test/docs/chore, identifies risks (breaking changes, concurrency, security boundaries, migrations). No coding until complete.</p>
+            <div class="phase-title">Thinking Protocol (sequential-thinking MCP)</div>
+            <p class="phase-detail"><strong>MANDATORY</strong>: Uses the sequential-thinking MCP tool. Restates the task → traces the call graph → classifies (feat/fix/refactor) → assesses risk → plans test strategy → produces ordered change list. No coding until complete. All validation uses <code style="color:var(--teal);font-family:JetBrains Mono;font-size:11px">make test</code>, <code style="color:var(--teal);font-family:JetBrains Mono;font-size:11px">make lint</code>, <code style="color:var(--teal);font-family:JetBrains Mono;font-size:11px">make build</code> — never raw commands.</p>
           </div>
         </div>
         <div class="phase-item">
@@ -1647,8 +1661,8 @@ Issue: #57
 <span class="c-cmd">python3</span> .agent/skills/release-manager/scripts/generate_release_notes.py \
   <span class="c-flag">--version</span> <span class="c-str">1.4.0</span>
 
-<span class="c-comment"># 3. Bump version file (example: package.json)</span>
-<span class="c-cmd">npm version</span> minor <span class="c-flag">--no-git-tag-version</span>
+<span class="c-comment"># 3. Bump version file (uses stack.make — never raw npm/bun/pip)</span>
+<span class="c-comment"># Edit package.json or pyproject.toml directly</span>
 
 <span class="c-comment"># 4. Insert changelog entry + commit</span>
 <span class="c-cmd">git add</span> CHANGELOG.md package.json
@@ -1662,7 +1676,7 @@ Issue: #57
 <span class="c-comment"># 6. Create GitHub release</span>
 <span class="c-cmd">gh release create</span> v1.4.0 \
   <span class="c-flag">--title</span> <span class="c-str">"v1.4.0"</span> \
-  <span class="c-flag">--notes-file</span> .agent/skills/release-manager/tmp/release-body.md \
+  <span class="c-flag">--notes-file</span> .agent/tmp/release-body.md \
   <span class="c-flag">--latest</span></pre>
       </div>
     </section>
@@ -1804,7 +1818,7 @@ Issue: #57
     <!-- ═══════════════════════════════════════════════════ -->
     <section id="rules">
       <h2>Rules & Standards</h2>
-      <p class="section-intro">4 rule files in .agent/rules/. These are model_decision triggers — they activate automatically when the relevant workflow runs.</p>
+      <p class="section-intro">6 rule files in .agent/rules/. These are model_decision triggers — they activate automatically when the relevant workflow runs.</p>
 
       <div class="card-grid">
         <div class="card">
@@ -1850,10 +1864,75 @@ Issue: #57
           </div>
           <p>Absolute no-modification rule (no code edits, no commits, no branch creation), runtime validation mandatory, review comment pattern (one comment per issue, structured format), risk classification (SAFE/LOW/MEDIUM/HIGH RISK), gh CLI only (gh api for batched review submission).</p>
         </div>
+
+        <div class="card">
+          <div class="card-header">
+            <div class="card-icon" style="background:var(--teal-dim)">📋</div>
+            <div>
+              <div class="card-name">po-standards</div>
+              <div class="card-type">trigger: triage, planning files, visual review</div>
+            </div>
+          </div>
+          <p>Planning file hierarchy (TASKS/TODO/BACKLOG), triage rules with non-negotiable ordering, Docker health via <code style="color:var(--teal);font-family:JetBrains Mono;font-size:11px">make build</code>, visual review via browser-agent (replaces Playwright), sprint planning gates.</p>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <div class="card-icon" style="background:var(--pink-dim)">🚀</div>
+            <div>
+              <div class="card-name">release-standards</div>
+              <div class="card-type">trigger: version bumping, tagging, CHANGELOG</div>
+            </div>
+          </div>
+          <p>Pre-release gate (clean tree + CI green + commits to release), strict SemVer rules, annotated tag convention, CHANGELOG discipline (Keep a Changelog format), GitHub release requirements, version file rules. Never uses npm version — edits files directly.</p>
+        </div>
       </div>
 
       <div class="callout success">
-        <p>Add the 7 lines from <code style="font-family:JetBrains Mono;font-size:12px">_gitignore-additions.txt</code> to your .gitignore once. Every skill's tmp/ directory will be protected from accidental commits for all future runs.</p>
+        <p>Add the lines from <code style="font-family:JetBrains Mono;font-size:12px">_gitignore-additions.txt</code> to your .gitignore once. Every skill's tmp/ directory will be protected from accidental commits for all future runs.</p>
+      </div>
+    </section>
+
+    <hr class="divider">
+
+    <!-- THREE MANDATES -->
+    <section id="mandates">
+      <h2>Three Mandates</h2>
+      <p class="section-intro">The three architectural rules that govern the entire pipeline. No exceptions.</p>
+
+      <div class="card-grid">
+        <div class="card" style="grid-column: span 2">
+          <div class="card-header">
+            <div class="card-icon" style="background:var(--green-dim)">⚙️</div>
+            <div>
+              <div class="card-name">1. Strict Makefile Commands</div>
+              <div class="card-type">stack.make — single source of truth</div>
+            </div>
+          </div>
+          <p>All test/lint/build/typecheck commands go through <code style="color:var(--teal);font-family:JetBrains Mono;font-size:11px">make</code> targets defined in <code style="color:var(--teal);font-family:JetBrains Mono;font-size:11px">.agent/make/stack.make</code>. Agents NEVER guess package managers or run raw npm/pnpm/bun/pytest commands. Edit stack.make once per project, never think about it again.</p>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <div class="card-icon" style="background:var(--purple-dim)">🧠</div>
+            <div>
+              <div class="card-name">2. Sequential-Thinking MCP</div>
+              <div class="card-type">mandatory for multi-step tasks</div>
+            </div>
+          </div>
+          <p>Every multi-step task uses the sequential-thinking MCP tool. Each thought: assess current state → validate prerequisites → plan next action. Jules steps use a ReAct loop: Think → Dispatch → Observe → Pull → Verify.</p>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <div class="card-icon" style="background:var(--blue-dim)">🐳</div>
+            <div>
+              <div class="card-name">3. Docker-First Execution</div>
+              <div class="card-type">containers when available</div>
+            </div>
+          </div>
+          <p>All builds and tests run inside containers when available. <code style="color:var(--teal);font-family:JetBrains Mono;font-size:11px">make build</code> and <code style="color:var(--teal);font-family:JetBrains Mono;font-size:11px">make test</code> route through Docker Compose by default. Visual product reviews use the browser-agent for live inspection.</p>
+        </div>
       </div>
     </section>
 

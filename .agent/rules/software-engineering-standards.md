@@ -77,6 +77,17 @@ All agents, workflows, and skills operate under a mandatory observability mandat
 
 ---
 
+## Pipeline Control (Sequential-Thinking Mandatory)
+
+All multi-step tasks MUST use the `sequential-thinking` MCP tool:
+
+- **Before implementation**: Break the task into numbered thoughts. Assess scope, trace call graph, plan changes.
+- **At phase gates**: Validate prerequisites before transitioning to the next phase.
+- **On failure**: Use a revision thought to reassess approach before retrying.
+- **Never skip**: Even "simple" tasks benefit from structured reasoning. The overhead is trivial; the cost of a wrong approach is not.
+
+---
+
 ## Performance & Scalability
 
 Performance problems in production are the hardest to debug:

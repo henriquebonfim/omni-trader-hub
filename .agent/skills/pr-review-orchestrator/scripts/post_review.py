@@ -11,7 +11,7 @@ import sys
 from pathlib import Path
 
 BASE_DIR = Path(".agent/skills/pr-review-orchestrator")
-TMP_DIR = BASE_DIR / "tmp"
+TMP_DIR = Path(".agent/tmp")
 
 MATRIX_FILE = TMP_DIR / "review-matrix.json"
 RUNTIME_FILE = TMP_DIR / "runtime-summary.json"
