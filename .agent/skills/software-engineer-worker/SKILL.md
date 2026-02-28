@@ -233,6 +233,7 @@ Type:          feat|fix|refactor|...
 Files changed: N
 Tests:         N added/updated
 CHANGELOG:     Updated under [Unreleased]
+O11y:          Record any technical hurdles in .agent/logs/FRICTION.md
 Baseline delta: build PASS→PASS | tests PASS→PASS | lint PASS→PASS
 
 Commits:
@@ -250,3 +251,4 @@ Commits:
 | Architectural redesign required beyond scope | BLOCK — report, create issue, do not implement |
 | 3+ self-healing iterations on same failure | BLOCK — report exact error + context to user |
 | Test suite introduces regressions after 3 fix attempts | BLOCK — do not skip/comment tests to hide failures |
+| Environment or tool failure blocks progress | LOG in FRICTION.md — report to user |

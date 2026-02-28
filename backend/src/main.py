@@ -152,9 +152,12 @@ class OmniTrader:
         await self.exchange.connect()
         await self.database.connect()
 
+        # Restore risk state (Anti-Amnesia)
+        await self.risk.load_state()
+
         # Initialize daily stats
         balance_info = await self.exchange.get_balance()
-        self.risk.initialize_daily_stats(balance_info["total"])
+        await self.risk.initialize_daily_stats(balance_info["total"])
 
         # Send startup notification
         await self.notifier.bot_started(self.config.trading.symbol, paper_mode)
@@ -258,7 +261,7 @@ class OmniTrader:
                 pnl_pct = ((entry_price - exit_price) / entry_price) * 100
 
             # Record in risk manager
-            self.risk.record_trade(pnl)
+            await self.risk.record_trade(pnl)
 
             # Log to database
             await self.database.log_trade_close(
@@ -404,7 +407,7 @@ class OmniTrader:
                     start_of_week = today - timedelta(days=6) # 7 days inclusive
                     weekly_pnl = await self.database.get_weekly_pnl(start_of_week.isoformat())
 
-                    if self.risk.check_weekly_circuit_breaker(weekly_pnl, total_balance):
+                    if await self.risk.check_weekly_circuit_breaker(weekly_pnl, total_balance):
                         logger.critical("weekly_circuit_breaker_active", status="skipping_cycle")
                         await self.notifier.send("🚨 **Weekly Circuit Breaker Triggered**! Trading paused.")
                         return
@@ -459,7 +462,7 @@ class OmniTrader:
                     )
 
             # 3. Update daily stats with current balance
-            self.risk.initialize_daily_stats(total_balance)
+            await self.risk.initialize_daily_stats(total_balance)
 
             # 4. Fetch market data (Multi-Timeframe)
             limit = max(
@@ -866,7 +869,7 @@ class OmniTrader:
                 net_pnl -= open_fee
 
             # Record in risk manager (use Net PnL to reflect actual equity change)
-            self.risk.record_trade(net_pnl)
+            await self.risk.record_trade(net_pnl)
 
             # Log to database
             await self.database.log_trade_close(
