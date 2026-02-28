@@ -1,15 +1,18 @@
-import pytest
-from unittest.mock import AsyncMock, patch
 import json
 import os
 import sys
+from unittest.mock import AsyncMock, patch
+
+import pytest
 
 # Add backend to sys.path to ensure imports work correctly
 sys.path.append(os.path.join(os.path.dirname(__file__), '../'))
 
+from datetime import date
+
 from src.database.redis_store import RedisStore
 from src.risk import RiskManager
-from datetime import date
+
 
 @pytest.mark.asyncio
 async def test_redis_store_connection():

@@ -84,7 +84,7 @@ class PostgresDatabase(BaseDatabase):
             logger.info("starting_database_backup", file=full_path)
             
             # Run pg_dump
-            result = subprocess.run(
+            subprocess.run(
                 cmd, 
                 env=env, 
                 check=True, 

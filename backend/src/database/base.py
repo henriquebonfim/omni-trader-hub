@@ -5,6 +5,7 @@ Abstract base class for database implementations.
 from abc import ABC, abstractmethod
 from typing import Optional
 
+
 class BaseDatabase(ABC):
     """
     Abstract interface for trade and signal storage.
