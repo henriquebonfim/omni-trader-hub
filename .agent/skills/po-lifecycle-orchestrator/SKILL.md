@@ -167,20 +167,20 @@ Store in `tmp/test-health.json`:
 
 ---
 
-## Phase 3 — Product Visual Review
+### 3a — Live Product Review (browser-agent)
 
-Navigate the running product to see what the user actually experiences. Use whichever is available:
-
-### 3a — Antigravity Integrated Browser (preferred)
-
-If Antigravity browser tool is available in the session:
+**LIVE REVIEW IS MANDATORY.** Do not rely on static screenshots.
 
 ```
-1. Navigate to http://localhost:<PORT> (detect from docker-compose ports or package.json scripts)
-2. Take a screenshot of the home/landing page
-3. Navigate to each main route (from README, sitemap, or detected router config)
-4. Take screenshot per route
-5. Look for: broken layouts, error states, 404s, console errors, missing assets
+1. Detect app URL (see logic below).
+2. Invoke 'browser-agent' with the Task: "Perform a live Product Owner health review of the application at <URL>."
+3. Instructions for browser-agent:
+   - Navigate to the landing page and all core routes.
+   - Verify layout integrity and responsive behavior.
+   - Look for broken links, error states, and console logs.
+   - Test core user flows (e.g., login, search, order placement).
+4. Extract findings from the browser-agent's report.
+5. Record findings in 'tmp/visual-review.json'.
 ```
 
 Extract app URL:
@@ -204,14 +204,14 @@ for k,v in scripts.items():
 grep -E "PORT=|VITE_PORT=|NEXT_PUBLIC_PORT=" .env .env.local .env.development 2>/dev/null | head -3
 ```
 
-For each screenshot taken, record findings in `tmp/visual-review.json`:
+For each review session, record findings in `tmp/visual-review.json`:
 ```json
 [
   {
     "route": "/",
-    "screenshot_path": "tmp/screenshots/home.png",
     "status": "OK|BROKEN|MISSING",
-    "issues_found": ["broken nav link", "console error: ..."]
+    "findings": ["broken nav link", "console error: ..."],
+    "performance_notes": "..."
   }
 ]
 ```

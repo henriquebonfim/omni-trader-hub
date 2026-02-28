@@ -41,6 +41,11 @@ Issues → Triage → Score → Branch → Implement → PR → Review → Merge
 ├── logs/                   ← System Observability (O11y)
 │   └── FRICTION.md          ← Global Friction Log (Black Box Recorder)
 │
+├── make/                   ← Centralized Agent Makefiles
+│   ├── agents.make          ← Orchestration scripts (scoring, triage, etc.)
+│   ├── gh.make              ← GitHub CLI targets
+│   └── jules.make           ← Jules CLI targets
+│
 ├── skills/
 │   ├── issue-task-orchestrator/
 │   │   ├── SKILL.md

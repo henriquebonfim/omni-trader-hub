@@ -174,19 +174,9 @@ APP_URL="http://localhost:${APP_PORT:-3000}"
 echo "App URL: $APP_URL"
 ```
 
-**If Antigravity browser is available in this session:**
-
-→ Navigate to `$APP_URL` directly using the browser tool
-→ Take screenshots of each main route
-→ Record findings in `tmp/visual-review.json`
-
-**Otherwise, use Playwright:**
-
-```bash
-mkdir -p .agent/skills/po-lifecycle-orchestrator/tmp/screenshots
-
-make po-playwright ARGS="--url \"$APP_URL\" --output-dir .agent/skills/po-lifecycle-orchestrator/tmp/screenshots/"
-```
+→ Navigate to `$APP_URL` directly using the 'browser-agent' tool.
+→ Perform a live scan of all core routes and record findings.
+→ Record results in `tmp/visual-review.json` (no screenshots).
 
 If server isn't running:
 ```bash
@@ -261,6 +251,5 @@ echo "✅ Ready — run /start-workflow to begin engineering on TASKS.md"
 
 ```bash
 rm -f .agent/skills/po-lifecycle-orchestrator/tmp/*.json
-rm -f .agent/skills/po-lifecycle-orchestrator/tmp/screenshots/*.png
 # TASKS.md, TODO.md, BACKLOG.md stay — they're project artifacts
 ```

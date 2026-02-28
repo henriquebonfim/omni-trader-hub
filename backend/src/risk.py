@@ -10,7 +10,7 @@ Handles:
 """
 
 from dataclasses import dataclass, field, asdict
-from datetime import date, datetime
+from datetime import date
 from typing import Optional
 
 import pandas as pd
@@ -18,7 +18,6 @@ import pandas_ta as ta
 import structlog
 
 from .config import get_config
-from .database.redis_store import RedisStore
 
 logger = structlog.get_logger()
 

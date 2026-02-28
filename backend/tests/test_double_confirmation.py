@@ -1,6 +1,5 @@
 import pytest
 import pandas as pd
-import numpy as np
 from src.strategies.base import Signal, BaseStrategy
 from src.config import Config
 from src.analysis.regime import MarketRegime
