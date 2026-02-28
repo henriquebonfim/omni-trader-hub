@@ -9,14 +9,15 @@ Handles:
 - Trailing Stop Logic
 """
 
-from dataclasses import dataclass, field
-from datetime import date
+from dataclasses import dataclass, field, asdict
+from datetime import date, datetime
 from typing import Optional
 
 import pandas as pd
 import structlog
 
 from .config import get_config
+from .database.redis_store import RedisStore
 
 logger = structlog.get_logger()
 
@@ -45,6 +46,19 @@ class DailyStats:
         if self.trades_count == 0:
             return 0.0
         return (self.wins / self.trades_count) * 100
+
+    def to_dict(self):
+        """Convert to dictionary with date serialized."""
+        data = asdict(self)
+        data['date'] = self.date.isoformat()
+        return data
+
+    @classmethod
+    def from_dict(cls, data):
+        """Create from dictionary."""
+        if isinstance(data.get('date'), str):
+            data['date'] = date.fromisoformat(data['date'])
+        return cls(**data)
 
 
 @dataclass
@@ -95,6 +109,72 @@ class RiskManager:
         self._circuit_breaker_active = False
         self._weekly_circuit_breaker_active = False
 
+        # Persistence
+        from .database.factory import DatabaseFactory
+        self.redis = DatabaseFactory.get_redis_store(config)
+        self._redis_key_prefix = "omnitrader:risk:"
+
+    async def load_state(self):
+        """Restore state from Redis."""
+        logger.info("risk_manager_restoring_state")
+        try:
+            # Restore Daily Stats
+            daily_stats_data = await self.redis.get(f"{self._redis_key_prefix}daily_stats")
+            if daily_stats_data:
+                stats = DailyStats.from_dict(daily_stats_data)
+                # Only restore if it's the same day
+                if stats.date == date.today():
+                    self.daily_stats = stats
+                    logger.info("restored_daily_stats", stats=daily_stats_data)
+                else:
+                    logger.info("skipping_stale_daily_stats", stored_date=str(stats.date))
+
+            # Restore Consecutive Losses
+            losses = await self.redis.get(f"{self._redis_key_prefix}consecutive_losses")
+            if losses is not None:
+                self.consecutive_losses = int(losses)
+                logger.info("restored_consecutive_losses", count=self.consecutive_losses)
+
+            # Restore Circuit Breakers
+            cb_active = await self.redis.get(f"{self._redis_key_prefix}circuit_breaker")
+            if cb_active is not None:
+                self._circuit_breaker_active = bool(cb_active)
+
+            wcb_active = await self.redis.get(f"{self._redis_key_prefix}weekly_circuit_breaker")
+            if wcb_active is not None:
+                self._weekly_circuit_breaker_active = bool(wcb_active)
+
+            logger.info("risk_state_restored")
+
+        except Exception as e:
+            logger.error("risk_state_restore_failed", error=str(e))
+
+    async def save_state(self):
+        """Persist state to Redis."""
+        try:
+            # Save Daily Stats (expire in 24h just in case, though we check date on load)
+            await self.redis.set(
+                f"{self._redis_key_prefix}daily_stats",
+                self.daily_stats.to_dict(),
+                expire=86400
+            )
+
+            # Save other fields
+            await self.redis.set(
+                f"{self._redis_key_prefix}consecutive_losses",
+                self.consecutive_losses
+            )
+            await self.redis.set(
+                f"{self._redis_key_prefix}circuit_breaker",
+                self._circuit_breaker_active
+            )
+            await self.redis.set(
+                f"{self._redis_key_prefix}weekly_circuit_breaker",
+                self._weekly_circuit_breaker_active
+            )
+        except Exception as e:
+            logger.error("risk_state_save_failed", error=str(e))
+
     def update_config(self, config):
         """Update risk parameters from new configuration."""
         self.position_size_pct = config.trading.position_size_pct
@@ -123,10 +203,11 @@ class RiskManager:
             liquidation_buffer_pct=self.liquidation_buffer_pct,
         )
 
-    def initialize_daily_stats(self, current_balance: float):
+    async def initialize_daily_stats(self, current_balance: float):
         """Initialize or reset daily statistics."""
         today = date.today()
 
+        state_changed = False
         if self.daily_stats.date != today:
             # New day - reset stats
             logger.info(
@@ -137,9 +218,14 @@ class RiskManager:
             self.daily_stats = DailyStats(date=today, starting_balance=current_balance)
             self.consecutive_losses = 0  # Reset streak for new day
             self._circuit_breaker_active = False
+            state_changed = True
         elif self.daily_stats.starting_balance == 0:
             # First run of the day
             self.daily_stats.starting_balance = current_balance
+            state_changed = True
+
+        if state_changed:
+            await self.save_state()
 
     def calculate_position_size(self, balance: float, entry_price: float) -> float:
         """
@@ -328,7 +414,7 @@ class RiskManager:
 
         return None
 
-    def record_trade(self, pnl: float):
+    async def record_trade(self, pnl: float):
         """
         Record a completed trade.
 
@@ -356,6 +442,9 @@ class RiskManager:
         # Check circuit breaker
         self._check_circuit_breaker()
 
+        # Save state
+        await self.save_state()
+
     def _check_circuit_breaker(self):
         """Check if circuit breaker should be triggered."""
         if self.daily_stats.pnl_pct <= -self.max_daily_loss_pct:
@@ -375,7 +464,7 @@ class RiskManager:
         """
         return self._circuit_breaker_active or self._weekly_circuit_breaker_active
 
-    def check_weekly_circuit_breaker(self, weekly_pnl: float, current_balance: float) -> bool:
+    async def check_weekly_circuit_breaker(self, weekly_pnl: float, current_balance: float) -> bool:
         """
         Check if weekly loss limit is exceeded.
 
@@ -401,17 +490,30 @@ class RiskManager:
 
         weekly_pnl_pct = (weekly_pnl / start_week_balance) * 100
 
-        if weekly_pnl_pct <= -self.max_weekly_loss_pct:
-            self._weekly_circuit_breaker_active = True
-            logger.warning(
-                "weekly_circuit_breaker_triggered",
-                weekly_pnl=weekly_pnl,
-                weekly_pnl_pct=f"{weekly_pnl_pct:.2f}%",
-                limit=f"-{self.max_weekly_loss_pct}%"
-            )
-            return True
+        state_changed = False
+        result = False
 
-        return False
+        if weekly_pnl_pct <= -self.max_weekly_loss_pct:
+            if not self._weekly_circuit_breaker_active:
+                self._weekly_circuit_breaker_active = True
+                logger.warning(
+                    "weekly_circuit_breaker_triggered",
+                    weekly_pnl=weekly_pnl,
+                    weekly_pnl_pct=f"{weekly_pnl_pct:.2f}%",
+                    limit=f"-{self.max_weekly_loss_pct}%"
+                )
+                state_changed = True
+            result = True
+        else:
+            if self._weekly_circuit_breaker_active:
+                self._weekly_circuit_breaker_active = False
+                state_changed = True
+            result = False
+
+        if state_changed:
+            await self.save_state()
+
+        return result
 
     def check_black_swan(self, ohlcv: pd.DataFrame) -> bool:
         """

@@ -61,7 +61,7 @@ git remote prune origin
 
 ```bash
 # List active sessions
-jules remote list --session
+COLUMNS=200 jules remote list --session | cat
 
 # Pull final state of any sessions related to this PR
 # jules remote pull --session <SESSION_ID>

@@ -63,7 +63,7 @@ gh pr diff <PR_NUMBER> --name-only \
 ### 6 — Post Replies
 
 ```bash
-python3 .agent/skills/pr-code-orchestrator/scripts/post_comment_replies.py <PR_NUMBER>
+make pr-reply PR=<PR_NUMBER>
 ```
 
 ### 7 — CI Check

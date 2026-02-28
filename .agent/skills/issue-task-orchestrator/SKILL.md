@@ -14,7 +14,7 @@ Transforms open GitHub issues into validated, scored, and assigned engineering t
 ```bash
 # Verify tooling
 gh --version
-jules version
+make j-version
 
 # Ensure tmp/ exists and is gitignored
 mkdir -p .agent/skills/issue-task-orchestrator/tmp
@@ -29,10 +29,7 @@ grep -qxF '.agent/skills/issue-task-orchestrator/tmp/' .gitignore \
 Fetch all open issues with full metadata in one call:
 
 ```bash
-gh issue list \
-  --state open \
-  --limit 100 \
-  --json number,title,body,labels,assignees,milestone,comments,createdAt,updatedAt \
+make gh-issue-list ARGS="--state open --limit 100 --json number,title,body,labels,assignees,milestone,comments,createdAt,updatedAt" \
   > .agent/skills/issue-task-orchestrator/tmp/raw-issues.json
 ```
 
@@ -49,10 +46,7 @@ gh pr list \
 Check recent merged work to detect already-resolved issues:
 
 ```bash
-gh pr list \
-  --state merged \
-  --limit 20 \
-  --json number,title,body,mergedAt \
+make gh-pr-list ARGS="--state merged --limit 20 --json number,title,body,mergedAt" \
   --jq '[.[] | {number,title,body,mergedAt}]' \
   > .agent/skills/issue-task-orchestrator/tmp/recent-merged.json
 ```
@@ -134,8 +128,7 @@ For each issue with status `CONFIRMED`:
 
 ```bash
 # View full issue detail including comments
-gh issue view <NUMBER> \
-  --json number,title,body,comments,labels,assignees \
+make gh-issue-view ID=<NUMBER> ARGS="--json number,title,body,comments,labels,assignees" \
   --jq '{number,title,body,labels:[.labels[].name],comments:[.comments[].body]}'
 ```
 
@@ -146,7 +139,7 @@ gh issue view <NUMBER> \
 Use the script for consistent, automated replies:
 
 ```bash
-python3 .agent/skills/issue-task-orchestrator/scripts/post_issue_comments.py
+make issue-post
 ```
 
 Manual format per issue status:
@@ -194,7 +187,7 @@ gh issue comment <NUMBER> --body "**Status: ⏭ INVALID**
 
 **Reason:** <Technical explanation>"
 
-gh issue close <NUMBER> --reason "not planned"
+make gh-issue-close ID=<NUMBER> ARGS="--reason \"not planned\""
 ```
 
 ---
@@ -222,13 +215,11 @@ For issues that benefit from Jules' async execution:
 
 ```bash
 # Read issue details for task description
-ISSUE_BODY=$(gh issue view <NUMBER> \
-  --json number,title,body,labels \
+ISSUE_BODY=$(make gh-issue-view ID=<NUMBER> ARGS="--json number,title,body,labels" \
   --jq '"Issue #\(.number): \(.title)\n\nDescription:\n\(.body)\n\nLabels: \(.labels[].name)"')
 
 # Create Jules session with enriched task description
-jules new --repo $(gh repo view --json nameWithOwner -q .nameWithOwner) \
-  "$(cat <<EOF
+make j-dispatch ARGS="--repo $(gh repo view --json nameWithOwner -q .nameWithOwner)" TASK="$(cat <<EOF
 ## Task: Fix Issue #<NUMBER>
 
 **Closes:** #<NUMBER>
@@ -255,10 +246,10 @@ Track session IDs:
 
 ```bash
 # List active sessions
-jules remote list --session
+make j-list
 
 # Check session status / pull result
-jules remote pull --session <SESSION_ID>
+make j-pull ID=<SESSION_ID>
 ```
 
 ---
@@ -269,16 +260,9 @@ After all confirmed tasks are implemented:
 
 ```bash
 # Collect all closed issue numbers from matrix
-ISSUE_REFS=$(python3 -c "
-import json
-matrix = json.load(open('.agent/skills/issue-task-orchestrator/tmp/issue-matrix.json'))
-confirmed = [f'Closes #{i[\"issue_number\"]}' for i in matrix if i['status'] == 'CONFIRMED']
-print('\n'.join(confirmed))
-")
+ISSUE_REFS=$(make -s issue-refs) # Note: requires adding issue-refs to Makefile for clean output
 
-gh pr create \
-  --title "feat: resolve confirmed issues batch $(date +%Y-%m-%d)" \
-  --body "$(cat <<EOF
+BODY=$(cat <<EOF
 ## Summary
 
 This PR resolves all confirmed issues from the latest triage batch.
@@ -317,5 +301,6 @@ git status  # Confirm nothing staged accidentally
 - [ ] Confirmed issues implemented on feature branch
 - [ ] PR created referencing all `Closes #N`
 - [ ] Protected branches untouched
+- [ ] Technical hurdles logged in .agent/logs/FRICTION.md
 - [ ] `tmp/` cleared
 - [ ] `git status` clean (no temp files staged)

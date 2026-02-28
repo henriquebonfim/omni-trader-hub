@@ -43,6 +43,16 @@ gh pr create \
 
 ---
 
+## Jules Session Integration
+
+When working with Jules remote sessions:
+
+- **Mandatory Pull with Apply**: Always use `jules remote pull --session <ID> --apply` to bring changes into the local workspace.
+- **Verification**: After pulling, verify the changes inside Docker before pushing or creating a PR.
+- **Branch Management**: Always create a local branch *before* applying the Jules session result.
+
+---
+
 ## Tooling: gh CLI Only
 
 All GitHub operations use the gh CLI:

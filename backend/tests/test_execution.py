@@ -17,10 +17,13 @@ def bot():
 
         # Mock dependencies
         with patch("src.main.Exchange"), \
-             patch("src.main.Database"), \
+             patch("src.main.DatabaseFactory") as mock_db_factory, \
              patch("src.main.RiskManager"), \
              patch("src.main.Notifier") as MockNotifier, \
              patch("src.main.get_strategy") as mock_get_strategy:
+
+            # Setup DB mock
+            mock_db_factory.get_database.return_value = AsyncMock()
 
             # Setup strategy mock
             mock_strategy = MagicMock()

@@ -4,135 +4,140 @@ description: /start-workflow
 
 # Start Workflow
 
-Full-cycle orchestration: triage issues → score by priority → assign top task to Jules → review PR → merge → repeat.
+Full-cycle orchestration: PO review → triage → score → implement → PR → review → merge → release.
+
+Always begins with a PO health check to ensure planning files are current before any engineering starts.
+
+---
+
+## Step 0 — PO Health Check
+
+Before engineering, confirm planning files are current:
+
+```bash
+# Are planning files fresh? (< 24h)
+TASKS_AGE=$(( ($(date +%s) - $(stat -c %Y TASKS.md 2>/dev/null || echo 0)) / 3600 ))
+echo "TASKS.md age: ${TASKS_AGE}h"
+
+[ $TASKS_AGE -gt 24 ] \
+  && echo "⚠️  TASKS.md stale — running /handle-po-review first" \
+  || echo "✅ TASKS.md current"
+```
+
+If TASKS.md is stale or doesn't exist:
+```
+→ Run /handle-po-review first
+```
+
+If TASKS.md is current and Docker + tests are passing:
+```
+→ Continue to Step 1
+```
 
 ---
 
 ## Step 1 — Strategic Context Scan
 
-Build project context before touching issues:
-
 ```bash
-# Product context
-[ -f TODO.md ]   && cat TODO.md
+[ -f TODO.md ]   && cat TODO.md | head -40
 [ -f README.md ] && head -80 README.md
 
-# Avoid creating duplicate work
+# Check what's already in-flight
 gh pr list --state open \
   --json number,title,headRefName,author \
   --jq '.[] | "#\(.number) [\(.headRefName)] \(.title)"'
 
-# Understand recent velocity
+# Recent velocity
 gh pr list --state merged --limit 10 \
   --json number,title,mergedAt \
   --jq '.[] | "\(.mergedAt[:10]) #\(.number) \(.title)"'
-
-# Snapshot open issue count by label
-gh issue list --state open --limit 100 \
-  --json number,title,labels \
-  --jq 'group_by(.labels[0].name // "unlabeled") | .[] | {label: .[0].labels[0].name, count: length}'
 ```
-
-Use Sequential Thinking MCP (if available) to reason about:
-- Current product focus and momentum
-- Highest-risk open items
-- Blocking dependencies between issues
 
 ---
 
-## Step 2 — Process Issues
-
-```
-/handle-issues
-```
-
-This classifies all open issues, posts structured replies, implements confirmed tasks, creates a batch PR, and generates `TASKS.md`.
-
----
-
-## Step 3 — Priority Review
-
-After `/handle-issues` completes, review the ranked task list:
+## Step 2 — Issue Processing (if new issues since last triage)
 
 ```bash
-# View generated task priority ranking
-cat TASKS.md
-
-# Cross-reference against open PRs (don't assign work already in flight)
-gh pr list --state open --json number,title,body \
-  --jq '.[] | "PR #\(.number): \(.title)"'
-
-# Check if Jules already has active sessions
-jules remote list --session
+# Quick check: new issues since last triage
+gh issue list --state open --json number,createdAt \
+  --jq '[.[] | select(.createdAt > "'"$(date -d '24 hours ago' --iso-8601=seconds 2>/dev/null || date -v-24H +%Y-%m-%dT%H:%M:%S 2>/dev/null || echo '2000-01-01')"'")] | length'
 ```
 
-Confirm with user which task to assign next, or proceed automatically with #1.
+If new issues detected: `/handle-backlog-triage` (lightweight — just updates planning files)
+
+Otherwise: proceed with current TASKS.md
 
 ---
 
-## Step 4 — Jules Assignment
+## Step 3 — Pick Top Priority Task
 
-Build an enriched task description from TASKS.md and assign:
+Read TASKS.md and identify the top unstarted item:
 
 ```bash
-REPO=$(gh repo view --json nameWithOwner --jq .nameWithOwner)
+cat TASKS.md | head -50
+```
 
-# Read top confirmed task
-TASK_TITLE="<title from TASKS.md>"
-TASK_ISSUE="#<issue number>"
-TASK_CONTEXT="<body from issue>"
+Cross-check:
+- Not already assigned as an open PR
+- Not already in a Jules session (`jules remote list --session`)
+- Engineering prerequisites met (Docker + tests green)
 
-jules new --repo "${REPO}" \
-"## Task: ${TASK_TITLE}
+---
 
-**Closes:** ${TASK_ISSUE}
+## Step 4 — Jules Task Assignment
+
+Build enriched task description from the TASKS.md item and issue body:
+
+```bash
+TASK_BODY=$(cat <<'EOF'
+## Task: <title from TASKS.md>
+
+**Closes:** #<issue_number>
+**Priority:** <Critical|High|Sprint>
+**Source:** TASKS.md — $(date +%Y-%m-%d)
 
 ### Context
-${TASK_CONTEXT}
+<2-3 sentences from issue body>
 
 ### Acceptance Criteria
-- [ ] Root cause addressed (bugs) or feature fully implemented
-- [ ] Unit/integration tests cover the new behavior
-- [ ] All existing tests still pass
+- [ ] <specific testable criterion>
+- [ ] <specific testable criterion>
+- [ ] All existing tests pass
+- [ ] New tests cover changed behavior
 - [ ] CHANGELOG.md updated under [Unreleased]
-- [ ] No unrelated file changes
 
-### Technical Constraints
-- Follow existing patterns in the codebase
-- Keep commits conventional: feat/fix/refactor/test/chore
-- One logical change per commit
+### Technical Notes
+<Architecture constraints, relevant files, patterns to follow>
 
 ### Definition of Done
-- PR created referencing ${TASK_ISSUE}
-- CI green
-- All acceptance criteria checked"
+- [ ] PR created with Closes #N
+- [ ] CI passing
+- [ ] No regressions
+- [ ] Visual review: no new broken routes
+EOF
+)
+
+jules new --repo <owner>/<repo> "$TASK_BODY"
 ```
 
-For parallel workstreams (2nd and 3rd ranked tasks ready simultaneously):
-
+For parallel tasks:
 ```bash
-jules new --repo "${REPO}" --parallel 2 "<task description>"
+jules new --repo <owner>/<repo> --parallel 2 "$TASK_BODY"
 ```
 
 ---
 
-## Step 5 — Monitor Jules
+## Step 5 — Monitor Jules Session
 
 ```bash
-# Check session status
 jules remote list --session
+```
 
-# When Jules completes and creates a PR:
-gh pr list --state open --json number,title,author \
-  --jq '.[] | select(.author.login | startswith("jules")) | "#\(.number) \(.title)"'
+When Jules creates a PR → Step 6
 
-# Pull the session result (without applying)
-jules remote pull --session <SESSION_ID>
-
-# OR: apply the patch to local repo for review
-jules remote pull --session <SESSION_ID> --apply
-# OR: teleport (clone repo + checkout branch + apply)
-jules teleport <SESSION_ID>
+If Jules needs correction:
+```bash
+gh pr comment <N> --body "@jules <specific correction>"
 ```
 
 ---
@@ -140,18 +145,10 @@ jules teleport <SESSION_ID>
 ## Step 6 — Code Review
 
 ```bash
-# AI read-only review
 /handle-pr-review <PR_NUMBER>
 ```
 
-If changes are needed, comment on the PR and mention Jules:
-
-```bash
-gh pr comment <PR_NUMBER> --body "@jules <specific correction requested>"
-```
-
-If direct code fixes are faster:
-
+If changes needed:
 ```bash
 /handle-pr-code <PR_NUMBER>
 ```
@@ -166,60 +163,57 @@ If direct code fixes are faster:
 
 ---
 
-## Step 8 — Release (when milestone is complete)
+## Step 8 — Release (when milestone complete)
 
-Check if enough work has accumulated for a release:
-
+Count unreleased commits:
 ```bash
-# Count unreleased commits since last tag
 LAST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "none")
-git log ${LAST_TAG}..HEAD --oneline --no-merges | wc -l
+[ "$LAST_TAG" != "none" ] \
+  && git log ${LAST_TAG}..HEAD --oneline | wc -l \
+  || echo "No tags yet"
 ```
 
-If significant work is merged, trigger:
-
+If significant (5+ commits or milestone complete):
 ```bash
-# "Prepare a release for everything merged since vX.Y.Z"
-# → activates release-manager skill
+/handle-release
 ```
 
 ---
 
 ## Step 9 — Loop
 
-Return to Step 3. Pick the next ranked task.
-
-**Tracking velocity:**
-
 ```bash
-# Issues closed this cycle
-gh issue list --state closed \
-  --search "closed:>$(date -d '7 days ago' +%Y-%m-%d)" \
-  --json number --jq 'length'
-
-# PRs merged this week
-gh pr list --state merged \
-  --search "merged:>$(date -d '7 days ago' +%Y-%m-%d)" \
-  --json number --jq 'length'
+# Remove completed item from TASKS.md
+# Pick next item
+# Return to Step 4
 ```
 
----
-
-## Available Skills Reference
-
-| Skill | Invoke when... |
-|-------|---------------|
-| `ui-ux-pro-max` | Any frontend/UI work before writing component code |
-| `software-engineer-worker` | Direct implementation (small tasks, no Jules needed) |
-| `release-manager` | After merging a milestone batch, or on release day |
-| `issue-task-orchestrator` | Triaging issues into scored, confirmed tasks |
-| `pr-code-orchestrator` | Implementing PR review feedback |
-| `pr-review-orchestrator` | Read-only code review before merge |
+Update planning files after each completed item:
+- Remove done item from TASKS.md
+- Promote top TODO item to TASKS.md if TASKS is now empty
+- Track velocity: `Avg cycle: Xh per task`
 
 ---
 
 ## Abort Conditions
 
-- Protected branch violation detected → stop, investigate, never force-push
-- CI globally broken → fix before assigning new work  
-- Circular task dependencies → resolve with user before scoring
+- Protected branch violation → STOP, never force-push
+- Test suite broken → Fix before assigning new work
+- Docker broken → Fix before assigning new work
+- TASKS.md empty → Run `/handle-po-review` to get new priorities
+
+---
+
+## Specialized Commands Reference
+
+| Task type | Command |
+|-----------|---------|
+| Full sprint start | `/handle-po-review` |
+| Quick daily triage | `/handle-backlog-triage` |
+| Process open issues | `/handle-issues` |
+| Direct implementation | `/handle-code "<task>"` |
+| Review PR | `/handle-pr-review <N>` |
+| Fix PR feedback | `/handle-pr-code <N>` |
+| Merge PR | `/handle-close-pr <N>` |
+| Ship release | `/handle-release` |
+| Any UI task | load `ui-ux-pro-max` skill first |
