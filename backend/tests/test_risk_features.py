@@ -1,7 +1,7 @@
-import pytest
 from datetime import timedelta
 
 import pandas as pd
+import pytest
 
 from src.risk import RiskManager
 
