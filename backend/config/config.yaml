@@ -8,6 +8,9 @@ notifications:
   discord_webhook: ${DISCORD_WEBHOOK_URL}
   enabled: true
 risk:
+  atr_multiplier_sl: 1.5
+  atr_multiplier_tp: 2.0
+  atr_period: 14
   liquidation_buffer_pct: 0.5
   max_daily_loss_pct: 5.0
   max_positions: 50
@@ -17,9 +20,6 @@ risk:
   trailing_stop_activation_pct: 1.0
   trailing_stop_callback_pct: 0.5
   use_atr_stops: true
-  atr_period: 14
-  atr_multiplier_sl: 1.5
-  atr_multiplier_tp: 2.0
 strategy:
   adx_period: 14
   adx_threshold: 25
