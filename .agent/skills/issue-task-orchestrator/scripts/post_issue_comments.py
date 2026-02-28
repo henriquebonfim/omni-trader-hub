@@ -74,7 +74,13 @@ Closing this issue as it appears to be addressed. If the problem persists, pleas
 
 def post_comment(issue_number: int, body: str) -> None:
     print(f"  → Posting comment to issue #{issue_number}...")
-    run(["gh", "issue", "comment", str(issue_number), "--body", body])
+    body_file = TMP_DIR / f"issue-comment-{issue_number}.md"
+    body_file.write_text(body)
+    try:
+        run(["gh", "issue", "comment", str(issue_number), "--body-file", str(body_file)])
+    finally:
+        if body_file.exists():
+            body_file.unlink()
 
 
 def close_if_needed(issue: dict) -> None:

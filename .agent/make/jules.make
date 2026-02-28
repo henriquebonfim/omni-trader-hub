@@ -9,6 +9,7 @@ PARALLEL ?= 1
 j-help:
 	@echo "Event-Oriented Jules commands:"
 	@echo "  j-dispatch TASK=\"...\" ARGS=\"--repo ...\" PARALLEL=1"
+	@echo "  j-dispatch-file TASK_FILE=\"...\" ARGS=\"--repo ...\" PARALLEL=1"
 	@echo "  j-list                 List all remote sessions"
 	@echo "  j-status ID=<id>       Check status of a specific session"
 	@echo "  j-poll ID=<id>         Poll session until completion"
@@ -35,6 +36,13 @@ j-dispatch:
 	@ID=$$(jules new $(ARGS) --parallel $(PARALLEL) "$(TASK)" | grep -oE '[0-9]{6,}') && \
 	echo "Created session $$ID" && \
 	echo "$(TASK)" > $(JULES_DIR)/sessions/$$ID.task && \
+	touch $(JULES_DIR)/sessions/$$ID.dispatched
+
+j-dispatch-file:
+	@echo "Dispatching task from file: $(TASK_FILE) (parallel=$(PARALLEL))"
+	@ID=$$(jules new $(ARGS) --parallel $(PARALLEL) "$$(cat $(TASK_FILE))" | grep -oE '[0-9]{6,}') && \
+	echo "Created session $$ID" && \
+	cat $(TASK_FILE) > $(JULES_DIR)/sessions/$$ID.task && \
 	touch $(JULES_DIR)/sessions/$$ID.dispatched
 
 j-status:

@@ -174,12 +174,10 @@ def create_github_release(version: str, release_body_path: Path) -> str:
     """Create GitHub release via gh CLI."""
     print(f"\n[6/6] Creating GitHub release...")
 
-    release_body = release_body_path.read_text()
-
     result = run([
         "gh", "release", "create", f"v{version}",
         "--title", f"v{version}",
-        "--notes", release_body,
+        "--notes-file", str(release_body_path),
         "--latest",
     ])
 

@@ -33,14 +33,22 @@ def post_comment(issue_number: int, body: str, dry_run: bool) -> bool:
         print(f"  {body[:120]}...")
         return True
 
-    result = subprocess.run(
-        ["gh", "issue", "comment", str(issue_number), "--body", body],
-        capture_output=True, text=True
-    )
-    if result.returncode != 0:
-        print(f"  ❌ Failed to post to #{issue_number}: {result.stderr.strip()}")
-        return False
-    return True
+    body_file = Path(f".agent/tmp/triage-comment-{issue_number}.md")
+    body_file.parent.mkdir(parents=True, exist_ok=True)
+    body_file.write_text(body)
+
+    try:
+        result = subprocess.run(
+            ["gh", "issue", "comment", str(issue_number), "--body-file", str(body_file)],
+            capture_output=True, text=True
+        )
+        if result.returncode != 0:
+            print(f"  ❌ Failed to post to #{issue_number}: {result.stderr.strip()}")
+            return False
+        return True
+    finally:
+        if body_file.exists():
+            body_file.unlink()
 
 
 def format_comment(item: dict) -> str:

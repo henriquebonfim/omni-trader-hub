@@ -33,10 +33,7 @@ def create_followup_issue(pr_number: str, entry: dict) -> str:
     comment_url = entry.get("comment_url", "unknown")
     classification = entry.get("classification", "OUT_OF_SCOPE")
 
-    result = run([
-        "gh", "issue", "create",
-        "--title", f"Follow-up from PR #{pr_number}: {classification} — {entry.get('path', 'unknown')}:{entry.get('line', '?')}",
-        "--body", f"""## Context
+    body = f"""## Context
 
 This item was raised as a review comment on PR #{pr_number} but is out of scope for that change and requires separate handling.
 
@@ -51,9 +48,17 @@ The requested change exceeds the scope of PR #{pr_number}. Implementing it here 
 ## Next steps
 
 Review this issue and schedule in the appropriate sprint/milestone.
-""",
+"""
+    body_file = TMP_DIR / f"issue-body-{pr_number}.md"
+    body_file.write_text(body)
+
+    result = run([
+        "gh", "issue", "create",
+        "--title", f"Follow-up from PR #{pr_number}: {classification} — {entry.get('path', 'unknown')}:{entry.get('line', '?')}",
+        "--body-file", str(body_file),
         "--label", "follow-up,technical-debt"
     ])
+    body_file.unlink()
     issue_url = result.strip()
     return issue_url.split("/")[-1]  # Extract issue number from URL
 
@@ -101,11 +106,18 @@ This was a clarification question — answered inline. No code change required."
 
 def reply_to_comment(comment_id: str, body: str) -> None:
     """Post a reply to an inline PR review comment."""
+    payload = {"body": body}
+    payload_file = TMP_DIR / f"comment-reply-{comment_id}.json"
+    with open(payload_file, "w") as f:
+        json.dump(payload, f)
+
     run([
         "gh", "api",
         "repos/{owner}/{repo}/pulls/comments/{id}/replies".replace("{id}", str(comment_id)),
-        "-f", f"body={body}"
+        "--method", "POST",
+        "--input", str(payload_file)
     ])
+    payload_file.unlink()
 
 
 def main() -> None:
