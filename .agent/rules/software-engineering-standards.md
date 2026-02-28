@@ -99,6 +99,17 @@ Performance problems in production are the hardest to debug:
 
 ---
 
+## UI/UX Pro Max Mandate (Frontend/UI Only)
+
+For any task involving user interface creation or modification (React, Tailwind, HTML, etc.):
+
+- **Pre-Code Vibe Check**: Before writing any implementation code, you MUST query the Design Intelligence engine to establish the styling baseline.
+- **Run**: `python3 .agent/skills/ui-ux-pro-max/scripts/search.py "<keywords>" --design-system`
+- **Persistence**: If initiating a new feature, use the `--persist` flag to generate/update `.agent/design-system/MASTER.md`. Subsequent frontend tasks must read this file to guarantee styling consistency.
+- **Never Hardcode**: Use established semantic tokens (e.g., `bg-primary`, `text-slate-900`) and standard spacing scales instead of ad-hoc hex codes or arbitrary margins.
+
+---
+
 ## Security Requirements
 
 Security mistakes are often invisible until they're catastrophic:

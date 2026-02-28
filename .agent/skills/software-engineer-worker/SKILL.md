@@ -75,6 +75,13 @@ Use `sequential-thinking` MCP if the change touches >2 files or has architectura
 - Test cases to add
 - Backward compatibility check
 
+**UI/UX Pre-Code Check (Frontend Only)**:
+If the task involves frontend UI, you MUST establish the design baseline before coding:
+```bash
+python3 .agent/skills/ui-ux-pro-max/scripts/search.py "<keywords>" --design-system --persist -p "<ProjectName>"
+```
+Read the generated `.agent/design-system/MASTER.md` to guarantee styling consistency.
+
 ---
 
 ## Phase 5 — Veto Checkpoint
