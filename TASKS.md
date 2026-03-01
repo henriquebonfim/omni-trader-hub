@@ -45,9 +45,9 @@ This list tracks the structural weak points identified during the Production Rea
 ## 🟡 Low Priority (Execution Precision)
 
 ### 5. WebSocket Integration
-- [ ] **CCXT WebSocket Integration**
+- [x] **CCXT WebSocket Integration**
     - **Risk Level**: 🟡 Low to Medium
     - **Issue**: Current implementation relies on REST polling for order status and price updates.
     - **Vulnerability**: Potentially outdated market data and missed partial fill events during high volatility.
     - **Impact**: Inaccurate position sizing and slower execution.
-    - **Mitigation Path**: Implement `watch_ticker`, `watch_ohlcv`, and `watch_orders` using the unified CCXT async WebSocket API (formerly CCXT Pro). Since we already use `ccxt.async_support`, this involves enabling the `pro` features and refactoring the event loop targets.
+    - **Mitigation Path**: ✅ **WsFeed module** (`src/ws_feed.py`) uses `ccxt.pro.binanceusdm` to stream `watch_ticker`, `watch_ohlcv`, and `watch_orders` as background asyncio tasks. OHLCV cache is pre-seeded via REST on first cycle then kept fresh via WS merges. `run_cycle()` prefers WS cache (avoids REST round-trips when warm); real-time price sourced from WS ticker. Order fills tracked via `watch_orders` (live mode). Paper/offline mode skips auth-required streams. 23 new tests. All 107 tests pass.
