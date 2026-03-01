@@ -18,12 +18,16 @@ import uvicorn
 
 from src.strategies import Signal, get_strategy
 
-from .analysis.regime import RegimeClassifier
+from .analysis.regime import MarketRegime, RegimeClassifier
 from .config import get_config, reload_config
 from .database import DatabaseFactory
 from .exchange import Exchange
 from .notifier import Notifier
 from .risk import RiskManager
+from .strategies.base import StrategyResult
+from .workers.dispatch import dispatch
+from .workers.serializers import df_to_json, market_data_to_json
+from .workers.tasks import analyze_regime, analyze_strategy
 
 # Configure structured logging
 structlog.configure(
@@ -92,6 +96,10 @@ class OmniTrader:
         # Initialize to 60 so it runs immediately on first cycle
         self._weekly_check_counter = 60
         self._funding_check_counter = 0
+
+    def _config_dict(self) -> dict:
+        """Serialize current config to a plain dict for Celery worker transport."""
+        return self.config.to_dict()
 
     async def reload_config(self):
         """Reload configuration and update all components."""
@@ -515,11 +523,45 @@ class OmniTrader:
                 await self.stop("Black Swan Event")
                 return
 
-            # 5. Analyze with strategy
-            result = self.strategy.analyze(market_data, current_side, market_trend=market_trend)
+            # 5. Analyze with strategy + regime — dispatched to Celery workers
+            # Both tasks run concurrently; the event loop is free for I/O while
+            # workers crunch Pandas/NumPy indicators in a separate process.
+            strategy_name = getattr(self.config.strategy, "name", "ema_volume")
+            config_dict = self._config_dict()
+            market_data_json = market_data_to_json(market_data)
+            primary_ohlcv_json = df_to_json(primary_ohlcv)
 
-            # 5a. Determine Market Regime
-            current_regime = self.regime_classifier.analyze(primary_ohlcv)
+            try:
+                strategy_result_dict, regime_value = await asyncio.gather(
+                    dispatch(
+                        analyze_strategy,
+                        strategy_name,
+                        config_dict,
+                        market_data_json,
+                        current_side,
+                        market_trend,
+                        timeout=25.0,
+                    ),
+                    dispatch(
+                        analyze_regime,
+                        primary_ohlcv_json,
+                        timeout=25.0,
+                    ),
+                )
+                result = StrategyResult(
+                    signal=Signal(strategy_result_dict["signal"]),
+                    reason=strategy_result_dict["reason"],
+                    indicators=strategy_result_dict["indicators"],
+                )
+                current_regime = MarketRegime(regime_value)
+            except Exception as celery_exc:
+                # Celery worker unavailable or timed out — fall back to local execution.
+                logger.warning(
+                    "celery_dispatch_failed_using_local_fallback",
+                    error=str(celery_exc),
+                )
+                result = self.strategy.analyze(market_data, current_side, market_trend=market_trend)
+                current_regime = self.regime_classifier.analyze(primary_ohlcv)
 
             # 5b. Regime Gating
             # If current regime is not in strategy's valid regimes, force HOLD for entries.

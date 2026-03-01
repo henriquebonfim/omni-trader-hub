@@ -35,12 +35,12 @@ This list tracks the structural weak points identified during the Production Rea
     - **Mitigation Path**: ✅ **Proactive token-bucket limiter** intercepts all CCXT calls *before* transmission. Capacity=2000 weight units, refill at 40 units/s (Binance 2400/60s). Per-endpoint weight table. Thread-safe via asyncio.Lock. `Exchange.get_rate_limit_usage()` now returns bucket status.
 
 ### 4. Event Loop Optimization (Worker Offloading)
-- [ ] **Implement Celery + Redis Worker Architecture**
+- [x] **Implement Celery + Redis Worker Architecture**
     - **Risk Level**: 🟠 Medium
     - **Issue**: FastAPI and the trading loop share a single-threaded event loop. Large Pandas/NumPy indicator calculations block heartbeats.
     - **Vulnerability**: Delayed API responses and missed price triggers.
     - **Impact**: Execution slippage and heartbeat timeouts.
-    - **Mitigation Path**: Offload indicator calculations and heavy data processing to a **Celery** worker. Use existing **Redis** container as the message broker. This ensures the trading loop remains strictly for I/O and order management.
+    - **Mitigation Path**: ✅ **Celery worker offload** dispatches `analyze_strategy` + `analyze_regime` tasks to a separate worker process via asyncio-safe `dispatch()` (ThreadPoolExecutor bridge). Broker=Redis DB1, backend=Redis DB2. `compose.yml` adds `celery-worker` service. Local fallback if worker unavailable. 12 new tests. All 84 tests pass.
 
 ## 🟡 Low Priority (Execution Precision)
 
