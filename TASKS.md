@@ -26,12 +26,13 @@ This list tracks the structural weak points identified during the Production Rea
 ## 🟠 Medium Priority (Performance & Reliability)
 
 ### 3. Advanced Rate Limiting
-- [ ] **Implement Leaky-Bucket Rate Limiter**
+- [x] **Implement Leaky-Bucket Rate Limiter**
+    - **Status**: ✅ **Implemented** (`src/rate_limiter.py`, `tests/test_rate_limiter.py`). Wired into all CCXT call-sites in `src/exchange.py`.
     - **Risk Level**: 🟠 Medium
-    - **Issue**: Current rate limiting relies on simple logic and `asyncio.sleep` after errors occur.
+    - **Issue**: Current rate limiting relied on simple logic and `asyncio.sleep` after errors occur.
     - **Vulnerability**: In volatile markets, the bot may exceed exchange limits and face temporary IP bans.
     - **Impact**: Inability to exit positions during a crash.
-    - **Mitigation Path**: Intercept all CCXT calls with a weight-aware rate limiter *before* transmission.
+    - **Mitigation Path**: ✅ **Proactive token-bucket limiter** intercepts all CCXT calls *before* transmission. Capacity=2000 weight units, refill at 40 units/s (Binance 2400/60s). Per-endpoint weight table. Thread-safe via asyncio.Lock. `Exchange.get_rate_limit_usage()` now returns bucket status.
 
 ### 4. Event Loop Optimization (Worker Offloading)
 - [ ] **Implement Celery + Redis Worker Architecture**
