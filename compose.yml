@@ -41,6 +41,28 @@ services:
         condition: service_healthy
     restart: unless-stopped
 
+  celery-worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: omnitrader-celery
+    command: celery -A src.workers worker --loglevel=info --concurrency=2 --queues=celery
+    volumes:
+      - ./backend/config:/app/config
+      - ./backend/src:/app/src
+    env_file:
+      - .env
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "celery", "-A", "src.workers", "inspect", "ping", "-t", "5"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+
   frontend:
     build:
       context: ./frontend
