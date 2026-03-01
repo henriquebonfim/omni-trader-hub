@@ -14,6 +14,7 @@ import pandas as pd
 import structlog
 
 from .config import get_config
+from .rate_limiter import LeakyBucketRateLimiter
 
 logger = structlog.get_logger()
 
@@ -91,38 +92,17 @@ class Exchange:
         self.client = ccxt.binance(exchange_config)
         self.config = config
         self._markets_loaded = False
+        self._rate_limiter = LeakyBucketRateLimiter()
 
     async def _check_rate_limit(self):
         """
-        Check API rate limits and sleep if necessary.
-        Binance limit is usually 2400 per minute.
-        We'll keep a buffer of 400 (sleep if > 2000).
+        Legacy stub — superseded by the proactive LeakyBucketRateLimiter.
+
+        Kept for backward compatibility; calling code should use
+        ``self._rate_limiter.acquire(endpoint)`` directly.
         """
-        if self.paper_mode:
-            return
-
-        try:
-            # Check headers from last request
-            if hasattr(self.client, "last_response_headers") and self.client.last_response_headers:
-                headers = self.client.last_response_headers
-                # x-mbx-used-weight-1m
-                used_weight_1m = headers.get("x-mbx-used-weight-1m")
-
-                if used_weight_1m:
-                    weight = int(used_weight_1m)
-                    if weight > 2000:
-                        logger.warning("rate_limit_approaching", used=weight, limit=2400)
-                        # Simple backoff logic
-                        if weight > 2300:
-                            logger.warning("rate_limit_critical_sleep", duration=10)
-                            await asyncio.sleep(10)
-                        elif weight > 2200:
-                            logger.warning("rate_limit_high_sleep", duration=5)
-                            await asyncio.sleep(5)
-                        else:
-                            await asyncio.sleep(1)
-        except Exception as e:
-            logger.warning("rate_limit_check_failed", error=str(e))
+        # No-op: the bucket limiter handles throttling proactively before
+        # each CCXT call, so reactive header inspection is no longer needed.
 
     async def update_config(self, config):
         """Update exchange configuration."""
@@ -251,7 +231,7 @@ class Exchange:
         Returns:
             DataFrame with columns: timestamp, open, high, low, close, volume
         """
-        await self._check_rate_limit()
+        await self._rate_limiter.acquire("fetch_ohlcv")
         symbol = symbol or self.config.trading.symbol
         timeframe = timeframe or self.config.trading.timeframe
 
@@ -267,7 +247,7 @@ class Exchange:
 
     async def get_ticker(self, symbol: str | None = None) -> dict:
         """Get current ticker for symbol."""
-        await self._check_rate_limit()
+        await self._rate_limiter.acquire("fetch_ticker")
         symbol = symbol or self.config.trading.symbol
 
         if self.paper_mode and not self._markets_loaded:
@@ -293,7 +273,7 @@ class Exchange:
                 "used": used,
             }
 
-        await self._check_rate_limit()
+        await self._rate_limiter.acquire("fetch_balance")
         balance = await self.client.fetch_balance()
         usdt = balance.get("USDT", {})
         return {
@@ -316,7 +296,7 @@ class Exchange:
                 return Position(self._paper_position)
             return Position()
 
-        await self._check_rate_limit()
+        await self._rate_limiter.acquire("fetch_positions")
         positions = await self.client.fetch_positions([symbol])
 
         for pos in positions:
@@ -335,7 +315,7 @@ class Exchange:
                 if o["status"] == "open" and o["symbol"] == symbol
             ]
 
-        await self._check_rate_limit()
+        await self._rate_limiter.acquire("fetch_open_orders")
         return await self.client.fetch_open_orders(symbol)
 
     async def market_long(
@@ -401,7 +381,7 @@ class Exchange:
             logger.info("paper_long_opened", symbol=symbol, amount=amount, price=price)
             return order
 
-        await self._check_rate_limit()
+        await self._rate_limiter.acquire("create_order")
         order = await self.client.create_market_buy_order(
             symbol,
             amount,
@@ -474,7 +454,7 @@ class Exchange:
             logger.info("paper_short_opened", symbol=symbol, amount=amount, price=price)
             return order
 
-        await self._check_rate_limit()
+        await self._rate_limiter.acquire("create_order")
         order = await self.client.create_market_sell_order(
             symbol,
             amount,
@@ -555,7 +535,7 @@ class Exchange:
             return order
 
         # Close by opening opposite position
-        await self._check_rate_limit()
+        await self._rate_limiter.acquire("create_order")
         if position.side == "long":
             order = await self.client.create_market_sell_order(
                 symbol, position.size, params={"reduceOnly": True}
@@ -619,7 +599,7 @@ class Exchange:
             return order
 
         # Cancel existing open STOP_MARKET orders to replace them
-        await self._check_rate_limit()
+        await self._rate_limiter.acquire("fetch_open_orders")
         open_orders = await self.client.fetch_open_orders(symbol)
         cancel_tasks = [
             self.client.cancel_order(o["id"], symbol)
@@ -691,7 +671,7 @@ class Exchange:
             return order
 
         # Cancel existing open TAKE_PROFIT_MARKET orders
-        await self._check_rate_limit()
+        await self._rate_limiter.acquire("fetch_open_orders")
         open_orders = await self.client.fetch_open_orders(symbol)
         cancel_tasks = [
             self.client.cancel_order(o["id"], symbol)
@@ -724,7 +704,7 @@ class Exchange:
             logger.info("orders_cancelled", symbol=symbol, count=0)
             return []
 
-        await self._check_rate_limit()
+        await self._rate_limiter.acquire("cancel_all_orders")
         orders = await self.client.cancel_all_orders(symbol)
         logger.info("orders_cancelled", symbol=symbol, count=len(orders))
         return orders
@@ -766,7 +746,7 @@ class Exchange:
 
             return trades
 
-        await self._check_rate_limit()
+        await self._rate_limiter.acquire("fetch_my_trades")
         return await self.client.fetch_my_trades(symbol, since=since, limit=limit)
 
     async def fetch_funding_rate(self, symbol: str | None = None) -> float:
@@ -793,11 +773,15 @@ class Exchange:
         Get current API rate limit usage.
 
         Returns:
-            Dict with used weight and reset time if available.
+            Dict with leaky-bucket status plus Binance response-header weight
+            (if available from the last live request).
         """
-        if self.paper_mode:
-            return {"used": 0, "remaining": 2400}
+        bucket = self._rate_limiter.status()
 
+        if self.paper_mode:
+            return {"source": "paper", "bucket": bucket}
+
+        result: dict = {"source": "live", "bucket": bucket}
         try:
             # CCXT stores last response headers in client.last_response_headers
             # Binance headers: x-mbx-used-weight, x-mbx-used-weight-1m
@@ -806,14 +790,12 @@ class Exchange:
                 used_weight_1m = headers.get("x-mbx-used-weight-1m")
                 used_weight = headers.get("x-mbx-used-weight")
 
-                return {
-                    "used_weight_1m": int(used_weight_1m) if used_weight_1m else 0,
-                    "used_weight": int(used_weight) if used_weight else 0
-                }
+                result["binance_used_weight_1m"] = int(used_weight_1m) if used_weight_1m else 0
+                result["binance_used_weight"] = int(used_weight) if used_weight else 0
         except Exception:
             pass
 
-        return {}
+        return result
 
     async def get_order_fill_details(
         self, order_id: str, symbol: str | None = None, retries: int = 5, delay: float = 1.0
