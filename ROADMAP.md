@@ -505,6 +505,25 @@ graph TB
 
 ---
 
+## 🔹 Phase 4: Intelligence & Multi-Exchange Scaling (North Star)
+
+These items represent the long-term vision for OmniTrader to transition from a single-pair bot to an institutional-grade intelligence platform.
+
+### 1. High-Performance Infrastructure
+- [ ] **QuestDB Time-Series Scaling**: Migrate OHLCV and tick data storage to QuestDB for high-performance time-series ingestion and querying. Essential for multi-pair scaling where SQLite/Postgres reach IOPS limits.
+
+### 2. Advanced Multi-Exchange Engines (Neo4j)
+- [ ] **Cross-Exchange Arbitrage Engine**: Build a graph-based pathfinding engine in Neo4j to identify 5+ hop profit loops across multiple exchanges and spot/futures markets.
+- [ ] **Social Knowledge Graph**: Map and track influencer impact and "Smart Money" wallet movements to identify volatility precursors before they hit the ticker.
+
+### 3. Local Intelligence Layer (Ollama)
+- [ ] **Ollama "Intel Side-car"**: Utilize local LLMs for non-latency-critical background analysis:
+    - **Market Narrative**: Real-time summary of price action vs. news sentiment.
+    - **Trade Post-Mortems**: Automated analysis of failed trades to identify execution friction or strategy decay.
+    - **Sentiment Filtering**: Deep analysis of social sentiment (news/socials) as a confirmation gate for high-leverage entries.
+
+---
+
 ## 🔹 Immediate Next Steps (Recommended Prioritization)
 
 Based on the current MVP state and this Roadmap analysis:
