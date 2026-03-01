@@ -28,6 +28,7 @@ from .strategies.base import StrategyResult
 from .workers.dispatch import dispatch
 from .workers.serializers import df_to_json, market_data_to_json
 from .workers.tasks import analyze_regime, analyze_strategy
+from .ws_feed import WsFeed
 
 # Configure structured logging
 structlog.configure(
@@ -91,6 +92,26 @@ class OmniTrader:
         self._running = False
         self._shutdown_event = asyncio.Event()
         self.ws_manager = None  # Set by main() after API creation
+
+        # Build the WS timeframe subscription list from the loaded strategy
+        _ws_tfs = list(self.strategy.required_timeframes)
+        _primary_tf = self.config.trading.timeframe
+        if _primary_tf not in _ws_tfs:
+            _ws_tfs.append(_primary_tf)
+        _trend_filter = getattr(self.config.strategy, "trend_filter_enabled", False)
+        if _trend_filter:
+            _trend_tf = getattr(self.config.strategy, "trend_timeframe", "4h")
+            if _trend_tf not in _ws_tfs:
+                _ws_tfs.append(_trend_tf)
+
+        import os
+        self.ws_feed = WsFeed(
+            symbol=self.config.trading.symbol,
+            timeframes=_ws_tfs,
+            api_key=os.getenv("BINANCE_API_KEY"),
+            api_secret=os.getenv("BINANCE_SECRET"),
+            paper_mode=getattr(self.config.exchange, "paper_mode", True),
+        )
 
         self._reconcile_counter = 0
         # Initialize to 60 so it runs immediately on first cycle
@@ -169,6 +190,9 @@ class OmniTrader:
 
         # Send startup notification
         await self.notifier.bot_started(self.config.trading.symbol, paper_mode)
+
+        # Start WebSocket feed (non-blocking background tasks)
+        await self.ws_feed.start()
 
         self._running = True
         logger.info("omnitrader_started")
@@ -382,6 +406,12 @@ class OmniTrader:
         except Exception as e:
             logger.error("backup_failed_on_stop", error=str(e))
 
+        # Stop WebSocket feed before closing exchange connection
+        try:
+            await self.ws_feed.stop()
+        except Exception as e:
+            logger.warning("ws_feed_stop_failed", error=str(e))
+
         # Close connections
         await self.exchange.close()
         await self.database.close()
@@ -473,6 +503,8 @@ class OmniTrader:
             await self.risk.initialize_daily_stats(total_balance)
 
             # 4. Fetch market data (Multi-Timeframe)
+            # Prefer the WS cache to avoid REST round-trips; fall back to REST
+            # when the cache is empty or hasn't been seeded yet, then seed it.
             limit = max(
                 getattr(self.config.trading, "ohlcv_limit", 100),
                 self.strategy.required_candles,
@@ -486,18 +518,33 @@ class OmniTrader:
                 required_timeframes.append(primary_tf)
 
             market_data = {}
-            fetch_tasks = [
-                self.exchange.fetch_ohlcv(symbol, timeframe=tf, limit=limit)
-                for tf in required_timeframes
-            ]
-            results = await asyncio.gather(*fetch_tasks)
+            rest_needed = []
+            for tf in required_timeframes:
+                cached = self.ws_feed.latest_ohlcv(tf)
+                if cached is not None and len(cached) >= limit:
+                    market_data[tf] = cached.tail(limit)
+                else:
+                    rest_needed.append(tf)
 
-            for tf, df in zip(required_timeframes, results, strict=False):
-                market_data[tf] = df
+            if rest_needed:
+                rest_tasks = [
+                    self.exchange.fetch_ohlcv(symbol, timeframe=tf, limit=limit)
+                    for tf in rest_needed
+                ]
+                rest_results = await asyncio.gather(*rest_tasks)
+                for tf, df in zip(rest_needed, rest_results, strict=False):
+                    market_data[tf] = df
+                    self.ws_feed.seed_ohlcv(tf, df)
 
             # Get primary OHLCV for price and risk checks
             primary_ohlcv = market_data[primary_tf]
-            current_price = float(primary_ohlcv["close"].iloc[-1])
+
+            # Prefer real-time WS ticker price over last-close REST proxy
+            ws_ticker = self.ws_feed.latest_ticker()
+            if ws_ticker and ws_ticker.get("last"):
+                current_price = float(ws_ticker["last"])
+            else:
+                current_price = float(primary_ohlcv["close"].iloc[-1])
 
             # 4a. Check Trend (if enabled)
             market_trend = "neutral"
@@ -505,8 +552,15 @@ class OmniTrader:
             if trend_filter_enabled:
                 trend_tf = getattr(self.config.strategy, "trend_timeframe", "4h")
                 try:
-                    # Fetch enough candles for EMA 200
-                    trend_ohlcv = await self.exchange.fetch_ohlcv(symbol, timeframe=trend_tf, limit=210)
+                    # Use WS cache if available (needs ≥ 210 rows for EMA 200)
+                    trend_cached = self.ws_feed.latest_ohlcv(trend_tf)
+                    if trend_cached is not None and len(trend_cached) >= 210:
+                        trend_ohlcv = trend_cached
+                    else:
+                        trend_ohlcv = await self.exchange.fetch_ohlcv(
+                            symbol, timeframe=trend_tf, limit=210
+                        )
+                        self.ws_feed.seed_ohlcv(trend_tf, trend_ohlcv)
                     market_trend = self.strategy.check_trend(trend_ohlcv)
                 except Exception as e:
                     logger.warning("trend_fetch_failed", error=str(e))
