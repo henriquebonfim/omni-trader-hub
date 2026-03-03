@@ -1,9 +1,9 @@
 # OmniTrader — Roadmap
 
-**Version**: 1.0
-**Date**: 2026-02-24
+**Version**: 1.1
+**Date**: 2026-03-03
 **Author**: AI Product Owner & Finance Strategist
-**Status**: Draft — Pending Founder Review
+**Status**: Post-Audit — Critical fixes required before live trading
 
 ---
 
@@ -11,12 +11,18 @@
 
 OmniTrader is a **self-hosted, automated BTC/USDT Futures trading bot** targeting sustainable risk-adjusted returns through a portfolio of quantitative strategies on Binance. The system is currently an MVP with paper trading, a single-pair focus (BTC/USDT), 5 pluggable strategies, and a React dashboard for monitoring.
 
-**Current state**: Working MVP with EMA, ADX, Bollinger Bands, Breakout, and Z-Score strategies — all paper-traded with simulated capital. The system already includes a risk management layer (position sizing, SL/TP, circuit breaker, trailing stops), a FastAPI backend, WebSocket live feed, and Docker Compose deployment.
+**Current state**: Working MVP with EMA, ADX, Bollinger Bands, Breakout, and Z-Score strategies — all paper-traded with simulated capital. Infrastructure includes: risk management layer (position sizing, SL/TP, circuit breakers, trailing stops, black swan detection, auto-deleverage), FastAPI backend, **Celery worker offloading**, **WebSocket live feed** (CCXT Pro), **PostgreSQL** + SQLite dual database support, **Redis state persistence**, external **watchdog** process, and Docker Compose deployment (7 services).
 
 **Product thesis**: Generate consistent, positive expectancy returns by combining trend-following and mean-reversion strategies with strict risk management, regime awareness, and disciplined position sizing — **not** by promising outsized returns.
 
 > [!CAUTION]
 > **Profit Realism Disclaimer**: Sustained monthly returns above 5–10% risk-adjusted are exceptionally rare in crypto. Any strategy claiming >15–25% monthly returns sustained over 6+ months is either taking extreme hidden risk, is curve-fitted to historical data, or both. This Roadmap designs for **capital preservation first, growth second**.
+
+> [!CAUTION]
+> **Institutional Audit (2026-03-03)**: A comprehensive code audit identified **7 critical bugs** (SL/TP failure non-fatal, paper mode PnL wrong, ATR stops not wired, API endpoints unprotected, Redis failures silent, position count hardcoded, paper SL/TP never simulated) and **9 high-priority issues**. All findings are tracked in [TASKS.md](TASKS.md). **DO NOT deploy live capital until all Critical (T6–T12) items are resolved.**
+
+> [!WARNING]
+> **Geopolitical Context (2026-03-03)**: Day 3 of US-Israeli war with Iran. Strait of Hormuz closed. Oil prices spiking, risk-off sentiment building. BTC correlation to equities increases during systemic stress. The system has **zero macro/geopolitical awareness** — no mechanism to detect or respond to this crisis. The prevailing "greed noise" (bullish retail sentiment during active geopolitical crisis) makes mean-reversion signals unreliable and all signals lower-confidence. See new section: **Geopolitical & Macro Risk Assessment**.
 
 ---
 
@@ -140,7 +146,7 @@ The current codebase implements 5 strategies. Below is a financially rigorous as
 
 ---
 
-#### 6. Smart Money Concepts (SMC) — Planned (P2)
+#### 6. Smart Money Concepts (SMC) — Partially Implemented (Analysis Layer)
 
 | Dimension | Assessment |
 |-----------|------------|
@@ -153,6 +159,8 @@ The current codebase implements 5 strategies. Below is a financially rigorous as
 | **Overfitting risk** | HIGH — discretionary concepts translated to rules often lose edge |
 | **Backtesting requirement** | Extremely difficult to backtest properly; forward-test in paper mode first |
 
+**Implementation status (2026-03-03)**: `smc/structure.py` implements BOS/CHoCH detection with fractal swing detection and delayed confirmation (correctly mitigates lookahead bias). `smc/analysis.py` provides multi-timeframe coordination. **However**: the SMC module is **not registered in the strategy registry** and has **no integration path to influence trade signals**. It is dead code until wired as a filter layer. Order blocks, fair value gaps, and liquidity sweep detection are **not implemented**.
+
 > [!IMPORTANT]
 > SMC is a **discretionary framework** that loses significant edge when mechanized. The biggest risk is translating subjective chart reading into rigid code rules that miss context. I recommend implementing SMC as a **filter/confirmation layer** on top of existing strategies rather than a standalone signal generator. This is how institutional systematic funds use discretionary insights — as overlays, not primary signals.
 
@@ -162,18 +170,27 @@ The current codebase implements 5 strategies. Below is a financially rigorous as
 
 ```
 Priority 1: ADX Trend (primary signal)
-  + Regime Classifier (P2 #56) to enable/disable strategies
-  + ATR-based stops (P2 #54) instead of fixed %
+  + Regime Classifier ✅ implemented — BUT needs hysteresis fix (TASKS T13)
+  + ATR-based stops — configured but NOT wired to exchange orders (TASKS T9)
 
 Priority 2: Bollinger/Z-Score (ONLY in classified ranging regime)
-  + Must be DISABLED during trending regime
+  + Must be DISABLED during trending regime ✅ (regime gating works)
+  + ⚠️ Both use level-based signals — add cooldown to prevent re-entry grinding (TASKS T15)
+  + ⚠️ Z-Score assumes normality — crypto fat tails make 2σ less extreme than modeled
 
-Priority 3: Breakout (ONLY with SMC liquidity sweep filter)
-  + Without SMC, false breakout rate is too high
+Priority 3: Breakout — CURRENTLY NON-FUNCTIONAL
+  + Donchian current-bar inclusion bug makes signals nearly impossible (TASKS T14)
+  + Must fix before any deployment, even in paper mode
 
 DO NOT: Run all strategies simultaneously without regime awareness.
          This is the #1 failure mode of retail bots.
 ```
+
+> [!WARNING]
+> **Audit Finding (2026-03-03)**: All strategies except `ema_volume` use **level-based** signals (not transitions). After a stop-loss hit, they immediately re-enter if the condition persists. This creates a "re-entry grinder" pattern — 3-5 consecutive losses in a single session before the circuit breaker fires. A `min_bars_between_entries` cooldown is required (TASKS.md T15).
+
+> [!WARNING]
+> **No Backtesting Engine Exists.** There is zero statistical evidence that any strategy has positive expectancy. The paper mode is the only testing mechanism, and it has critical bugs (PnL formula wrong, SL/TP never simulated). Building a backtesting engine (BACKLOG.md B1) is the single most important long-term investment.
 
 ---
 
@@ -207,14 +224,17 @@ Priority 5: Growth                 → Only after 1–4 are satisfied
 | **Trailing Stop** | 1% activation, 0.5% callback | ✅ Good | Keep; consider ATR-based trailing distance |
 | **Time-based exit** | None | Exit after 48 candles (12h on 15m) if < 0.5× ATR move | Thesis decay — capital tied up in dead trades |
 
+> [!CAUTION]
+> **Audit Finding (2026-03-03)**: Config has `use_atr_stops: true` with `atr_multiplier_sl: 1.5` and `atr_multiplier_tp: 2.0`, but **the code never applies them to exchange orders**. `_open_position()` always calls `calculate_stop_loss()` / `calculate_take_profit()` (fixed %). The `ohlcv` parameter is never passed to `validate_trade()`, so ATR stops are silently skipped. **The system believes it's using dynamic stops but is not.** Fix tracked in TASKS.md T9.
+
 ### Leverage Constraints
 
 | Rule | Value | Rationale |
 |------|-------|-----------|
 | **Max leverage** | 3x isolated | ✅ Correct — conservative for retail |
 | **Margin type** | Isolated | ✅ Correct — prevents cascading liquidation |
-| **Liquidation buffer** | None currently | **Must add**: Alert at 50% of distance-to-liquidation |
-| **Auto-deleverage** | None | Add at P1: reduce leverage to 1x if drawdown >10% |
+| **Liquidation buffer** | ✅ Implemented (0.5) | Alert at 50% of distance-to-liquidation |
+| **Auto-deleverage** | ✅ Implemented | Reduce leverage to 1x if drawdown >10% — **⚠️ uses daily PnL reset, not peak-equity HWM (TASKS T16)** |
 
 ### Circuit Breaker Enhancements
 
@@ -236,21 +256,85 @@ For single-pair (BTC/USDT) — not applicable yet. When multi-pair is added (P2 
 
 ---
 
+## 🔹 Geopolitical & Macro Risk Assessment
+
+> Added 2026-03-03 in response to active geopolitical crisis.
+
+### Current Crisis: US-Israeli War with Iran — Hormuz Closure
+
+| Dimension | Assessment |
+|-----------|------------|
+| **Event** | US-Israeli military operations against Iran, Day 3 (2026-03-03). Strait of Hormuz closed to commercial shipping. |
+| **Oil impact** | Immediate supply shock. ~20% of global oil transits Hormuz. Expect sustained oil price spike. |
+| **Macro cascade** | Oil spike → inflation fears → central bank hawkishness → risk-off across equities → crypto sells off initially (risk asset correlation), potential flight-to-BTC narrative later |
+| **BTC correlation shift** | During systemic geopolitical stress, BTC-equity correlation increases to ~0.5–0.7 (vs. ~0.2–0.3 normal). BTC behaves as **risk asset, not safe haven**, in the initial phase. |
+| **Historical precedent** | Russia-Ukraine 2022: BTC dropped ~15% in first week, recovered partially. However, Hormuz closure is **unprecedented in modern crypto era** — no direct analog. |
+| **Duration risk** | If conflict extends beyond 2 weeks, sustained risk-off could produce 3–6 month adverse regime for trend-following strategies. |
+
+### "Greed Noise" Warning
+
+When market sentiment diverges from geopolitical reality — bullish retail sentiment during active military conflict and supply chain disruption — this creates a **greed noise** environment:
+
+- **Mean-reversion signals are unreliable**: Retail greed may temporarily support prices, but institutional risk-off selling can overwhelm at any moment. Buying "oversold" dips during systemic stress is the classic falling-knife pattern.
+- **Trend signals are unreliable**: News-driven spikes (ceasefire rumors, escalation headlines) create false breakouts and whipsaws that destroy EMA/ADX trend detection.
+- **Volatility will spike**: ATR will expand significantly. The regime classifier should toggle to VOLATILE (if hysteresis is fixed).
+- **The system cannot detect this**: OmniTrader has zero macro awareness — no sentiment input, no news feed, no geopolitical risk factor. It will trade through the crisis as if nothing is happening.
+
+### Recommended Crisis Protocol (Document for Future Implementation)
+
+When a geopolitical crisis of this magnitude is active, the following parameter overrides should be applied:
+
+| Parameter | Normal | Crisis Override | Rationale |
+|-----------|--------|----------------|-----------|
+| `leverage` | 3× | **1×** | Reduce ruin risk during extreme tail events |
+| `position_size_pct` | 2.0% | **0.5%** | Minimize exposure per trade |
+| `max_daily_loss_pct` | 5.0% | **2.0%** | Tighter circuit breaker |
+| `strategy.name` | adx_trend | **adx_trend only** | Disable mean-reversion (falling knife risk) |
+| Manual approval gate | Off | **On** | Human reviews each signal before execution |
+| Mean-reversion strategies | Enabled in RANGING | **Disabled entirely** | Greed noise makes regime classification unreliable |
+
+> [!IMPORTANT]
+> This crisis protocol is **documented but not yet implementable** — the system lacks a `crisis_mode` config toggle, manual approval gate, or macro event detection. Implementation tracked in BACKLOG.md B4.
+
+### Impact on OmniTrader Data Requirements
+
+The current crisis exposes gaps in the data pipeline. The following are now higher priority:
+
+| Data | Original Phase | New Priority | Rationale |
+|------|---------------|-------------|-----------|
+| Fear & Greed Index | P4 | **P2** | Essential to detect greed-noise divergence |
+| DXY index | P4 | **P2** | Dollar strength drives risk-off in crypto |
+| Oil futures (CL) | Not planned | **P2** | Direct indicator for Hormuz-class supply shocks |
+| VIX / Crypto Vol Index | Not planned | **P2** | Cross-asset volatility regime detection |
+
+---
+
 ## 🔹 Technical Architecture
 
 ### Current Architecture Assessment
 
 ```mermaid
 graph TB
-    subgraph "Backend (Python 3.13)"
-        ML["Main Loop (60s cycle)"]
+    subgraph "Backend (Python 3.12)"
+        ML["Main Loop (30s cycle)"]
         ST["Strategy Engine (5 strategies)"]
+        RG["Regime Classifier (ADX/ATR)"]
         RM["Risk Manager"]
-        EX["Exchange (CCXT)"]
-        DB["Database (SQLite WAL)"]
+        EX["Exchange (CCXT + CCXT Pro)"]
+        DB["Database (Postgres / SQLite)"]
+        RD["Redis (state + broker)"]
         NT["Notifier (Discord)"]
         API["FastAPI Server"]
-        WS["WebSocket Feed"]
+        WS["WebSocket Feed (CCXT Pro)"]
+        RL["Rate Limiter (leaky bucket)"]
+    end
+
+    subgraph "Workers"
+        CW["Celery Worker (analysis)"]
+    end
+
+    subgraph "Monitoring"
+        WD["Watchdog (health check)"]
     end
 
     subgraph "Frontend (Vite + React)"
@@ -266,38 +350,57 @@ graph TB
     end
 
     ML --> ST
+    ML --> RG
+    ST --> CW
+    RG --> CW
     ST --> RM
     RM --> EX
-    EX --> BIN_API
+    EX --> RL
+    RL --> BIN_API
+    WS --> BIN_WS
     ML --> DB
+    ML --> RD
     ML --> NT
     API --> DB
     WS --> DASH
     DASH --> API
+    WD --> API
 ```
 
-### Architecture Gaps (Must Address for Live Trading)
+### Architecture Gaps — Updated Post-Audit (2026-03-03)
 
-| Gap | Severity | Phase |
-|-----|----------|-------|
-| **No position reconciliation** | 🔴 Critical | P1 #44 |
-| **No slippage tracking** | 🟠 High | P1 #42 |
-| **No order fill verification** | 🔴 Critical | Before live |
-| **No API rate limit handling** | 🟠 High | P1 |
-| **No exchange error classification** | 🟠 High | P1 |
-| **No database backup** | 🟡 Medium | P1 |
-| **No heartbeat/watchdog** | 🟡 Medium | P1 |
-| **Single point of failure (1 process)** | 🟡 Medium | P3+ |
+| Gap | Original Status | Current Status | Ref |
+|-----|----------------|----------------|-----|
+| Position reconciliation | 🔴 Not implemented | ✅ Implemented (heuristic-based, fragile for multi-fill) | — |
+| Slippage tracking | 🟠 Not implemented | ✅ Implemented (expected vs actual fill, threshold alerts) | — |
+| Order fill verification | 🔴 Not implemented | ✅ Implemented (5 retries × 1s, matches by timestamp+side) | — |
+| API rate limit handling | 🟠 Not implemented | ✅ Implemented (leaky-bucket, 2000/2400 capacity, per-endpoint weights) | — |
+| Database backup | 🟡 Not implemented | ✅ Implemented (SQLite VACUUM INTO) | — |
+| Heartbeat/watchdog | 🟡 Not implemented | ✅ Implemented (external process, Docker container, Discord alerts) | — |
+| **SL/TP failure leaves naked position** | — | 🔴 **NEW — Critical** | T6 |
+| **Paper mode PnL formula wrong** | — | 🔴 **NEW — Critical** | T7 |
+| **Paper SL/TP never simulated** | — | 🔴 **NEW — Critical** | T8 |
+| **ATR stops configured but not wired** | — | 🔴 **NEW — Critical** | T9 |
+| **API mutation endpoints unprotected** | — | 🔴 **NEW — Critical** | T11 |
+| **Redis failures silently swallowed** | — | 🔴 **NEW — Critical** | T12 |
+| **Regime classifier no hysteresis** | — | 🟠 **NEW — High** | T13 |
+| **Breakout strategy Donchian bug** | — | 🟠 **NEW — High** | T14 |
+| **No backtesting engine** | — | 🔴 **NEW — Critical (research)** | B1 |
+| **No macro/geopolitical awareness** | — | 🟠 **NEW — High** | B4 |
+| Exchange error classification | 🟠 Not implemented | ❌ Still missing | — |
+| Single point of failure | 🟡 Medium | ✅ Partially mitigated (Celery worker, watchdog) | — |
 
 ### Recommended Additions Before Live Trading
 
-1. **Order Fill Verification**: After every `market_long`/`market_short`, verify the fill price and quantity match expectations within tolerance. Log discrepancy.
+> ✅ Items 1–4 from the original roadmap (fill verification, heartbeat, reconciliation, rate limiter) are now **implemented**. Updated priorities below:
 
-2. **Heartbeat Monitor**: External process that pings `/api/health` every 30s. If 3 consecutive failures → send emergency Discord alert + attempt graceful restart.
+1. **SL/TP Retry Logic**: When SL/TP placement fails, retry 3× with exponential backoff. If all retries fail, flatten the position immediately. Never leave a naked position. (TASKS T6)
 
-3. **Position Reconciliation**: Every cycle, compare `Exchange.get_position()` with local `database` state. If mismatch → alert and take conservative action (flatten if unsure).
+2. **Paper Mode Overhaul**: Fix PnL formula (entry×qty not entry²), add tick-by-tick SL/TP simulation against OHLCV data, emit simulated fills via event system. (TASKS T7, T8)
 
-4. **API Rate Limiter**: CCXT handles basic rate limiting, but implement application-level tracking of remaining weight. Binance allows 2400 weight/min for futures; current cycle uses ~50–100 weight.
+3. **ATR Stop Integration**: Pass OHLCV to `validate_trade()`, compute ATR(14)-based SL/TP, replace fixed % stops. (TASKS T9)
+
+4. **API Authentication**: Add Bearer token auth to all mutation endpoints (/start, /stop, /config). Rate-limit auth failures. (TASKS T11)
 
 ---
 
@@ -309,11 +412,11 @@ graph TB
 |--------------|-------|-----------------|
 | **Request weight** | 2400/min (Futures) | ~80–120/cycle (60s) — 5% utilization ✅ |
 | **Order rate** | 300/min | 1–2 orders/cycle — negligible ✅ |
-| **WebSocket streams** | 200 connections | 0 currently (uses REST polling) |
+| **WebSocket streams** | 200 connections | ✅ WsFeed uses CCXT Pro (ticker, OHLCV, orders) |
 | **IP ban threshold** | >2400 weight/min for 5+ min | Low risk at current rate |
 
 > [!TIP]
-> Current REST-only polling is fine for 60s cycles. When multi-pair trading is added (P2), switch to WebSocket market data to reduce API weight and improve latency.
+> ✅ WebSocket integration complete (`ws_feed.py`). REST fallback is maintained if WS cache is insufficient. WS reduces API weight and provides sub-second ticker updates.
 
 ### Order Types Available
 
@@ -445,18 +548,22 @@ graph TB
 
 ## 🔹 Failure Scenarios & Mitigation
 
-| Scenario | Probability | Impact | Mitigation |
-|----------|-------------|--------|------------|
-| **Extended sideways market (3–6mo)** | High (30%) | Strategy bleed, small losses compound | Regime classifier disables trend strategies; switch to mean-reversion |
-| **Flash crash (>15% in 1h)** | Medium (10%/yr) | SL slippage, large single-trade loss | Black swan detector → flatten all. Use stop-limit, not stop-market |
-| **Exchange downtime** | Medium (5%/yr) | Can't close position, SL doesn't execute | Set exchange-side SL (not just local). Position reconciliation on reconnect |
-| **API rate limit ban** | Low (2%) | Trading paused for minutes/hours | Application-level rate tracking. Exponential backoff |
-| **Overfitted strategy** | High (40%) | Works on backtest, fails live | Walk-forward analysis. Out-of-sample testing. Minimum 2yr backtest |
-| **Liquidity gap (low-vol pair)** | Low for BTC | Large slippage on entry/exit | BTC/USDT has excellent liquidity. Risk increases with alt pairs |
-| **Funding rate spike** | Medium (15%/yr) | Unexpected holding cost >0.1%/8h | Monitor funding; exit before funding if rate >3× normal |
-| **Binance API change** | Medium (10%/yr) | Bot breaks silently | Pin CCXT version, test on update. Health check includes trade capability |
-| **Local server failure** | Medium (20%/yr) | Bot goes offline with open position | Exchange-side SL/TP always set. Watchdog process. Cloud deployment (P3) |
-| **Correlated losses across strategies** | High if no regime filter | All strategies lose simultaneously | Regime classifier + strategy exclusion rules |
+| Scenario | Probability | Impact | Mitigation | Status |
+|----------|-------------|--------|------------|--------|
+| **Extended sideways market (3–6mo)** | High (30%) | Strategy bleed, small losses compound | Regime classifier disables trend strategies; switch to mean-reversion | ✅ Regime classifier exists, ⚠️ needs hysteresis (T13) |
+| **Flash crash (>15% in 1h)** | Medium (10%/yr) | SL slippage, large single-trade loss | Black swan detector → flatten all. Use stop-limit, not stop-market | ✅ Black swan detector implemented |
+| **Exchange downtime** | Medium (5%/yr) | Can't close position, SL doesn't execute | Set exchange-side SL (not just local). Position reconciliation on reconnect | ✅ Exchange-side SL/TP, ⚠️ SL placement failure non-fatal (T6) |
+| **API rate limit ban** | Low (2%) | Trading paused for minutes/hours | Application-level rate tracking. Exponential backoff | ✅ Leaky-bucket rate limiter implemented |
+| **Overfitted strategy** | High (40%) | Works on backtest, fails live | Walk-forward analysis. Out-of-sample testing. Minimum 2yr backtest | ❌ **No backtesting engine exists** (B1) |
+| **Liquidity gap (low-vol pair)** | Low for BTC | Large slippage on entry/exit | BTC/USDT has excellent liquidity. Risk increases with alt pairs | ✅ BTC-only for now |
+| **Funding rate spike** | Medium (15%/yr) | Unexpected holding cost >0.1%/8h | Monitor funding; exit before funding if rate >3× normal | ❌ Not implemented |
+| **Binance API change** | Medium (10%/yr) | Bot breaks silently | Pin CCXT version, test on update. Health check includes trade capability | ⚠️ No version lockfile (T25) |
+| **Local server failure** | Medium (20%/yr) | Bot goes offline with open position | Exchange-side SL/TP always set. Watchdog process. Cloud deployment (P3) | ✅ Watchdog + exchange-side SL/TP |
+| **Correlated losses across strategies** | High if no regime filter | All strategies lose simultaneously | Regime classifier + strategy exclusion rules | ✅ Regime gating exists, ⚠️ hysteresis needed (T13) |
+| **Geopolitical crisis / Hormuz closure** | **HIGH (active now)** | Extreme volatility, correlation spike, regime shift | Crisis mode protocol, manual oversight, reduced parameters | ❌ **No macro awareness** (B4) |
+| **SL/TP placement failure during volatility** | Medium (15%/yr) | **Naked position → potential liquidation** | Retry 3× or flatten immediately | ❌ **Not handled — position left unprotected** (T6) |
+| **Paper mode gives false confidence** | **HIGH (active now)** | Deploy live based on broken paper results | Fix PnL formula, add SL/TP simulation | ❌ **Paper mode is broken** (T7, T8) |
+| **Unauthorized API access** | Medium if exposed | Attacker opens leveraged positions, drains capital | Auth on all mutation endpoints | ❌ **Endpoints unprotected** (T11) |
 
 ---
 
@@ -524,29 +631,55 @@ These items represent the long-term vision for OmniTrader to transition from a s
 
 ---
 
-## 🔹 Immediate Next Steps (Recommended Prioritization)
+## 🔹 Immediate Next Steps (Post-Audit Prioritization)
 
-Based on the current MVP state and this Roadmap analysis:
+> Updated 2026-03-03 after institutional audit. Previous items (position reconciliation, slippage tracking, fill verification, watchdog, rate limiter) are now **implemented**. New priorities reflect audit-discovered bugs.
 
-### Before Any Live Trading
+> **⚠️ GEOPOLITICAL HOLD**: Even after all fixes below, do not deploy live capital while the Iran/Hormuz crisis is active and the system lacks macro awareness. The "greed noise" environment makes all strategy signals lower-confidence.
 
-1. ✅ ADX Trend as primary strategy (already implemented)
-2. ❌ **Position reconciliation** (P1 #44) — Critical safety feature
-3. ❌ **Slippage tracking** (P1 #42) — Must know fill quality
-4. ❌ **Order fill verification** — Confirm every fill matches expectation
-5. ❌ **Liquidation price monitoring** — Even with SL, monitor distance
-6. ❌ **30-day paper trading validation** — Minimum 50 trades, calculate Sharpe
+### Phase 0: Critical Bug Fixes (Before ANY Trading)
 
-### First Live Deployment ($100)
+| # | Item | Severity | Ref | Est. |
+|---|------|----------|-----|------|
+| 1 | Fix SL/TP failure → retry 3× or flatten | 🔴 Critical | T6 | 2h |
+| 2 | Fix paper mode PnL formula | 🔴 Critical | T7 | 1h |
+| 3 | Add paper SL/TP simulation engine | 🔴 Critical | T8 | 4h |
+| 4 | Wire ATR stops to exchange orders | 🔴 Critical | T9 | 3h |
+| 5 | Fix `current_positions` hardcoded to 0 | 🔴 Critical | T10 | 1h |
+| 6 | Add auth to all mutation endpoints | 🔴 Critical | T11 | 2h |
+| 7 | Fix Redis silent failure for risk state | 🔴 Critical | T12 | 2h |
 
-7. Set up heartbeat/watchdog monitoring
-8. Semi-automatic mode (dashboard approval) for first 2 weeks
-9. Daily review of slippage, fills, and PnL in dashboard
-10. After 30 live trades with positive expectancy → scale to $500
+### Phase 1: High-Priority Correctness (Before Paper Validation)
 
-### Medium Term
+| # | Item | Severity | Ref | Est. |
+|---|------|----------|-----|------|
+| 8 | Add regime hysteresis (Schmitt trigger) | 🟠 High | T13 | 3h |
+| 9 | Fix Breakout Donchian current-bar bug | 🟠 High | T14 | 1h |
+| 10 | Add entry cooldown for level-based strategies | 🟠 High | T15 | 3h |
+| 11 | Implement peak-equity HWM drawdown tracking | 🟠 High | T16 | 3h |
+| 12 | Fix consecutive loss streak midnight reset | 🟠 High | T17 | 1h |
+| 13 | Add market order size validation | 🟠 High | T18 | 1h |
+| 14 | Add WS stale-data detection | 🟠 High | T19 | 2h |
 
-11. Regime classifier (P2 #56) — The single highest-impact feature
-12. ATR-based stops (P2 #54) — Replace fixed % with volatility-aware
-13. Backtesting engine (P3 #74) — Can't optimize without backtesting
-14. Walk-forward analysis (P3 #75) — Prevents overfitting
+### Phase 2: Validation (30-Day Paper Test)
+
+15. Run 30-day paper trading with all Phase 0+1 fixes applied
+16. Minimum 50 trades required
+17. Calculate: Sharpe, Sortino, max drawdown, profit factor, win rate
+18. Compare paper PnL to manual back-calculation (verify simulation fidelity)
+19. Monitor regime classifier transitions for hysteresis correctness
+
+### Phase 3: Infrastructure Hardening
+
+20. Test Postgres implementation (T20)
+21. Add Alembic migrations (T21)
+22. Pin dependency versions + lockfile (T25)
+23. Add Celery circuit breaker (T26)
+24. Separate dev/prod requirements (T24)
+
+### Phase 4: Research & Edge Validation
+
+25. Build backtesting engine (B1) — **The single most important investment**
+26. Walk-forward validation (B2)
+27. Monte Carlo stress testing (B3)
+28. Implement geopolitical/macro risk module (B4)

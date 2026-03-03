@@ -1,53 +1,207 @@
-# OmniTrader — Technical Debt & Architectural Backlog
+# OmniTrader — Technical Debt & Audit Findings
 
-This list tracks the structural weak points identified during the Production Readiness Audit. Transitioning from Paper Trading to Live Funds / Multi-Pair scaling requires addressing these items.
+Single source of truth for all technical work: architecture items, audit-discovered bugs, and risk gaps.
+Institutional-grade audit completed **2026-03-03** — findings integrated below.
 
-## 🔴 High Priority (Risk Mitigation)
+> Last updated: 2026-03-03 by Institutional Audit
 
-### 1. Database Infrastructure Migration
-- [/] **Migrate to High-Performance Database**
-    - **Status**: ✅ **Implemented** (`src/database/postgres.py`). Ready for config switch.
-    - **Risk Level**: 🔴 High
-    - **Issue**: SQLite (single-file) lacks the concurrency needed for high-frequency writes and multi-pair scaling.
-    - **Vulnerability**: Potential for database corruption during crashes or high-write volumes.
-    - **Impact**: Loss of trade history and broken state reconciliation.
-    - **Mitigation Path**:
-        - **PostgreSQL**: ✅ **Coded**. Includes schema initialization and trade history persistence. Ready for production switch.
+---
 
-### 2. State Persistence Implementation
-- [/] **Implement "Anti-Amnesia" Persistence Layer**
-    - **Status**: ✅ **Implemented** (`src/database/redis_store.py`).
-    - **Risk Level**: 🔴 High
-    - **Issue**: Trailing stop levels, loss streaks, and daily PnL reset states currently reside partially in memory.
-    - **Vulnerability**: Docker restarts or process crashes wipe critical trading state.
-    - **Impact**: Bot may re-enter failed trades or ignore daily loss limits upon restart.
-    - **Mitigation Path**: ✅ **Redis**: Store logic implemented. Linked via `DatabaseFactory`. Next step: Explicitly hook into `RiskManager` rolling state.
+## 🔴 Critical (Capital-at-Risk Bugs)
 
-## 🟠 Medium Priority (Performance & Reliability)
+### T6. SL/TP Placement Failure is Non-Fatal
+- [ ] **Fix: Retry 3× or flatten position immediately**
+    - **Risk Level**: 🔴 Critical
+    - **Location**: `src/main.py` `_open_position()` — SL/TP placement wrapped in independent try/except that logs and continues.
+    - **Vulnerability**: If the exchange rejects the SL order (price validation, rate limit, network error), the position is left **open without a stop loss on the exchange**.
+    - **Impact**: Naked position during volatility → potential liquidation at 33% adverse move (3× leverage).
+    - **Fix**: After SL placement failure, retry 3× with exponential backoff. If all retries fail, immediately close the position via `close_position()`. Never allow a position to exist without exchange-side protection.
 
-### 3. Advanced Rate Limiting
+### T7. Paper Mode PnL Formula Incorrect
+- [ ] **Fix: Correct PnL calculation in `exchange.py`**
+    - **Risk Level**: 🔴 Critical
+    - **Location**: `src/exchange.py` `close_position()` paper mode branch.
+    - **Vulnerability**: Uses `(exit_price - entry_price) / entry_price * notional` instead of the correct `(exit_price - entry_price) * contracts`. Yields PnL in "notional-weighted percentage" units, not USDT.
+    - **Impact**: All paper trading results are **mathematically wrong**. Cannot validate any strategy edge.
+    - **Fix**: Use `pnl = (exit_price - entry_price) * position.contracts` for longs; negate for shorts. Match the live-mode formula in `main.py _close_position()`.
+
+### T8. Paper Mode SL/TP Never Simulated
+- [ ] **Fix: Add paper SL/TP simulation engine**
+    - **Risk Level**: 🔴 Critical
+    - **Location**: `src/exchange.py` — paper orders stored in `_paper_orders` list but never checked against price.
+    - **Vulnerability**: Paper positions can only exit via strategy signals, never via stop-loss or take-profit hits.
+    - **Impact**: Paper mode drastically overstates strategy performance (no stop-outs, no trailing stop triggers). Cannot trust paper results for validation.
+    - **Fix**: In `run_cycle()` or a dedicated `_check_paper_orders()` method, iterate `_paper_orders` each cycle and trigger fills when price crosses SL/TP levels.
+
+### T9. ATR Stops Configured But Not Applied to Exchange
+- [ ] **Fix: Wire ATR stop values to `set_stop_loss` / `set_take_profit`**
+    - **Risk Level**: 🔴 Critical
+    - **Location**: `src/main.py` `_open_position()` — always calls `calculate_stop_loss` / `calculate_take_profit` (fixed %). Never calls `calculate_atr_stops` even though `use_atr_stops: true` is set in config.
+    - **Vulnerability**: System believes it's using dynamic volatility-based stops but actually places fixed 2%/4% stops. Config says one thing, code does another.
+    - **Impact**: Fixed stops are too tight in high-vol and too wide in low-vol. The designed volatility-adaptive behavior does not exist.
+    - **Fix**: Pass `ohlcv` DataFrame to `validate_trade()`. When `use_atr_stops` is enabled, use ATR-derived prices for `set_stop_loss()` / `set_take_profit()` instead of fixed-%.
+
+### T10. `current_positions` Hardcoded to 0
+- [ ] **Fix: Pass actual position count to `validate_trade`**
+    - **Risk Level**: 🔴 Critical
+    - **Location**: `src/main.py` `_open_position()` — `current_positions=0` hardcoded.
+    - **Vulnerability**: The `max_positions` check in `RiskManager.validate_trade()` is dead code. Config allows 50 concurrent positions (nonsensical for single-asset) and the check never enforces it anyway.
+    - **Impact**: If multi-position logic is ever activated, there is **no cap** on concurrent positions.
+    - **Fix**: Query actual open position count from exchange/database. Set `max_positions` to a sane value (1 for single-asset, 3-5 for multi-pair).
+
+### T11. API Mutation Endpoints Unprotected
+- [ ] **Fix: Add `verify_api_key` dependency to all mutation routes**
+    - **Risk Level**: 🔴 Critical
+    - **Location**: `src/api/routes/bot.py`, `src/api/routes/config.py`, `src/api/routes/notifications.py`
+    - **Vulnerability**: `/api/bot/start`, `/api/bot/stop`, `/api/bot/trade/open`, `/api/bot/trade/close`, `PUT /api/config`, `PUT /api/notifications/discord` require **no authentication**. Anyone with network access can open leveraged positions, stop the bot, or change risk parameters.
+    - **Impact**: Complete capital loss via unauthorized trading or parameter manipulation.
+    - **Fix**: Apply `verify_api_key` dependency to every mutation endpoint. Add RBAC for production.
+
+### T12. Redis Failures Silently Swallowed
+- [ ] **Fix: Raise or fallback on risk-state persistence failure**
+    - **Risk Level**: 🔴 Critical
+    - **Location**: `src/database/redis_store.py` — `set()`, `get()`, `delete()` all catch `Exception` and log but return `None`/`False`.
+    - **Vulnerability**: Risk state persistence failures are invisible. `RiskManager.save_state()` could fail silently → consecutive loss counter resets → bot continues at full size after a losing streak.
+    - **Impact**: Circuit breakers and loss-streak sizing become unreliable.
+    - **Fix**: For critical risk state keys, raise on Redis failure or implement in-memory fallback that preserves the last known state.
+
+---
+
+## 🟠 High Priority (Correctness & Reliability)
+
+### T13. Regime Classifier No Hysteresis
+- [ ] **Add Schmitt-trigger hysteresis to regime detection**
+    - **Risk Level**: 🟠 High
+    - **Location**: `src/analysis/regime.py` — ADX threshold is a single value (25). Regime flips every 30s cycle when ADX oscillates near boundary.
+    - **Impact**: Strategy gating whipsaws — a signal is approved one cycle and blocked the next, or vice versa.
+    - **Fix**: Enter TRENDING when ADX > 28, exit to RANGING only when ADX < 22. Same pattern for VOLATILE (ATR > 1.7× to enter, < 1.3× to exit). Track `current_regime` state between cycles.
+
+### T14. Breakout Strategy Donchian Bug
+- [ ] **Fix: Use prior-bar Donchian channel for breakout signals**
+    - **Risk Level**: 🟠 High
+    - **Location**: `src/strategies/breakout.py` — `pandas_ta.donchian()` includes the current bar in the rolling max/min. `close > upper_channel` at `iloc[-1]` requires close to exceed the current bar's own high-of-highs — nearly impossible.
+    - **Impact**: Strategy generates almost no signals. Effectively dead code.
+    - **Fix**: Compare `close.iloc[-1]` against `donchian_upper.iloc[-2]` (prior bar's channel), which is the classic Turtle system definition.
+
+### T15. Level-Based Signals Without Cooldown
+- [ ] **Add `min_bars_between_entries` cooldown**
+    - **Risk Level**: 🟠 High
+    - **Location**: `src/strategies/adx_trend.py`, `bollinger_bands.py`, `breakout.py`, `z_score.py` — all use level conditions (not transitions). After SL hit, they immediately re-enter if condition persists.
+    - **Impact**: "Re-entry grinder" — rapid SL hits in falling knives or false breakouts. 3-5 consecutive losses in a single session before circuit breaker fires.
+    - **Fix**: Add `_last_entry_bar` tracking in `BaseStrategy`. Block new entries for N bars (configurable, default 10) after any entry.
+
+### T16. Drawdown Uses Daily PnL Not Peak-Equity HWM
+- [ ] **Fix: Implement peak-equity high-water mark tracking**
+    - **Risk Level**: 🟠 High
+    - **Location**: `src/risk.py` `calculate_position_size()` — auto-deleverage uses `daily_pnl_pct` as proxy for drawdown. Resets every UTC midnight.
+    - **Impact**: A 9% loss on Day 1 + 9% loss on Day 2 = 18% real drawdown, but auto-deleverage (10% threshold) never triggers.
+    - **Fix**: Track `peak_equity` in Redis. Calculate `current_drawdown = (peak - current) / peak`. Use this for auto-deleverage instead of daily PnL.
+
+### T17. Consecutive Loss Streak Resets at Midnight
+- [ ] **Fix: Carry loss streaks across day boundaries**
+    - **Risk Level**: 🟠 High
+    - **Location**: `src/risk.py` `_ensure_daily_init()` — `self.consecutive_losses = 0` on new day.
+    - **Impact**: A 3-loss streak spanning midnight is forgotten. Size reduction (50% after 3 consecutive losses) never triggers.
+    - **Fix**: Persist `consecutive_losses` in Redis independently of daily stats. Only reset on consecutive wins, not on calendar boundary.
+
+### T18. No Market Order Size Validation at Exchange Boundary
+- [ ] **Fix: Validate `amount` parameter in `market_long` / `market_short`**
+    - **Risk Level**: 🟠 High
+    - **Location**: `src/exchange.py` — `amount` defaults to `None` and is never validated before CCXT call.
+    - **Impact**: A refactoring error bypassing `validate_trade()` would send a None/0/negative-sized market order to the exchange.
+    - **Fix**: Add `assert amount is not None and amount > 0` guard at the top of both methods. Return error, don't throw.
+
+### T19. WebSocket Feed No Stale-Data Detection
+- [ ] **Fix: Add timestamp-based staleness check**
+    - **Risk Level**: 🟠 High
+    - **Location**: `src/ws_feed.py` — streaming loops reconnect on exception but no mechanism detects silently stale data.
+    - **Impact**: Bot trades on minutes-old prices after silent WS disconnection.
+    - **Fix**: Track `last_ticker_update_time`. In `run_cycle()`, if ticker age > 60s, fall back to REST and log warning. If > 120s, pause trading.
+
+### T20. Postgres Implementation Completely Untested
+- [ ] **Add Postgres integration tests**
+    - **Risk Level**: 🟠 High
+    - **Location**: `tests/` — all 20 test files use SQLite in-memory. Zero Postgres coverage.
+    - **Impact**: Schema divergence (TIMESTAMPTZ vs TEXT, JSONB vs TEXT) means Postgres could fail in production with no warning.
+    - **Fix**: Add `test_database_postgres.py` using testcontainers or a compose-based test PostgreSQL. Test all CRUD operations, schema creation, and migration edge cases.
+
+### T21. No Database Migration Framework
+- [ ] **Implement Alembic or equivalent migration system**
+    - **Risk Level**: 🟠 High
+    - **Location**: `src/database/postgres.py`, `sqlite.py` — DDL via inline `CREATE TABLE IF NOT EXISTS`. SQLite has ad-hoc `ALTER TABLE` migration; Postgres has none.
+    - **Impact**: Adding columns to Postgres requires manual SQL intervention. Schema drift between environments.
+    - **Fix**: Add Alembic with version-tracked migrations. Generate initial migration from current schema. All future changes via migration files.
+
+---
+
+## 🟡 Medium Priority (Hardening & Hygiene)
+
+### T22. Auth is Fail-Open by Default
+- [ ] **Fix: Require API key even in development**
+    - **Location**: `src/api/auth.py` — if `OMNITRADER_API_KEY` env var not set, all auth is bypassed.
+    - **Fix**: Generate a random key on first startup if none configured. Log it once. Never allow zero-auth.
+
+### T23. Hardcoded Postgres Password
+- [ ] **Fix: Remove default password fallbacks**
+    - **Location**: `compose.yml`, `config/config.yaml`, `src/database/postgres.py` — `omnitrader_password` is hardcoded as fallback everywhere.
+    - **Fix**: Require `POSTGRES_PASSWORD` env var with no default. Fail startup if not set.
+
+### T24. Dev Dependencies in Production Image
+- [ ] **Fix: Separate dev/prod requirements**
+    - **Location**: `requirements.txt` — `pytest`, `ruff`, `pre-commit` installed in production Docker image.
+    - **Fix**: Split into `requirements.txt` (prod) and `requirements-dev.txt` (test/lint). Update Dockerfile to install only prod deps.
+
+### T25. No Dependency Lockfile
+- [ ] **Fix: Pin all versions, generate lockfile**
+    - **Location**: `requirements.txt` — all deps use floor pins (`>=`). `pandas-ta>=0.3.14b` is **unmaintained** (last release 2022).
+    - **Impact**: Builds are not reproducible. A dep update can silently break the system.
+    - **Fix**: `pip freeze > requirements.lock`. Pin exact versions. Evaluate `pandas-ta` replacement (e.g., `ta-lib` or manual indicator implementations).
+
+### T26. Celery Dispatch No Circuit Breaker
+- [ ] **Fix: Add Celery health circuit breaker in `dispatch.py`**
+    - **Location**: `src/workers/dispatch.py` — if Celery worker dies, `dispatch()` blocks for 30s per cycle (timeout). `ThreadPoolExecutor(max_workers=4)` can be exhausted.
+    - **Fix**: Track consecutive Celery failures. After 3 failures, skip Celery for 5 minutes and fall back to local execution. Log prominently.
+
+### T27. `min_size` Hardcoded for BTC
+- [ ] **Fix: Fetch minimum order size from exchange**
+    - **Location**: `src/risk.py` — `min_size = 0.001` hardcoded. Breaks if multi-asset is added (e.g., ETH min = 0.01).
+    - **Fix**: Use `exchange.markets[symbol]['limits']['amount']['min']` from CCXT market info.
+
+### T28. Notifier Creates New HTTP Client Per Message
+- [ ] **Fix: Use session-scoped `httpx.AsyncClient`**
+    - **Location**: `src/notifier.py` — creates new `httpx.AsyncClient` per notification. No connection pooling, no Discord rate limiting.
+    - **Fix**: Initialize client once in `__init__`. Add simple rate limiter (30 req/60s for Discord webhooks).
+
+---
+
+## ✅ Completed (Audit Trail)
+
+<details>
+<summary>Previously completed items (T1–T5)</summary>
+
+### T1. Database Infrastructure Migration
+- [x] **Migrate to High-Performance Database**
+    - **Status**: ✅ Implemented (`src/database/postgres.py`). Ready for config switch.
+    - **Completed**: 2026-02 | **Note**: Postgres untested in production — see T20.
+
+### T2. State Persistence Implementation
+- [x] **Implement "Anti-Amnesia" Persistence Layer**
+    - **Status**: ✅ Implemented (`src/database/redis_store.py`).
+    - **Completed**: 2026-02 | **Note**: Redis failures silently swallowed — see T12.
+
+### T3. Advanced Rate Limiting
 - [x] **Implement Leaky-Bucket Rate Limiter**
-    - **Status**: ✅ **Implemented** (`src/rate_limiter.py`, `tests/test_rate_limiter.py`). Wired into all CCXT call-sites in `src/exchange.py`.
-    - **Risk Level**: 🟠 Medium
-    - **Issue**: Current rate limiting relied on simple logic and `asyncio.sleep` after errors occur.
-    - **Vulnerability**: In volatile markets, the bot may exceed exchange limits and face temporary IP bans.
-    - **Impact**: Inability to exit positions during a crash.
-    - **Mitigation Path**: ✅ **Proactive token-bucket limiter** intercepts all CCXT calls *before* transmission. Capacity=2000 weight units, refill at 40 units/s (Binance 2400/60s). Per-endpoint weight table. Thread-safe via asyncio.Lock. `Exchange.get_rate_limit_usage()` now returns bucket status.
+    - **Status**: ✅ Implemented (`src/rate_limiter.py`). Capacity=2000, refill 40 units/s. All CCXT call-sites wired.
+    - **Completed**: 2026-02
 
-### 4. Event Loop Optimization (Worker Offloading)
+### T4. Event Loop Optimization (Worker Offloading)
 - [x] **Implement Celery + Redis Worker Architecture**
-    - **Risk Level**: 🟠 Medium
-    - **Issue**: FastAPI and the trading loop share a single-threaded event loop. Large Pandas/NumPy indicator calculations block heartbeats.
-    - **Vulnerability**: Delayed API responses and missed price triggers.
-    - **Impact**: Execution slippage and heartbeat timeouts.
-    - **Mitigation Path**: ✅ **Celery worker offload** dispatches `analyze_strategy` + `analyze_regime` tasks to a separate worker process via asyncio-safe `dispatch()` (ThreadPoolExecutor bridge). Broker=Redis DB1, backend=Redis DB2. `compose.yml` adds `celery-worker` service. Local fallback if worker unavailable. 12 new tests. All 84 tests pass.
+    - **Status**: ✅ Implemented. Celery worker offloads `analyze_strategy` + `analyze_regime` tasks. 12 new tests.
+    - **Completed**: 2026-02 | **Note**: No Celery circuit breaker — see T26.
 
-## 🟡 Low Priority (Execution Precision)
-
-### 5. WebSocket Integration
+### T5. WebSocket Integration
 - [x] **CCXT WebSocket Integration**
-    - **Risk Level**: 🟡 Low to Medium
-    - **Issue**: Current implementation relies on REST polling for order status and price updates.
-    - **Vulnerability**: Potentially outdated market data and missed partial fill events during high volatility.
-    - **Impact**: Inaccurate position sizing and slower execution.
-    - **Mitigation Path**: ✅ **WsFeed module** (`src/ws_feed.py`) uses `ccxt.pro.binanceusdm` to stream `watch_ticker`, `watch_ohlcv`, and `watch_orders` as background asyncio tasks. OHLCV cache is pre-seeded via REST on first cycle then kept fresh via WS merges. `run_cycle()` prefers WS cache (avoids REST round-trips when warm); real-time price sourced from WS ticker. Order fills tracked via `watch_orders` (live mode). Paper/offline mode skips auth-required streams. 23 new tests. All 107 tests pass.
+    - **Status**: ✅ Implemented (`src/ws_feed.py`). Streams ticker, OHLCV, orders. 23 new tests.
+    - **Completed**: 2026-02 | **Note**: No stale-data detection — see T19.
+
+</details>
