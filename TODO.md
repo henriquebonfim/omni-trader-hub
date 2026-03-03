@@ -11,12 +11,13 @@ Promoted from TASKS.md after institutional audit (2026-03-03).
 
 ## Sprint: Post-Audit Critical Fixes
 
-### 1. Fix SL/TP Failure → Retry or Flatten (T6)
-- [ ] In `_open_position()`: after SL placement fails, retry 3× with 1s backoff
-- [ ] If all retries fail, immediately call `_close_position()` to flatten
-- [ ] Same pattern for TP placement failure
-- [ ] Add test: mock SL failure → verify position is flattened
+### 1. Fix SL/TP Failure → Retry or Flatten (T6) ✅
+- [x] In `_open_position()`: after SL placement fails, retry 3× with 1s backoff
+- [x] If all retries fail, immediately call `_close_position()` to flatten
+- [x] Same pattern for TP placement failure
+- [x] Add test: mock SL failure → verify position is flattened
 - **Ref**: TASKS.md T6
+- **Completed**: 2026-03-03 | Commit 59a9dce
 
 ### 2. Fix Paper Mode PnL Formula (T7)
 - [ ] Change formula to `(exit_price - entry_price) * contracts` (long) / negate for short

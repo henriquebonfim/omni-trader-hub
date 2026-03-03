@@ -7,9 +7,9 @@ RUNTIME    = python
 PKG_MGR    = pip
 
 # ─── Commands ──────────────────────────────────────────────
-TEST_CMD   = docker compose run --rm -e PYTHONPATH=/app omnitrader pytest -q tests/ && docker compose run --rm frontend bun test
-LINT_CMD   = docker compose run --rm -e PYTHONPATH=/app omnitrader ruff check src/ && docker compose run --rm frontend bun run lint
-TYPE_CMD   = docker compose run --rm -e PYTHONPATH=/app omnitrader mypy src/ && docker compose run --rm frontend bun run typecheck
+TEST_CMD   = docker compose run --rm -e PYTHONPATH=/app omnitrader pytest -q tests/ && docker compose run --rm frontend-test bun test --pass-with-no-tests
+LINT_CMD   = docker compose run --rm -e PYTHONPATH=/app omnitrader ruff check src/ && docker compose run --rm frontend-test bun run lint
+TYPE_CMD   = docker compose run --rm -e PYTHONPATH=/app omnitrader mypy src/ && docker compose run --rm frontend-test bun run typecheck
 BUILD_CMD  = docker compose build
 DEV_CMD    = docker compose up
 

@@ -835,17 +835,47 @@ class OmniTrader:
             stop_loss = self.risk.calculate_stop_loss(entry_price, side)
             take_profit = self.risk.calculate_take_profit(entry_price, side)
 
-            # Set stop loss
-            try:
-                await self.exchange.set_stop_loss(symbol, stop_loss, side)
-            except Exception as e:
-                logger.error("set_stop_loss_failed", error=str(e))
+            # Set stop loss with retries
+            sl_success = False
+            for attempt in range(4):
+                try:
+                    await self.exchange.set_stop_loss(symbol, stop_loss, side)
+                    sl_success = True
+                    break
+                except Exception as e:
+                    if attempt < 3:
+                        logger.warning("set_stop_loss_failed_retrying", attempt=attempt+1, error=str(e))
+                        await asyncio.sleep(1 * (2 ** attempt))
+                    else:
+                        logger.error("set_stop_loss_failed_final", error=str(e))
 
-            # Set take profit
-            try:
-                await self.exchange.set_take_profit(symbol, take_profit, side)
-            except Exception as e:
-                logger.error("set_take_profit_failed", error=str(e))
+            if not sl_success:
+                logger.critical("flattening_position_due_to_sl_failure")
+                pos = await self.exchange.get_position(symbol)
+                if pos.is_open:
+                    await self._close_position(pos, entry_price, "emergency_close_sl_placement_failed")
+                return
+
+            # Set take profit with retries
+            tp_success = False
+            for attempt in range(4):
+                try:
+                    await self.exchange.set_take_profit(symbol, take_profit, side)
+                    tp_success = True
+                    break
+                except Exception as e:
+                    if attempt < 3:
+                        logger.warning("set_take_profit_failed_retrying", attempt=attempt+1, error=str(e))
+                        await asyncio.sleep(1 * (2 ** attempt))
+                    else:
+                        logger.error("set_take_profit_failed_final", error=str(e))
+
+            if not tp_success:
+                logger.critical("flattening_position_due_to_tp_failure")
+                pos = await self.exchange.get_position(symbol)
+                if pos.is_open:
+                    await self._close_position(pos, entry_price, "emergency_close_tp_placement_failed")
+                return
 
             # Log to database
             await self.database.log_trade_open(

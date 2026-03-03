@@ -79,6 +79,17 @@ services:
         condition: service_healthy
     restart: unless-stopped
 
+  frontend-test:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      target: builder
+    volumes:
+      - ./frontend:/app
+    working_dir: /app
+    profiles:
+      - test
+
   postgres:
     # image: postgres:18-alpine
     image: postgres:15-alpine
