@@ -16,7 +16,6 @@ analyze_regime
 Both tasks are **idempotent** (read-only, stateless) — safe to retry.
 """
 
-import json
 
 import structlog
 

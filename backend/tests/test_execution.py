@@ -37,6 +37,108 @@ def bot():
             yield bot
 
 @pytest.mark.asyncio
+async def test_open_position_sl_failure_flattens_position(bot):
+    bot.config.trading.symbol = "BTC/USDT"
+    
+    # Mock validation to approve
+    bot.risk.validate_trade.return_value = MagicMock(approved=True, position_size=1.0)
+    
+    # Mock exchange
+    bot.exchange.market_long = AsyncMock(return_value={"id": "order123", "average": 50000.0})
+    bot.exchange.cancel_all_orders = AsyncMock()
+    bot.exchange.get_order_fill_details = AsyncMock(return_value={
+        "average_price": 50000.0,
+        "total_fee": 1.0,
+        "fee_currency": "USDT",
+        "confirmed": True
+    })
+    
+    # Make set_stop_loss ALWAYS fail
+    bot.exchange.set_stop_loss = AsyncMock(side_effect=Exception("API Error"))
+    bot.exchange.set_take_profit = AsyncMock()
+    
+    # Mock _close_position and get_position
+    bot._close_position = AsyncMock()
+    open_pos = Position({"symbol": "BTC/USDT", "side": "long", "contracts": 1.0, "entryPrice": 50000.0})
+    bot.exchange.get_position = AsyncMock(return_value=open_pos)
+    
+    # Patch asyncio.sleep to not actually sleep during tests
+    with patch("asyncio.sleep", new_callable=AsyncMock) as mock_sleep:
+        await bot._open_position("long", 50000.0, 10000.0, "test_reason")
+    
+    # Assertions
+    assert bot.exchange.set_stop_loss.call_count == 4
+    assert mock_sleep.call_count == 3  # Slept 3 times
+    
+    bot.exchange.set_take_profit.assert_not_called()
+    bot._close_position.assert_called_once_with(open_pos, 50000.0, "emergency_close_sl_placement_failed")
+    bot.database.log_trade_open.assert_not_called()
+
+@pytest.mark.asyncio
+async def test_open_position_tp_failure_flattens_position(bot):
+    bot.config.trading.symbol = "BTC/USDT"
+    
+    bot.risk.validate_trade.return_value = MagicMock(approved=True, position_size=1.0)
+    
+    bot.exchange.market_long = AsyncMock(return_value={"id": "order123", "average": 50000.0})
+    bot.exchange.cancel_all_orders = AsyncMock()
+    bot.exchange.get_order_fill_details = AsyncMock(return_value={
+        "average_price": 50000.0,
+        "total_fee": 1.0,
+        "fee_currency": "USDT",
+        "confirmed": True
+    })
+    
+    bot.exchange.set_stop_loss = AsyncMock()
+    # Make set_take_profit ALWAYS fail
+    bot.exchange.set_take_profit = AsyncMock(side_effect=Exception("API Error"))
+    
+    bot._close_position = AsyncMock()
+    open_pos = Position({"symbol": "BTC/USDT", "side": "long", "contracts": 1.0, "entryPrice": 50000.0})
+    bot.exchange.get_position = AsyncMock(return_value=open_pos)
+    
+    with patch("asyncio.sleep", new_callable=AsyncMock) as mock_sleep:
+        await bot._open_position("long", 50000.0, 10000.0, "test_reason")
+    
+    assert bot.exchange.set_stop_loss.call_count == 1
+    assert bot.exchange.set_take_profit.call_count == 4
+    assert mock_sleep.call_count == 3
+    
+    bot._close_position.assert_called_once_with(open_pos, 50000.0, "emergency_close_tp_placement_failed")
+    bot.database.log_trade_open.assert_not_called()
+
+@pytest.mark.asyncio
+async def test_open_position_success_with_retries(bot):
+    bot.config.trading.symbol = "BTC/USDT"
+    
+    bot.risk.validate_trade.return_value = MagicMock(approved=True, position_size=1.0)
+    
+    bot.exchange.market_long = AsyncMock(return_value={"id": "order123", "average": 50000.0})
+    bot.exchange.cancel_all_orders = AsyncMock()
+    bot.exchange.get_order_fill_details = AsyncMock(return_value={
+        "average_price": 50000.0,
+        "total_fee": 1.0,
+        "fee_currency": "USDT",
+        "confirmed": True
+    })
+    
+    # Fail twice, then succeed
+    bot.exchange.set_stop_loss = AsyncMock(side_effect=[Exception("Fail 1"), Exception("Fail 2"), None])
+    bot.exchange.set_take_profit = AsyncMock(side_effect=[Exception("Fail 1"), None])
+    
+    bot._close_position = AsyncMock()
+    
+    with patch("asyncio.sleep", new_callable=AsyncMock) as mock_sleep:
+        await bot._open_position("long", 50000.0, 10000.0, "test_reason")
+    
+    assert bot.exchange.set_stop_loss.call_count == 3
+    assert bot.exchange.set_take_profit.call_count == 2
+    assert mock_sleep.call_count == 3  # 2 for SL, 1 for TP
+    
+    bot._close_position.assert_not_called()
+    bot.database.log_trade_open.assert_called_once()
+
+@pytest.mark.asyncio
 async def test_close_position_slippage(bot):
     # Setup
     position = Position({

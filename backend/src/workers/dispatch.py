@@ -17,7 +17,6 @@ Usage::
 
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
-from functools import partial
 from typing import Any
 
 # Shared executor — 2 threads is sufficient; we only ever run 2 Celery tasks

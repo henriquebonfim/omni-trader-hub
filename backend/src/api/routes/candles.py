@@ -1,5 +1,4 @@
 from fastapi import APIRouter, Request, Query
-from typing import Optional
 
 router = APIRouter(prefix="/candles", tags=["candles"])
 
