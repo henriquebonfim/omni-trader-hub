@@ -3,6 +3,7 @@ import time
 import sys
 import argparse
 import re
+import os
 
 def get_session_status(session_id):
     try:
@@ -11,14 +12,13 @@ def get_session_status(session_id):
             ["jules", "remote", "list", "--session"],
             capture_output=True,
             text=True,
-            env={"COLUMNS": "200"}
+            env={**os.environ, "COLUMNS": "200"}
         )
         if result.returncode != 0:
             print(f"Error running jules command: {result.stderr}", file=sys.stderr)
             return None
 
-        lines = result.stdout.strip().split('
-')
+        lines = result.stdout.strip().split('\n')
         for line in lines:
             if session_id in line:
                 # Basic parsing: ID is usually the first column, Status is the last
