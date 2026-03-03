@@ -86,6 +86,10 @@ export const botStop = () => api.post('/bot/stop')
 export const botRestart = () => api.post('/bot/restart')
 export const fetchBotState = () => api.get('/bot/state')
 
+// Manual Trading
+export const manualTradeOpen = (side: 'long' | 'short') => api.post('/bot/trade/open', { side })
+export const manualTradeClose = () => api.post('/bot/trade/close')
+
 // Notifications
 export const fetchDiscordConfig = () => api.get('/notifications/discord')
 export const updateDiscordConfig = (payload: { webhook_url: string; enabled: boolean }) =>
@@ -135,3 +139,4 @@ export interface CycleMessage {
   market_trend?: string
   time_in_trade?: number
 }
+

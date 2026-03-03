@@ -74,14 +74,16 @@ class WsFeed:
         self._timeframes = list(timeframes)
         self._paper_mode = paper_mode
 
-        self._client = ccxtpro.binanceusdm(
-            {
-                "apiKey": api_key,
-                "secret": api_secret,
-                "enableRateLimit": True,
-                "options": {"defaultType": "swap"},
-            }
-        )
+        exchange_config = {
+            "enableRateLimit": True,
+            "options": {"defaultType": "swap"},
+        }
+        
+        if not self._paper_mode:
+            exchange_config["apiKey"] = api_key
+            exchange_config["secret"] = api_secret
+
+        self._client = ccxtpro.binanceusdm(exchange_config)
 
         # Caches
         self._ticker: dict | None = None

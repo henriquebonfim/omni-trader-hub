@@ -126,25 +126,30 @@ class RiskManager:
         try:
             # Restore Daily Stats
             daily_stats_data = await self.redis.get(f"{self._redis_key_prefix}daily_stats")
+            is_same_day = False
             if daily_stats_data:
                 stats = DailyStats.from_dict(daily_stats_data)
                 # Only restore if it's the same day
                 if stats.date == date.today():
                     self.daily_stats = stats
+                    is_same_day = True
                     logger.info("restored_daily_stats", stats=daily_stats_data)
                 else:
                     logger.info("skipping_stale_daily_stats", stored_date=str(stats.date))
 
-            # Restore Consecutive Losses
+            # Restore Consecutive Losses (streak carries over days unless reset by win)
             losses = await self.redis.get(f"{self._redis_key_prefix}consecutive_losses")
             if losses is not None:
                 self.consecutive_losses = int(losses)
                 logger.info("restored_consecutive_losses", count=self.consecutive_losses)
 
             # Restore Circuit Breakers
-            cb_active = await self.redis.get(f"{self._redis_key_prefix}circuit_breaker")
-            if cb_active is not None:
-                self._circuit_breaker_active = bool(cb_active)
+            if is_same_day:
+                cb_active = await self.redis.get(f"{self._redis_key_prefix}circuit_breaker")
+                if cb_active is not None:
+                    self._circuit_breaker_active = bool(cb_active)
+            else:
+                self._circuit_breaker_active = False
 
             wcb_active = await self.redis.get(f"{self._redis_key_prefix}weekly_circuit_breaker")
             if wcb_active is not None:

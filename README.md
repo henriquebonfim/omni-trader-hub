@@ -5,11 +5,14 @@ A simple, working BTC/USDT Futures trading bot using EMA + Volume strategy.
 ## Features
 
 - **Paper Trading Mode** - Test with $10k simulated balance using live market data
+- **Manual Trading & Charting** - Execute Buy/Sell/Close orders directly from the dashboard and view real-time candlestick charts with multiple timeframes (from 1 second to 9 years)*.
 - **EMA(9/21) + Volume Strategy** - Trend-following with volume confirmation
 - **Risk Management** - 2% position sizing, 2% SL, 4% TP, 5% daily circuit breaker
 - **Discord Alerts** - Real-time notifications for all trading events
 - **SQLite Logging** - Complete trade history with P&L tracking
 - **Async Architecture** - Non-blocking, efficient market data handling
+
+*\*Note on chart timeframes: The frontend supports selecting extremely granular or high-level timeframes (e.g. "10 sec" or "9 Years"). Since the exchange (Binance) natively supports only specific intervals (like 1s, 1m, 1h, 1d, 1M), the backend automatically maps unsupported intervals to the nearest native exchange interval so the chart will still render successfully.*
 
 ## Quick Start
 

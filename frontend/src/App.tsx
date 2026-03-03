@@ -11,6 +11,7 @@ import BotControl from './components/BotControl'
 import DiscordConfig from './components/DiscordConfig'
 import RiskDashboard from './components/RiskDashboard'
 import SlippageReport from './components/SlippageReport'
+import CandleChart from './components/CandleChart'
 
 type Page = 'dashboard' | 'risk' | 'slippage' | 'trades' | 'config' | 'notifications'
 
@@ -63,6 +64,7 @@ export default function App() {
               <BotControl />
               <StrategySelector />
             </div>
+            {status?.symbol && <CandleChart symbol={status.symbol} />}
             <EquityCurve />
           </>
         )}

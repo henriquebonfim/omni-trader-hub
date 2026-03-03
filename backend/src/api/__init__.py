@@ -12,7 +12,7 @@ import structlog
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from .routes import bot, config, notifications, status, strategies, trades
+from .routes import bot, config, notifications, status, strategies, trades, candles
 from .websocket import router as ws_router
 
 logger = structlog.get_logger()
@@ -66,6 +66,7 @@ def create_api(bot_instance) -> FastAPI:
     app.include_router(config.router, prefix="/api")
     app.include_router(bot.router, prefix="/api")
     app.include_router(notifications.router, prefix="/api")
+    app.include_router(candles.router, prefix="/api")
     app.include_router(ws_router)
 
     @app.get("/api/health")

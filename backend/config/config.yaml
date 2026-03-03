@@ -33,7 +33,7 @@ strategy:
     period: 20
   ema_fast: 10
   ema_slow: 21
-  name: ema_volume
+  name: adx_trend
   volume_sma: 20
   volume_threshold: 1.5
   z_score_threshold: 2.0
