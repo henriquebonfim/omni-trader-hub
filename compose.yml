@@ -34,6 +34,8 @@ services:
     command: python -m src.watchdog
     volumes:
       - ./backend/config:/app/config
+    environment:
+      - WATCHDOG_HEALTH_URL=http://omnitrader:8000/api/health
     env_file:
       - .env
     depends_on:
@@ -126,22 +128,22 @@ services:
       retries: 5
     restart: unless-stopped
 
-  ollama:
-    image: ollama/ollama:0.17.6
-    container_name: omnitrader-ollama
-    environment:
-      - OLLAMA_DEBUG=1
-    ports:
-      - "11434:11434"
-    volumes:
-      - ollama_data:/root/.ollama
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: 1
-              capabilities: [gpu]
+  # ollama:
+  #   image: ollama/ollama:0.17.6
+  #   container_name: omnitrader-ollama
+  #   environment:
+  #     - OLLAMA_DEBUG=1
+  #   ports:
+  #     - "11434:11434"
+  #   volumes:
+  #     - ollama_data:/root/.ollama
+  #   deploy:
+  #     resources:
+  #       reservations:
+  #         devices:
+  #           - driver: nvidia
+  #             count: 1
+  #             capabilities: [gpu]
 
 volumes:
   postgres_data:

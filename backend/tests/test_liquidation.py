@@ -21,13 +21,17 @@ async def test_liquidation_risk_trigger():
     bot.config.trading.ohlcv_limit = 100
 
     # Mock Balance
-    bot.exchange.get_balance.return_value = {"total": 10000.0, "free": 10000.0, "used": 0.0}
+    bot.exchange.get_balance.return_value = {
+        "total": 10000.0,
+        "free": 10000.0,
+        "used": 0.0,
+    }
 
     # Initialize Risk Manager with buffer
     bot.risk = RiskManager()
-    bot.risk.liquidation_buffer_pct = 0.5 # 50%
+    bot.risk.liquidation_buffer_pct = 0.5  # 50%
     bot.risk.max_daily_loss_pct = 5.0
-    bot.risk.initialize_daily_stats(10000.0)
+    await bot.risk.initialize_daily_stats(10000.0)
 
     # Mock Strategy
     bot.strategy = MagicMock()
@@ -45,13 +49,12 @@ async def test_liquidation_risk_trigger():
 
     # Let's mock exchange.fetch_ohlcv to return a dataframe-like object
     import pandas as pd
+
     # Ensure DataFrame has a DatetimeIndex and necessary columns for Black Swan check
     now = pd.Timestamp.now()
-    df = pd.DataFrame({
-        "close": [45000.0],
-        "high": [45000.0],
-        "low": [44900.0]
-    }, index=[now])
+    df = pd.DataFrame(
+        {"close": [45000.0], "high": [45000.0], "low": [44900.0]}, index=[now]
+    )
     bot.exchange.fetch_ohlcv.return_value = df
 
     # Mock Position: Long from 50k, Liq 40k. Total dist 10k.
@@ -59,21 +62,21 @@ async def test_liquidation_risk_trigger():
     # Let's make it 44k. Dist to Liq 4k. 4k/10k = 0.4 < 0.5. Trigger.
 
     # Update df to 44k
-    df = pd.DataFrame({
-        "close": [44000.0],
-        "high": [44000.0],
-        "low": [43900.0]
-    }, index=[now])
+    df = pd.DataFrame(
+        {"close": [44000.0], "high": [44000.0], "low": [43900.0]}, index=[now]
+    )
     bot.exchange.fetch_ohlcv.return_value = df
 
-    position = Position({
-        "symbol": "BTC/USDT",
-        "side": "long",
-        "contracts": 1.0,
-        "entryPrice": 50000.0,
-        "liquidationPrice": 40000.0,
-        "leverage": 10
-    })
+    position = Position(
+        {
+            "symbol": "BTC/USDT",
+            "side": "long",
+            "contracts": 1.0,
+            "entryPrice": 50000.0,
+            "liquidationPrice": 40000.0,
+            "leverage": 10,
+        }
+    )
     bot.exchange.get_position.return_value = position
 
     # Mock close_position
@@ -82,7 +85,7 @@ async def test_liquidation_risk_trigger():
     bot.exchange.get_order_fill_details.return_value = {
         "average_price": 44000.0,
         "total_fee": 1.0,
-        "fee_currency": "USDT"
+        "fee_currency": "USDT",
     }
 
     # Mock database fee query
@@ -95,7 +98,10 @@ async def test_liquidation_risk_trigger():
     # Verify Close Called
     bot.exchange.close_position.assert_called_once()
     bot.database.log_trade_close.assert_called_once()
-    assert bot.database.log_trade_close.call_args[1]["reason"] == "liquidation_risk_exit"
+    assert (
+        bot.database.log_trade_close.call_args[1]["reason"] == "liquidation_risk_exit"
+    )
+
 
 @pytest.mark.asyncio
 async def test_liquidation_risk_safe():
@@ -110,12 +116,16 @@ async def test_liquidation_risk_safe():
     bot.config.trading.ohlcv_limit = 100
 
     # Mock Balance
-    bot.exchange.get_balance.return_value = {"total": 10000.0, "free": 10000.0, "used": 0.0}
+    bot.exchange.get_balance.return_value = {
+        "total": 10000.0,
+        "free": 10000.0,
+        "used": 0.0,
+    }
 
     # Initialize Risk Manager with buffer
     bot.risk = RiskManager()
     bot.risk.liquidation_buffer_pct = 0.5
-    bot.risk.initialize_daily_stats(10000.0)
+    await bot.risk.initialize_daily_stats(10000.0)
 
     # Mock Strategy
     bot.strategy = MagicMock()
@@ -125,33 +135,32 @@ async def test_liquidation_risk_safe():
 
     # Mock OHLCV
     import pandas as pd
+
     now = pd.Timestamp.now()
-    df = pd.DataFrame({
-        "close": [45000.0],
-        "high": [45000.0],
-        "low": [44900.0]
-    }, index=[now])
+    df = pd.DataFrame(
+        {"close": [45000.0], "high": [45000.0], "low": [44900.0]}, index=[now]
+    )
     bot.exchange.fetch_ohlcv.return_value = df
 
     # Mock Position: Long from 50k, Liq 40k. Total dist 10k.
     # Current 48k. Dist to Liq 8k. 8k/10k = 0.8 > 0.5. Safe.
 
     # Update df to 48k
-    df = pd.DataFrame({
-        "close": [48000.0],
-        "high": [48000.0],
-        "low": [47900.0]
-    }, index=[now])
+    df = pd.DataFrame(
+        {"close": [48000.0], "high": [48000.0], "low": [47900.0]}, index=[now]
+    )
     bot.exchange.fetch_ohlcv.return_value = df
 
-    position = Position({
-        "symbol": "BTC/USDT",
-        "side": "long",
-        "contracts": 1.0,
-        "entryPrice": 50000.0,
-        "liquidationPrice": 40000.0,
-        "leverage": 10
-    })
+    position = Position(
+        {
+            "symbol": "BTC/USDT",
+            "side": "long",
+            "contracts": 1.0,
+            "entryPrice": 50000.0,
+            "liquidationPrice": 40000.0,
+            "leverage": 10,
+        }
+    )
     bot.exchange.get_position.return_value = position
     bot.database.get_weekly_pnl = AsyncMock(return_value=0.0)
 

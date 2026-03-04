@@ -12,6 +12,7 @@ structlog>=23.0.0
 pytest>=7.0.0
 pytest-asyncio>=0.21.0
 ruff>=0.3.0
+mypy>=1.0.0
 pre-commit>=3.6.0
 
 # Celery worker offloading (broker + result backend = existing Redis)
