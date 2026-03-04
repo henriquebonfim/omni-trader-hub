@@ -64,8 +64,9 @@ Promoted from TASKS.md after institutional audit (2026-03-03).
 - **Completed**: 2026-03-04 | PR #56
 
 ### 8. Add Entry Cooldown for Level-Based Strategies (T15)
-- [ ] Add `_last_entry_bar` tracking in `BaseStrategy`
-- [ ] Add `min_bars_between_entries` config param (default: 10)
-- [ ] Block new entries for N bars after any entry on same side
-- [ ] Add test: verify re-entry blocked within cooldown window
+- [x] Add `_last_entry_bar` tracking in `BaseStrategy`
+- [x] Add `min_bars_between_entries` config param (default: 10)
+- [x] Block new entries for N bars after any entry on same side
+- [x] Add test: verify re-entry blocked within cooldown window
 - **Ref**: TASKS.md T15
+- **Completed**: 2026-03-04 | PR #57
