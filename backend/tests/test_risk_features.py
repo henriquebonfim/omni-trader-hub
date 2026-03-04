@@ -1,4 +1,5 @@
 from datetime import timedelta
+from unittest.mock import AsyncMock, patch
 
 import pandas as pd
 import pytest
@@ -7,7 +8,9 @@ from src.risk import RiskManager
 
 
 @pytest.mark.asyncio
-async def test_weekly_circuit_breaker_triggered():
+@patch("src.database.factory.DatabaseFactory.get_redis_store")
+async def test_weekly_circuit_breaker_triggered(mock_get_store):
+    mock_get_store.return_value = AsyncMock()
     # Setup
     risk = RiskManager()
     risk.max_weekly_loss_pct = 10.0
@@ -23,7 +26,9 @@ async def test_weekly_circuit_breaker_triggered():
 
 
 @pytest.mark.asyncio
-async def test_weekly_circuit_breaker_not_triggered():
+@patch("src.database.factory.DatabaseFactory.get_redis_store")
+async def test_weekly_circuit_breaker_not_triggered(mock_get_store):
+    mock_get_store.return_value = AsyncMock()
     risk = RiskManager()
     risk.max_weekly_loss_pct = 10.0
 

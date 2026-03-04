@@ -1,4 +1,4 @@
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -9,7 +9,9 @@ from src.strategies.base import Signal
 
 
 @pytest.mark.asyncio
-async def test_liquidation_risk_trigger():
+@patch("src.database.factory.DatabaseFactory.get_redis_store")
+async def test_liquidation_risk_trigger(mock_get_store):
+    mock_get_store.return_value = AsyncMock()
     # Setup
     bot = OmniTrader()
     bot.exchange = AsyncMock()
@@ -104,7 +106,9 @@ async def test_liquidation_risk_trigger():
 
 
 @pytest.mark.asyncio
-async def test_liquidation_risk_safe():
+@patch("src.database.factory.DatabaseFactory.get_redis_store")
+async def test_liquidation_risk_safe(mock_get_store):
+    mock_get_store.return_value = AsyncMock()
     # Setup
     bot = OmniTrader()
     bot.exchange = AsyncMock()

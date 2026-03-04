@@ -131,7 +131,8 @@ class RiskManager:
         try:
             # Restore Daily Stats
             daily_stats_data = await self.redis.get(
-                f"{self._redis_key_prefix}daily_stats"
+                f"{self._redis_key_prefix}daily_stats",
+                critical=True
             )
             is_same_day = False
             if daily_stats_data:
@@ -147,7 +148,10 @@ class RiskManager:
                     )
 
             # Restore Consecutive Losses (streak carries over days unless reset by win)
-            losses = await self.redis.get(f"{self._redis_key_prefix}consecutive_losses")
+            losses = await self.redis.get(
+                f"{self._redis_key_prefix}consecutive_losses",
+                critical=True
+            )
             if losses is not None:
                 self.consecutive_losses = int(losses)
                 logger.info(
@@ -157,7 +161,8 @@ class RiskManager:
             # Restore Circuit Breakers
             if is_same_day:
                 cb_active = await self.redis.get(
-                    f"{self._redis_key_prefix}circuit_breaker"
+                    f"{self._redis_key_prefix}circuit_breaker",
+                    critical=True
                 )
                 if cb_active is not None:
                     self._circuit_breaker_active = bool(cb_active)
@@ -165,7 +170,8 @@ class RiskManager:
                 self._circuit_breaker_active = False
 
             wcb_active = await self.redis.get(
-                f"{self._redis_key_prefix}weekly_circuit_breaker"
+                f"{self._redis_key_prefix}weekly_circuit_breaker",
+                critical=True
             )
             if wcb_active is not None:
                 self._weekly_circuit_breaker_active = bool(wcb_active)
@@ -173,7 +179,8 @@ class RiskManager:
             logger.info("risk_state_restored")
 
         except Exception as e:
-            logger.error("risk_state_restore_failed", error=str(e))
+            logger.error("risk_state_restore_failed_critical", error=str(e))
+            raise  # Fail-fast on startup if we cannot retrieve critical risk state
 
     async def save_state(self):
         """Persist state to Redis."""
@@ -183,21 +190,28 @@ class RiskManager:
                 f"{self._redis_key_prefix}daily_stats",
                 self.daily_stats.to_dict(),
                 expire=86400,
+                critical=True
             )
 
             # Save other fields
             await self.redis.set(
-                f"{self._redis_key_prefix}consecutive_losses", self.consecutive_losses
+                f"{self._redis_key_prefix}consecutive_losses",
+                self.consecutive_losses,
+                critical=True
             )
             await self.redis.set(
-                f"{self._redis_key_prefix}circuit_breaker", self._circuit_breaker_active
+                f"{self._redis_key_prefix}circuit_breaker",
+                self._circuit_breaker_active,
+                critical=True
             )
             await self.redis.set(
                 f"{self._redis_key_prefix}weekly_circuit_breaker",
                 self._weekly_circuit_breaker_active,
+                critical=True
             )
         except Exception as e:
-            logger.error("risk_state_save_failed", error=str(e))
+            logger.error("risk_state_save_failed_critical", error=str(e))
+            raise  # Fail-fast during operation if risk limits cannot be persisted safely
 
     def update_config(self, config):
         """Update risk parameters from new configuration."""

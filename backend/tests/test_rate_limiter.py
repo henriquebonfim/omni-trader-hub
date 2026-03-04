@@ -12,7 +12,7 @@ Covers:
 
 import asyncio
 import time
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -21,7 +21,6 @@ from src.rate_limiter import (
     ENDPOINT_WEIGHTS,
     LeakyBucketRateLimiter,
 )
-
 
 # ---------------------------------------------------------------------------
 # Basic token consumption

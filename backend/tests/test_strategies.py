@@ -9,12 +9,12 @@ import pytest
 
 from src.config import Config
 from src.risk import RiskManager
-from src.strategies.base import BaseStrategy, Signal
 from src.strategies import (
     get_strategy,
     list_strategies,
 )
 from src.strategies.adx_trend import ADXTrendStrategy
+from src.strategies.base import BaseStrategy, Signal
 from src.strategies.bollinger_bands import BollingerBandsStrategy
 from src.strategies.breakout import BreakoutStrategy
 from src.strategies.ema_volume import EMAVolumeStrategy
@@ -339,7 +339,6 @@ class DummyStrategy(BaseStrategy):
 
 
 def test_entry_cooldown():
-    from src.strategies.base import Signal
 
     config_data = {
         "trading": {"timeframe": "1h"},

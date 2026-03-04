@@ -112,7 +112,7 @@ def analyze_strategy(
         logger.error(
             "analyze_strategy_task_failed", error=str(exc), strategy=strategy_name
         )
-        raise self.retry(exc=exc, countdown=1)
+        raise self.retry(exc=exc, countdown=1) from exc
 
 
 @celery_app.task(bind=True, name="omnitrader.analyze_regime", max_retries=2)
@@ -140,4 +140,4 @@ def analyze_regime(self, ohlcv_json: str) -> str:
 
     except Exception as exc:
         logger.error("analyze_regime_task_failed", error=str(exc))
-        raise self.retry(exc=exc, countdown=1)
+        raise self.retry(exc=exc, countdown=1) from exc
