@@ -16,11 +16,14 @@ async def db():
     yield db
     await db.close()
 
+
 @pytest.mark.asyncio
 async def test_connect_and_tables(db):
     # db fixture already calls connect() which calls _create_tables and _migrate_tables
     # We can verify tables exist by querying sqlite_master
-    async with db._connection.execute("SELECT name FROM sqlite_master WHERE type='table'") as cursor:
+    async with db._connection.execute(
+        "SELECT name FROM sqlite_master WHERE type='table'"
+    ) as cursor:
         tables = [row[0] for row in await cursor.fetchall()]
 
     assert "trades" in tables
@@ -28,13 +31,16 @@ async def test_connect_and_tables(db):
     assert "equity_snapshots" in tables
     assert "signals_log" in tables
 
-    async with db._connection.execute("SELECT name FROM sqlite_master WHERE type='index'") as cursor:
+    async with db._connection.execute(
+        "SELECT name FROM sqlite_master WHERE type='index'"
+    ) as cursor:
         indexes = [row[0] for row in await cursor.fetchall()]
 
     assert "idx_trades_timestamp" in indexes
     assert "idx_trades_symbol" in indexes
     assert "idx_equity_timestamp" in indexes
     assert "idx_signals_timestamp" in indexes
+
 
 @pytest.mark.asyncio
 async def test_log_trade_open_and_get_recent(db):
@@ -48,7 +54,7 @@ async def test_log_trade_open_and_get_recent(db):
         take_profit=55000.0,
         reason="test_signal",
         expected_price=49950.0,
-        slippage=50.0
+        slippage=50.0,
     )
     assert trade_id == 1
 
@@ -67,6 +73,7 @@ async def test_log_trade_open_and_get_recent(db):
     assert trade["take_profit"] == 55000.0
     assert trade["reason"] == "test_signal"
 
+
 @pytest.mark.asyncio
 async def test_log_trade_close(db):
     trade_id = await db.log_trade_close(
@@ -79,7 +86,7 @@ async def test_log_trade_close(db):
         pnl_pct=2.0,
         reason="take_profit",
         expected_price=50950.0,
-        slippage=-50.0  # Favorable
+        slippage=-50.0,  # Favorable
     )
     assert trade_id == 1
 
@@ -94,10 +101,11 @@ async def test_log_trade_close(db):
     assert trade["expected_price"] == 50950.0
     assert trade["slippage"] == -50.0
 
+
 @pytest.mark.asyncio
 async def test_get_last_trade(db):
     await db.log_trade_open("BTC/USDT", "LONG", 50000.0, 0.1, 5000.0, None, None)
-    await asyncio.sleep(0.01) # Ensure timestamp difference
+    await asyncio.sleep(0.01)  # Ensure timestamp difference
     await db.log_trade_open("ETH/USDT", "SHORT", 3000.0, 1.0, 3000.0, None, None)
 
     last_btc = await db.get_last_trade("BTC/USDT")
@@ -110,6 +118,7 @@ async def test_get_last_trade(db):
     last_none = await db.get_last_trade("SOL/USDT")
     assert last_none is None
 
+
 @pytest.mark.asyncio
 async def test_daily_summary(db):
     today = datetime.now(timezone.utc).date().isoformat()
@@ -121,7 +130,7 @@ async def test_daily_summary(db):
         pnl_pct=5.0,
         trades_count=5,
         wins=3,
-        losses=2
+        losses=2,
     )
 
     summary = await db.get_daily_summary(today)
@@ -139,7 +148,7 @@ async def test_daily_summary(db):
         pnl_pct=6.0,
         trades_count=6,
         wins=4,
-        losses=2
+        losses=2,
     )
 
     summary = await db.get_daily_summary(today)
@@ -149,6 +158,7 @@ async def test_daily_summary(db):
     # Test None case for a non-existent date
     summary_none = await db.get_daily_summary("1970-01-01")
     assert summary_none is None
+
 
 @pytest.mark.asyncio
 async def test_equity_snapshots(db):
@@ -161,6 +171,7 @@ async def test_equity_snapshots(db):
     assert snapshots[0]["balance"] == 10100.0
     assert snapshots[1]["balance"] == 10000.0
 
+
 @pytest.mark.asyncio
 async def test_log_signal(db):
     indicators = {"rsi": 75.0, "ema_cross": True}
@@ -170,7 +181,7 @@ async def test_log_signal(db):
         signal="SELL",
         regime="bull",
         reason="rsi_overbought",
-        indicators=indicators
+        indicators=indicators,
     )
 
     async with db._connection.execute("SELECT * FROM signals_log") as cursor:

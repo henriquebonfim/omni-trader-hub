@@ -27,6 +27,7 @@ async def get_daily_summary(date: str, request: Request):
     summary = await bot.database.get_daily_summary(date)
     if summary is None:
         from fastapi import HTTPException
+
         raise HTTPException(status_code=404, detail=f"No summary found for {date}")
     return summary
 

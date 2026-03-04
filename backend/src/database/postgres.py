@@ -27,7 +27,7 @@ class PostgresDatabase(BaseDatabase):
         self.db_name = os.getenv("POSTGRES_DB", "trades_db")
         self.host = os.getenv("POSTGRES_HOST", "localhost")
         self.port = os.getenv("POSTGRES_PORT", "5432")
-        
+
         if connection_string is None:
             connection_string = f"postgresql://{self.user}:{self.password}@{self.host}:{self.port}/{self.db_name}"
 
@@ -62,7 +62,7 @@ class PostgresDatabase(BaseDatabase):
             timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
             backup_file = f"backup_{self.db_name}_{timestamp}.sql"
             backup_path = os.path.join("data", "backups")
-            
+
             # Ensure backup directory exists
             os.makedirs(backup_path, exist_ok=True)
             full_path = os.path.join(backup_path, backup_file)
@@ -74,28 +74,29 @@ class PostgresDatabase(BaseDatabase):
 
             cmd = [
                 "pg_dump",
-                "-h", self.host,
-                "-p", self.port,
-                "-U", self.user,
-                "-d", self.db_name,
-                "-f", full_path
+                "-h",
+                self.host,
+                "-p",
+                self.port,
+                "-U",
+                self.user,
+                "-d",
+                self.db_name,
+                "-f",
+                full_path,
             ]
 
             logger.info("starting_database_backup", file=full_path)
-            
+
             # Run pg_dump
-            subprocess.run(
-                cmd, 
-                env=env, 
-                check=True, 
-                capture_output=True, 
-                text=True
-            )
+            subprocess.run(cmd, env=env, check=True, capture_output=True, text=True)
 
             logger.info("database_backup_successful", file=full_path)
 
         except subprocess.CalledProcessError as e:
-            logger.error("database_backup_failed_subprocess", error=str(e), stderr=e.stderr)
+            logger.error(
+                "database_backup_failed_subprocess", error=str(e), stderr=e.stderr
+            )
         except Exception as e:
             logger.error("database_backup_failed", error=str(e))
 
@@ -208,7 +209,7 @@ class PostgresDatabase(BaseDatabase):
                 fee,
                 fee_currency,
             )
-        
+
         logger.info(
             "trade_logged", action="OPEN", symbol=symbol, side=side, price=price
         )
@@ -312,13 +313,13 @@ class PostgresDatabase(BaseDatabase):
             rows = await conn.fetch(
                 "SELECT * FROM trades ORDER BY timestamp DESC LIMIT $1", limit
             )
-        
+
         # Convert rows (Record objects) to dicts and serialize datetimes
         results = []
         for row in rows:
             d = dict(row)
-            if d['timestamp']:
-                d['timestamp'] = d['timestamp'].isoformat()
+            if d["timestamp"]:
+                d["timestamp"] = d["timestamp"].isoformat()
             results.append(d)
         return results
 
@@ -328,11 +329,11 @@ class PostgresDatabase(BaseDatabase):
                 "SELECT * FROM trades WHERE symbol = $1 ORDER BY timestamp DESC LIMIT 1",
                 symbol,
             )
-        
+
         if row:
             d = dict(row)
-            if d['timestamp']:
-                d['timestamp'] = d['timestamp'].isoformat()
+            if d["timestamp"]:
+                d["timestamp"] = d["timestamp"].isoformat()
             return d
         return None
 
@@ -342,16 +343,16 @@ class PostgresDatabase(BaseDatabase):
             date_obj = datetime.strptime(date, "%Y-%m-%d").date()
         else:
             date_obj = date
-            
+
         async with self._pool.acquire() as conn:
             row = await conn.fetchrow(
                 "SELECT * FROM daily_summary WHERE date = $1", date_obj
             )
-        
+
         if row:
             d = dict(row)
-            if d['date']:
-                d['date'] = d['date'].isoformat()
+            if d["date"]:
+                d["date"] = d["date"].isoformat()
             return d
         return None
 
@@ -382,12 +383,12 @@ class PostgresDatabase(BaseDatabase):
             rows = await conn.fetch(
                 "SELECT * FROM equity_snapshots ORDER BY timestamp DESC LIMIT $1", limit
             )
-        
+
         results = []
         for row in rows:
             d = dict(row)
-            if d['timestamp']:
-                d['timestamp'] = d['timestamp'].isoformat()
+            if d["timestamp"]:
+                d["timestamp"] = d["timestamp"].isoformat()
             results.append(d)
         return results
 

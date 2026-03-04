@@ -24,7 +24,7 @@ async def test_reconcile_positions_db_open_exchange_flat():
         "side": "LONG",
         "price": "50000.0",
         "size": "0.1",
-        "timestamp": ts_str
+        "timestamp": ts_str,
     }
 
     # Exchange says FLAT
@@ -44,7 +44,7 @@ async def test_reconcile_positions_db_open_exchange_flat():
             "side": "sell",
             "price": 51500.0,
             "amount": 0.1,
-            "timestamp": expected_since + 60000 # 1 minute later
+            "timestamp": expected_since + 60000,  # 1 minute later
         }
     ]
 
@@ -53,11 +53,14 @@ async def test_reconcile_positions_db_open_exchange_flat():
     # Should log close with FOUND price
     bot.database.log_trade_close.assert_called_once()
     kwargs = bot.database.log_trade_close.call_args[1]
-    assert kwargs['reason'] == "reconciliation_detected_close"
-    assert kwargs['price'] == 51500.0
+    assert kwargs["reason"] == "reconciliation_detected_close"
+    assert kwargs["price"] == 51500.0
 
     # Verify call with correct 'since' parameter
-    bot.exchange.fetch_my_trades.assert_called_with("BTC/USDT", since=expected_since, limit=50)
+    bot.exchange.fetch_my_trades.assert_called_with(
+        "BTC/USDT", since=expected_since, limit=50
+    )
+
 
 @pytest.mark.asyncio
 async def test_reconcile_positions_db_close_exchange_open():
@@ -90,9 +93,9 @@ async def test_reconcile_positions_db_close_exchange_open():
             "id": "202",
             "symbol": "BTC/USDT",
             "side": "buy",
-            "price": 49800.0, # Actual entry price different from position average (maybe fees/slippage)
+            "price": 49800.0,  # Actual entry price different from position average (maybe fees/slippage)
             "amount": 0.1,
-            "timestamp": 1672574460000
+            "timestamp": 1672574460000,
         }
     ]
 
@@ -101,5 +104,5 @@ async def test_reconcile_positions_db_close_exchange_open():
     # Should log open with FOUND price
     bot.database.log_trade_open.assert_called_once()
     kwargs = bot.database.log_trade_open.call_args[1]
-    assert kwargs['reason'] == "reconciliation_detected_open"
-    assert kwargs['price'] == 49800.0
+    assert kwargs["reason"] == "reconciliation_detected_open"
+    assert kwargs["price"] == 49800.0

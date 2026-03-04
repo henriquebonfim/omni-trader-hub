@@ -30,6 +30,7 @@ async def test_reload_config_updates_components(monkeypatch):
     bot.strategy.update_config.assert_called_once_with(new_config)
     bot.notifier.update_config.assert_called_once_with(new_config)
 
+
 @pytest.mark.asyncio
 async def test_reload_config_switches_strategy(monkeypatch):
     bot = OmniTrader()

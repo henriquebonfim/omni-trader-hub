@@ -15,10 +15,13 @@ def mock_bot():
     bot.risk.check_circuit_breaker.return_value = False
     bot.ws_manager = None
     bot.database.get_recent_trades = AsyncMock(return_value=[])
-    bot.database.get_daily_summary = AsyncMock(return_value={"date": "2023-01-01", "pnl": 0})
+    bot.database.get_daily_summary = AsyncMock(
+        return_value={"date": "2023-01-01", "pnl": 0}
+    )
     bot.database.get_equity_snapshots = AsyncMock(return_value=[])
     bot.reload_config = AsyncMock()
     return bot
+
 
 def test_config_validation(mock_bot, monkeypatch):
     monkeypatch.delenv("OMNITRADER_API_KEY", raising=False)

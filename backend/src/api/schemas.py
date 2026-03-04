@@ -11,12 +11,14 @@ class ExchangeConfig(BaseModel):
     leverage: Optional[int] = Field(None, ge=1, le=125)
     margin_type: Optional[Literal["isolated", "cross"]] = None
 
+
 class TradingConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
     symbol: Optional[str] = None
     timeframe: Optional[str] = None
     position_size_pct: Optional[float] = Field(None, gt=0, le=100)
     cycle_seconds: Optional[int] = Field(None, gt=0)
+
 
 class BollingerBandsConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -33,13 +35,17 @@ class BollingerBandsConfig(BaseModel):
                 raise ValueError("rsi_lower must be strictly less than rsi_upper")
         return self
 
+
 class BreakoutConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
     period: Optional[int] = Field(None, gt=0)
 
+
 class StrategyConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    name: Optional[Literal["ema_volume", "adx_trend", "z_score", "bollinger_bands", "breakout"]] = None
+    name: Optional[
+        Literal["ema_volume", "adx_trend", "z_score", "bollinger_bands", "breakout"]
+    ] = None
     ema_fast: Optional[int] = Field(None, gt=0)
     ema_slow: Optional[int] = Field(None, gt=0)
     volume_sma: Optional[int] = Field(None, gt=0)
@@ -58,6 +64,7 @@ class StrategyConfig(BaseModel):
                 raise ValueError("ema_fast must be less than ema_slow")
         return self
 
+
 class RiskConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
     stop_loss_pct: Optional[float] = Field(None, gt=0, le=100)
@@ -69,15 +76,20 @@ class RiskConfig(BaseModel):
 
     @model_validator(mode="after")
     def validate_trailing_stop(self):
-        if self.trailing_stop_activation_pct is not None and self.trailing_stop_callback_pct is not None:
+        if (
+            self.trailing_stop_activation_pct is not None
+            and self.trailing_stop_callback_pct is not None
+        ):
             if self.trailing_stop_activation_pct <= self.trailing_stop_callback_pct:
                 raise ValueError("activation_pct must be greater than callback_pct")
         return self
+
 
 class NotificationsConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
     enabled: Optional[bool] = None
     discord_webhook: Optional[HttpUrl] = None
+
 
 class ConfigUpdate(BaseModel):
     model_config = ConfigDict(extra="forbid")

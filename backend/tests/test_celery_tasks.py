@@ -27,6 +27,7 @@ from src.workers.tasks import analyze_regime, analyze_strategy
 # Fixtures
 # ---------------------------------------------------------------------------
 
+
 @pytest.fixture(autouse=True)
 def celery_eager(monkeypatch):
     """Run all Celery tasks synchronously (no broker needed)."""
@@ -38,6 +39,7 @@ def celery_eager(monkeypatch):
 def _make_ohlcv(n: int = 60) -> pd.DataFrame:
     """Generate synthetic OHLCV DataFrame."""
     import numpy as np
+
     rng = pd.date_range("2025-01-01", periods=n, freq="5min")
     close = 50000 + np.cumsum(np.random.randn(n) * 100)
     df = pd.DataFrame(

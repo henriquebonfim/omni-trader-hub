@@ -18,7 +18,10 @@ from src.ws_feed import WsFeed, _MAX_OHLCV_ROWS, _raw_to_df
 # Helpers
 # ---------------------------------------------------------------------------
 
-def _make_df(n: int, start_ts: int = 1_700_000_000_000, freq_ms: int = 60_000) -> pd.DataFrame:
+
+def _make_df(
+    n: int, start_ts: int = 1_700_000_000_000, freq_ms: int = 60_000
+) -> pd.DataFrame:
     """Create a minimal OHLCV DataFrame with *n* rows."""
     timestamps = pd.date_range(
         pd.to_datetime(start_ts, unit="ms"),
@@ -154,7 +157,13 @@ def test_merge_ohlcv_appends_new_row():
     last_ts = base.index[-1]
     next_ts = last_ts + pd.Timedelta(minutes=1)
     new_row = pd.DataFrame(
-        {"open": 51_000.0, "high": 51_100.0, "low": 50_900.0, "close": 51_050.0, "volume": 200.0},
+        {
+            "open": 51_000.0,
+            "high": 51_100.0,
+            "low": 50_900.0,
+            "close": 51_050.0,
+            "volume": 200.0,
+        },
         index=pd.DatetimeIndex([next_ts], name="timestamp"),
     )
     feed._merge_ohlcv("1m", new_row)
@@ -171,7 +180,13 @@ def test_merge_ohlcv_updates_existing_row():
     # Same timestamp as last row but different close
     last_ts = base.index[-1]
     updated = pd.DataFrame(
-        {"open": 50_000.0, "high": 50_200.0, "low": 49_800.0, "close": 99_999.0, "volume": 300.0},
+        {
+            "open": 50_000.0,
+            "high": 50_200.0,
+            "low": 49_800.0,
+            "close": 99_999.0,
+            "volume": 300.0,
+        },
         index=pd.DatetimeIndex([last_ts], name="timestamp"),
     )
     feed._merge_ohlcv("1m", updated)

@@ -4,7 +4,7 @@ Bot lifecycle control routes.
 
 import asyncio
 
-from fastapi import APIRouter, Request, Depends
+from fastapi import APIRouter, Depends, Request
 from pydantic import BaseModel
 
 from src.api.auth import verify_api_key
@@ -62,44 +62,50 @@ async def get_state(request: Request):
 class TradeRequest(BaseModel):
     side: str
 
+
 @router.post("/trade/open", dependencies=[Depends(verify_api_key)])
 async def manual_open_trade(request: Request, body: TradeRequest):
     bot = request.app.state.bot
     if not bot._running:
         return {"ok": False, "message": "Bot is not running"}
-    
+
     position = await bot.exchange.fetch_position(bot.config.trading.symbol)
     if position.is_open:
         return {"ok": False, "message": "Position already open"}
-        
+
     ticker = bot.ws_feed.latest_ticker()
     if not ticker:
         return {"ok": False, "message": "No price data"}
-    
+
     current_price = float(ticker.get("last", 0))
     balance = await bot.exchange.fetch_balance()
-    
+
     # We call _open_position using create_task so it runs in background
-    asyncio.create_task(bot._open_position(body.side, current_price, balance, reason="manual_trade"))
-    
+    asyncio.create_task(
+        bot._open_position(body.side, current_price, balance, reason="manual_trade")
+    )
+
     return {"ok": True, "message": f"Manual {body.side} order initiated"}
+
 
 @router.post("/trade/close", dependencies=[Depends(verify_api_key)])
 async def manual_close_trade(request: Request):
     bot = request.app.state.bot
     if not bot._running:
         return {"ok": False, "message": "Bot is not running"}
-    
+
     position = await bot.exchange.fetch_position(bot.config.trading.symbol)
     if not position.is_open:
         return {"ok": False, "message": "No open position"}
-        
+
     ticker = bot.ws_feed.latest_ticker()
     if not ticker:
         return {"ok": False, "message": "No price data"}
-        
+
     current_price = float(ticker.get("last", 0))
-    
-    asyncio.create_task(bot._close_position(position, current_price, reason="manual_close"))
-    
+
+    asyncio.create_task(
+        bot._close_position(position, current_price, reason="manual_close")
+    )
+
     return {"ok": True, "message": "Manual close order initiated"}

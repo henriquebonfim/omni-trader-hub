@@ -60,6 +60,8 @@ class BaseStrategy(ABC):
         self.config = config
         self.ohlcv: pd.DataFrame | None = None
         self.current_position: str | None = None
+        self._last_entry_bar: Any = None
+        self._last_entry_side: str | None = None
 
     @property
     @abstractmethod
@@ -175,7 +177,9 @@ class BaseStrategy(ABC):
 
         signal = Signal.HOLD
         reason = "No signal"
-        trend_filter_enabled = getattr(self.config.strategy, "trend_filter_enabled", False)
+        trend_filter_enabled = getattr(
+            self.config.strategy, "trend_filter_enabled", False
+        )
 
         if current_position is None:
             if self.should_long():
@@ -194,6 +198,43 @@ class BaseStrategy(ABC):
                     signal = Signal.SHORT
                     reason = "Strategy Entry Short"
 
+            if signal in (Signal.LONG, Signal.SHORT):
+                min_bars = getattr(self.config.strategy, "min_bars_between_entries", 10)
+                current_bar_index = ohlcv.index[-1]
+
+                if (
+                    self._last_entry_bar is not None
+                    and self._last_entry_side == signal.value
+                ):
+                    if isinstance(ohlcv.index, pd.DatetimeIndex) and isinstance(
+                        self._last_entry_bar, pd.Timestamp
+                    ):
+                        bars_since = len(ohlcv.loc[self._last_entry_bar :]) - 1
+                    else:
+                        try:
+                            # Try to locate the position of the last entry bar in the current index
+                            last_pos = ohlcv.index.get_loc(self._last_entry_bar)
+                            current_pos = len(ohlcv) - 1
+                            bars_since = current_pos - last_pos
+                        except KeyError:
+                            # If the last entry bar is no longer in the dataframe, it means it was a long time ago
+                            bars_since = float("inf")
+
+                    if bars_since < min_bars:
+                        logger.info(
+                            "entry_cooldown_active",
+                            signal=signal.value,
+                            bars_since=bars_since,
+                            min_bars=min_bars,
+                        )
+                        reason = f"Entry Cooldown ({bars_since}/{min_bars} bars) blocked {signal.value}"
+                        signal = Signal.HOLD
+
+                # Update last entry tracker if we are actually emitting a signal
+                if signal in (Signal.LONG, Signal.SHORT):
+                    self._last_entry_bar = current_bar_index
+                    self._last_entry_side = signal.value
+
         # Apply Bias Confirmation (Higher Timeframe)
         bias_enabled = getattr(self.config.strategy, "bias_confirmation", False)
         if bias_enabled and signal in (Signal.LONG, Signal.SHORT):
@@ -202,11 +243,21 @@ class BaseStrategy(ABC):
             if bias_ohlcv is not None:
                 bias = self.check_trend(bias_ohlcv)
                 if signal == Signal.LONG and bias != "bullish":
-                    logger.info("bias_confirmation_rejected", signal="LONG", bias=bias, tf=bias_tf)
+                    logger.info(
+                        "bias_confirmation_rejected",
+                        signal="LONG",
+                        bias=bias,
+                        tf=bias_tf,
+                    )
                     signal = Signal.HOLD
                     reason = f"Bias Filter ({bias_tf}: {bias}) blocked Long"
                 elif signal == Signal.SHORT and bias != "bearish":
-                    logger.info("bias_confirmation_rejected", signal="SHORT", bias=bias, tf=bias_tf)
+                    logger.info(
+                        "bias_confirmation_rejected",
+                        signal="SHORT",
+                        bias=bias,
+                        tf=bias_tf,
+                    )
                     signal = Signal.HOLD
                     reason = f"Bias Filter ({bias_tf}: {bias}) blocked Short"
 

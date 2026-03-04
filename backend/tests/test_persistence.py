@@ -6,7 +6,7 @@ from unittest.mock import AsyncMock, patch
 import pytest
 
 # Add backend to sys.path to ensure imports work correctly
-sys.path.append(os.path.join(os.path.dirname(__file__), '../'))
+sys.path.append(os.path.join(os.path.dirname(__file__), "../"))
 
 from datetime import date
 
@@ -34,6 +34,7 @@ async def test_redis_store_connection():
         await store.close()
         mock_client.aclose.assert_awaited_once()
 
+
 @pytest.mark.asyncio
 async def test_redis_store_set_get():
     """Test setting and getting values."""
@@ -60,12 +61,15 @@ async def test_redis_store_set_get():
         assert val == {"foo": "bar"}
         mock_client.get.assert_awaited_with("test_key")
 
+
 @pytest.mark.asyncio
 async def test_risk_manager_state_persistence():
     """Test RiskManager saves and restores state."""
 
     # Mock RedisStore through Factory
-    with patch("src.database.factory.DatabaseFactory.get_redis_store") as mock_get_store:
+    with patch(
+        "src.database.factory.DatabaseFactory.get_redis_store"
+    ) as mock_get_store:
         mock_redis_instance = AsyncMock()
         mock_get_store.return_value = mock_redis_instance
 
@@ -75,8 +79,8 @@ async def test_risk_manager_state_persistence():
 
         # 2. Simulate trading activity
         # record_trade calls save_state internally
-        await risk.record_trade(100.0) # Win (+100)
-        await risk.record_trade(-50.0) # Loss (-50)
+        await risk.record_trade(100.0)  # Win (+100)
+        await risk.record_trade(-50.0)  # Loss (-50)
 
         # Verify in-memory state
         assert risk.daily_stats.realized_pnl == 50.0
@@ -99,7 +103,7 @@ async def test_risk_manager_state_persistence():
             if "daily_stats" in key:
                 return stored_stats
             if "consecutive_losses" in key:
-                return 1 # Last state was 1 loss
+                return 1  # Last state was 1 loss
             if "circuit_breaker" in key:
                 return False
             if "weekly_circuit_breaker" in key:
@@ -127,16 +131,19 @@ async def test_risk_manager_state_persistence():
         assert new_risk.consecutive_losses == 1
         assert new_risk.daily_stats.date == date.today()
 
+
 @pytest.mark.asyncio
 async def test_weekly_circuit_breaker_persistence():
     """Test Weekly Circuit Breaker state is persisted."""
 
-    with patch("src.database.factory.DatabaseFactory.get_redis_store") as mock_get_store:
+    with patch(
+        "src.database.factory.DatabaseFactory.get_redis_store"
+    ) as mock_get_store:
         mock_redis_instance = AsyncMock()
         mock_get_store.return_value = mock_redis_instance
 
         risk = RiskManager()
-        risk.max_weekly_loss_pct = 10.0 # 10%
+        risk.max_weekly_loss_pct = 10.0  # 10%
 
         # Trigger breaker
         # Current Balance = 1000. Weekly PnL = -150.

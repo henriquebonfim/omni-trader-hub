@@ -6,6 +6,7 @@ NOTE: This script does NOT restart the bot. It relies on the container/superviso
 (e.g., Docker healthcheck) to restart the process. This script's purpose is to
 notify the administrator of the failure.
 """
+
 import os
 import time
 
@@ -69,7 +70,9 @@ def main():
             else:
                 failures += 1
                 logger.warning(
-                    "health_check_failed", status=response.status_code, failures=failures
+                    "health_check_failed",
+                    status=response.status_code,
+                    failures=failures,
                 )
 
         except Exception as e:

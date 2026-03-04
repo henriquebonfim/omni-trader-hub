@@ -27,46 +27,56 @@ class MockStrategy(BaseStrategy):
     def should_exit(self):
         return False
 
+
 @pytest.fixture
 def mock_config():
     config_data = {
         "trading": {"symbol": "BTC/USDT", "timeframe": "15min"},
-        "strategy": {
-            "bias_confirmation": True,
-            "bias_timeframe": "4h"
-        }
+        "strategy": {"bias_confirmation": True, "bias_timeframe": "4h"},
     }
     return Config(config_data)
 
+
 def create_ohlcv(prices):
-    return pd.DataFrame({
-        "open": prices,
-        "high": [p + 1 for p in prices],
-        "low": [p - 1 for p in prices],
-        "close": [p + 0.5 for p in prices if p == prices[-1]] + [p for p in prices[:-1]], # make last candle bullish if close > open
-        "volume": [100] * len(prices)
-    }, index=pd.date_range("2021-01-01", periods=len(prices), freq="15min"))
+    return pd.DataFrame(
+        {
+            "open": prices,
+            "high": [p + 1 for p in prices],
+            "low": [p - 1 for p in prices],
+            "close": [p + 0.5 for p in prices if p == prices[-1]]
+            + [p for p in prices[:-1]],  # make last candle bullish if close > open
+            "volume": [100] * len(prices),
+        },
+        index=pd.date_range("2021-01-01", periods=len(prices), freq="15min"),
+    )
+
 
 def test_signal_bias_confirmation_long_blocked(mock_config):
     # Mock HTF (4h) as bearish
     # EMA 200 on 4h. Let's say prices are way below 100
     htf_prices = [50] * 210
-    htf_df = pd.DataFrame({
-        "open": htf_prices,
-        "high": htf_prices,
-        "low": htf_prices,
-        "close": htf_prices,
-        "volume": [100] * 210
-    }, index=pd.date_range("2021-01-01", periods=210, freq="4h"))
+    htf_df = pd.DataFrame(
+        {
+            "open": htf_prices,
+            "high": htf_prices,
+            "low": htf_prices,
+            "close": htf_prices,
+            "volume": [100] * 210,
+        },
+        index=pd.date_range("2021-01-01", periods=210, freq="4h"),
+    )
 
     # Mock LTF (15m) as bullish signal (close > open)
-    ltf_df = pd.DataFrame({
-        "open": [40] * 10,
-        "high": [42] * 10,
-        "low": [38] * 10,
-        "close": [41] * 10, # Bullish candle
-        "volume": [100] * 10
-    }, index=pd.date_range("2021-01-01", periods=10, freq="15min"))
+    ltf_df = pd.DataFrame(
+        {
+            "open": [40] * 10,
+            "high": [42] * 10,
+            "low": [38] * 10,
+            "close": [41] * 10,  # Bullish candle
+            "volume": [100] * 10,
+        },
+        index=pd.date_range("2021-01-01", periods=10, freq="15min"),
+    )
 
     strategy = MockStrategy(mock_config)
     market_data = {"15min": ltf_df, "4h": htf_df}
@@ -82,27 +92,34 @@ def test_signal_bias_confirmation_long_blocked(mock_config):
     assert result.signal == Signal.HOLD
     assert "Bias Filter (4h: bearish) blocked Long" in result.reason
 
+
 def test_signal_bias_confirmation_long_allowed(mock_config):
     # Mock HTF (4h) as bullish
     htf_prices = [150] * 210
     # EMA 200 of 150 is 150? No, let's make it clearly bullish.
     # Start at 100, end at 150.
     htf_prices = list(range(100, 310))
-    htf_df = pd.DataFrame({
-        "open": htf_prices,
-        "high": htf_prices,
-        "low": htf_prices,
-        "close": htf_prices,
-        "volume": [100] * 210
-    }, index=pd.date_range("2021-01-01", periods=210, freq="4h"))
+    htf_df = pd.DataFrame(
+        {
+            "open": htf_prices,
+            "high": htf_prices,
+            "low": htf_prices,
+            "close": htf_prices,
+            "volume": [100] * 210,
+        },
+        index=pd.date_range("2021-01-01", periods=210, freq="4h"),
+    )
 
-    ltf_df = pd.DataFrame({
-        "open": [40] * 10,
-        "high": [42] * 10,
-        "low": [38] * 10,
-        "close": [41] * 10,
-        "volume": [100] * 10
-    }, index=pd.date_range("2021-01-01", periods=10, freq="15min"))
+    ltf_df = pd.DataFrame(
+        {
+            "open": [40] * 10,
+            "high": [42] * 10,
+            "low": [38] * 10,
+            "close": [41] * 10,
+            "volume": [100] * 10,
+        },
+        index=pd.date_range("2021-01-01", periods=10, freq="15min"),
+    )
 
     strategy = MockStrategy(mock_config)
     market_data = {"15min": ltf_df, "4h": htf_df}
