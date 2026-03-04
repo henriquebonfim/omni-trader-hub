@@ -116,6 +116,7 @@ class RiskManager:
         # Daily tracking
         self.daily_stats = DailyStats()
         self.consecutive_losses = 0  # Track consecutive losses for drawdown sizing
+        self.peak_equity = 0.0       # Track peak equity for max drawdown sizing
         self._circuit_breaker_active = False
         self._weekly_circuit_breaker_active = False
 
@@ -158,6 +159,17 @@ class RiskManager:
                     "restored_consecutive_losses", count=self.consecutive_losses
                 )
 
+            # Restore Peak Equity
+            peak_eq = await self.redis.get(
+                f"{self._redis_key_prefix}peak_equity",
+                critical=True
+            )
+            if peak_eq is not None:
+                self.peak_equity = float(peak_eq)
+                logger.info(
+                    "restored_peak_equity", peak_equity=self.peak_equity
+                )
+
             # Restore Circuit Breakers
             if is_same_day:
                 cb_active = await self.redis.get(
@@ -197,6 +209,11 @@ class RiskManager:
             await self.redis.set(
                 f"{self._redis_key_prefix}consecutive_losses",
                 self.consecutive_losses,
+                critical=True
+            )
+            await self.redis.set(
+                f"{self._redis_key_prefix}peak_equity",
+                self.peak_equity,
                 critical=True
             )
             await self.redis.set(
@@ -271,6 +288,12 @@ class RiskManager:
             self.daily_stats.starting_balance = current_balance
             state_changed = True
 
+        # Update peak equity
+        if current_balance > self.peak_equity:
+            logger.info("peak_equity_updated", old_peak=self.peak_equity, new_peak=current_balance)
+            self.peak_equity = current_balance
+            state_changed = True
+
         if state_changed:
             await self.save_state()
 
@@ -288,17 +311,21 @@ class RiskManager:
         # Determine effective leverage (Auto-Deleverage)
         effective_leverage = self.leverage
 
-        # Check for significant drawdown (using daily stats as proxy for now,
-        # ideally should track peak equity for total drawdown)
-        if self.daily_stats.pnl_pct <= -self.auto_deleverage_threshold:
-            effective_leverage = 1
-            logger.warning(
-                "auto_deleverage_active",
-                drawdown_pct=self.daily_stats.pnl_pct,
-                threshold=self.auto_deleverage_threshold,
-                original_leverage=self.leverage,
-                new_leverage=1,
-            )
+        # Check for significant drawdown against peak equity
+        if balance > self.peak_equity:
+            self.peak_equity = balance
+
+        if self.peak_equity > 0:
+            drawdown_pct = ((self.peak_equity - balance) / self.peak_equity) * 100
+            if drawdown_pct >= self.auto_deleverage_threshold:
+                effective_leverage = 1
+                logger.warning(
+                    "auto_deleverage_active",
+                    drawdown_pct=drawdown_pct,
+                    threshold=self.auto_deleverage_threshold,
+                    original_leverage=self.leverage,
+                    new_leverage=1,
+                )
 
         # Risk amount in USDT
         risk_amount = balance * (self.position_size_pct / 100)
