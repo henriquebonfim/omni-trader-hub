@@ -42,10 +42,11 @@ Promoted from TASKS.md after institutional audit (2026-03-03).
 - **Completed**: 2026-03-04 | PR #53
 
 ### 5. Fix `current_positions` Hardcoded to 0 (T10)
-- [ ] Query actual open position count from exchange state
-- [ ] Change `max_positions` config from 50 to 1 (single-asset)
-- [ ] Add test: verify second position blocked when max_positions=1
+- [x] Query actual open position count from exchange state
+- [x] Change `max_positions` config from 50 to 1 (single-asset)
+- [x] Add test: verify second position blocked when max_positions=1
 - **Ref**: TASKS.md T10
+- **Completed**: 2026-03-04 | PR #54
 
 ### 6. Add Auth to All Mutation Endpoints (T11)
 - [ ] Add `verify_api_key` dependency to: `/api/bot/*`, `PUT /api/config`, `PUT /api/notifications/*`
