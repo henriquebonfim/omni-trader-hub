@@ -5,10 +5,7 @@ All Celery tasks run in **eager mode** (synchronous, no broker required)
 so these tests pass in CI and local environments without Redis.
 """
 
-import asyncio
 import json
-from types import SimpleNamespace
-from unittest.mock import MagicMock, patch
 
 import pandas as pd
 import pytest
@@ -21,7 +18,6 @@ from src.workers.serializers import (
     market_data_to_json,
 )
 from src.workers.tasks import analyze_regime, analyze_strategy
-
 
 # ---------------------------------------------------------------------------
 # Fixtures

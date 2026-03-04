@@ -10,7 +10,7 @@ Institutional-grade audit completed **2026-03-03** — findings integrated below
 ## 🔴 Critical (Capital-at-Risk Bugs)
 
 ### T6. SL/TP Placement Failure is Non-Fatal
-- [ ] **Fix: Retry 3× or flatten position immediately**
+- [x] **Fix: Retry 3× or flatten position immediately**
     - **Risk Level**: 🔴 Critical
     - **Location**: `src/main.py` `_open_position()` — SL/TP placement wrapped in independent try/except that logs and continues.
     - **Vulnerability**: If the exchange rejects the SL order (price validation, rate limit, network error), the position is left **open without a stop loss on the exchange**.
@@ -18,7 +18,7 @@ Institutional-grade audit completed **2026-03-03** — findings integrated below
     - **Fix**: After SL placement failure, retry 3× with exponential backoff. If all retries fail, immediately close the position via `close_position()`. Never allow a position to exist without exchange-side protection.
 
 ### T7. Paper Mode PnL Formula Incorrect
-- [ ] **Fix: Correct PnL calculation in `exchange.py`**
+- [x] **Fix: Correct PnL calculation in `exchange.py`**
     - **Risk Level**: 🔴 Critical
     - **Location**: `src/exchange.py` `close_position()` paper mode branch.
     - **Vulnerability**: Uses `(exit_price - entry_price) / entry_price * notional` instead of the correct `(exit_price - entry_price) * contracts`. Yields PnL in "notional-weighted percentage" units, not USDT.
@@ -26,7 +26,7 @@ Institutional-grade audit completed **2026-03-03** — findings integrated below
     - **Fix**: Use `pnl = (exit_price - entry_price) * position.contracts` for longs; negate for shorts. Match the live-mode formula in `main.py _close_position()`.
 
 ### T8. Paper Mode SL/TP Never Simulated
-- [ ] **Fix: Add paper SL/TP simulation engine**
+- [x] **Fix: Add paper SL/TP simulation engine**
     - **Risk Level**: 🔴 Critical
     - **Location**: `src/exchange.py` — paper orders stored in `_paper_orders` list but never checked against price.
     - **Vulnerability**: Paper positions can only exit via strategy signals, never via stop-loss or take-profit hits.
@@ -34,7 +34,7 @@ Institutional-grade audit completed **2026-03-03** — findings integrated below
     - **Fix**: In `run_cycle()` or a dedicated `_check_paper_orders()` method, iterate `_paper_orders` each cycle and trigger fills when price crosses SL/TP levels.
 
 ### T9. ATR Stops Configured But Not Applied to Exchange
-- [ ] **Fix: Wire ATR stop values to `set_stop_loss` / `set_take_profit`**
+- [x] **Fix: Wire ATR stop values to `set_stop_loss` / `set_take_profit`**
     - **Risk Level**: 🔴 Critical
     - **Location**: `src/main.py` `_open_position()` — always calls `calculate_stop_loss` / `calculate_take_profit` (fixed %). Never calls `calculate_atr_stops` even though `use_atr_stops: true` is set in config.
     - **Vulnerability**: System believes it's using dynamic volatility-based stops but actually places fixed 2%/4% stops. Config says one thing, code does another.
@@ -42,7 +42,7 @@ Institutional-grade audit completed **2026-03-03** — findings integrated below
     - **Fix**: Pass `ohlcv` DataFrame to `validate_trade()`. When `use_atr_stops` is enabled, use ATR-derived prices for `set_stop_loss()` / `set_take_profit()` instead of fixed-%.
 
 ### T10. `current_positions` Hardcoded to 0
-- [ ] **Fix: Pass actual position count to `validate_trade`**
+- [x] **Fix: Pass actual position count to `validate_trade`**
     - **Risk Level**: 🔴 Critical
     - **Location**: `src/main.py` `_open_position()` — `current_positions=0` hardcoded.
     - **Vulnerability**: The `max_positions` check in `RiskManager.validate_trade()` is dead code. Config allows 50 concurrent positions (nonsensical for single-asset) and the check never enforces it anyway.
@@ -50,7 +50,7 @@ Institutional-grade audit completed **2026-03-03** — findings integrated below
     - **Fix**: Query actual open position count from exchange/database. Set `max_positions` to a sane value (1 for single-asset, 3-5 for multi-pair).
 
 ### T11. API Mutation Endpoints Unprotected
-- [ ] **Fix: Add `verify_api_key` dependency to all mutation routes**
+- [x] **Fix: Add `verify_api_key` dependency to all mutation routes**
     - **Risk Level**: 🔴 Critical
     - **Location**: `src/api/routes/bot.py`, `src/api/routes/config.py`, `src/api/routes/notifications.py`
     - **Vulnerability**: `/api/bot/start`, `/api/bot/stop`, `/api/bot/trade/open`, `/api/bot/trade/close`, `PUT /api/config`, `PUT /api/notifications/discord` require **no authentication**. Anyone with network access can open leveraged positions, stop the bot, or change risk parameters.
@@ -58,7 +58,7 @@ Institutional-grade audit completed **2026-03-03** — findings integrated below
     - **Fix**: Apply `verify_api_key` dependency to every mutation endpoint. Add RBAC for production.
 
 ### T12. Redis Failures Silently Swallowed
-- [ ] **Fix: Raise or fallback on risk-state persistence failure**
+- [x] **Fix: Raise or fallback on risk-state persistence failure**
     - **Risk Level**: 🔴 Critical
     - **Location**: `src/database/redis_store.py` — `set()`, `get()`, `delete()` all catch `Exception` and log but return `None`/`False`.
     - **Vulnerability**: Risk state persistence failures are invisible. `RiskManager.save_state()` could fail silently → consecutive loss counter resets → bot continues at full size after a losing streak.
@@ -70,7 +70,7 @@ Institutional-grade audit completed **2026-03-03** — findings integrated below
 ## 🟠 High Priority (Correctness & Reliability)
 
 ### T13. Regime Classifier No Hysteresis
-- [ ] **Add Schmitt-trigger hysteresis to regime detection**
+- [x] **Add Schmitt-trigger hysteresis to regime detection**
     - **Risk Level**: 🟠 High
     - **Location**: `src/analysis/regime.py` — ADX threshold is a single value (25). Regime flips every 30s cycle when ADX oscillates near boundary.
     - **Impact**: Strategy gating whipsaws — a signal is approved one cycle and blocked the next, or vice versa.
@@ -84,7 +84,7 @@ Institutional-grade audit completed **2026-03-03** — findings integrated below
     - **Fix**: Compare `close.iloc[-1]` against `donchian_upper.iloc[-2]` (prior bar's channel), which is the classic Turtle system definition.
 
 ### T15. Level-Based Signals Without Cooldown
-- [ ] **Add `min_bars_between_entries` cooldown**
+- [x] **Add `min_bars_between_entries` cooldown**
     - **Risk Level**: 🟠 High
     - **Location**: `src/strategies/adx_trend.py`, `bollinger_bands.py`, `breakout.py`, `z_score.py` — all use level conditions (not transitions). After SL hit, they immediately re-enter if condition persists.
     - **Impact**: "Re-entry grinder" — rapid SL hits in falling knives or false breakouts. 3-5 consecutive losses in a single session before circuit breaker fires.

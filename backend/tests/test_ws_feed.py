@@ -11,8 +11,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pandas as pd
 import pytest
 
-from src.ws_feed import WsFeed, _MAX_OHLCV_ROWS, _raw_to_df
-
+from src.ws_feed import _MAX_OHLCV_ROWS, WsFeed, _raw_to_df
 
 # ---------------------------------------------------------------------------
 # Helpers
