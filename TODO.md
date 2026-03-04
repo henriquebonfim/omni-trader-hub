@@ -19,11 +19,12 @@ Promoted from TASKS.md after institutional audit (2026-03-03).
 - **Ref**: TASKS.md T6
 - **Completed**: 2026-03-03 | Commit 59a9dce
 
-### 2. Fix Paper Mode PnL Formula (T7)
-- [ ] Change formula to `(exit_price - entry_price) * contracts` (long) / negate for short
-- [ ] Match the live-mode formula already used in `main.py _close_position()`
-- [ ] Add test: verify paper PnL matches manual calculation for long and short
+### 2. Fix Paper Mode PnL Formula (T7) ✅
+- [x] Change formula to `(exit_price - entry_price) * contracts` (long) / negate for short
+- [x] Match the live-mode formula already used in `main.py _close_position()`
+- [x] Add test: verify paper PnL matches manual calculation for long and short
 - **Ref**: TASKS.md T7
+- **Completed**: 2026-03-04 | PR #51
 
 ### 3. Add Paper SL/TP Simulation (T8)
 - [ ] Add `_check_paper_orders()` method that checks paper orders vs current price each cycle
