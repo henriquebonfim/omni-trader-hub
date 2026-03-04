@@ -29,12 +29,15 @@ class RegimeClassifier:
         adx_period: int = 14,
         adx_threshold: int = 25,
         atr_period: int = 14,
-        atr_multiplier: float = 1.5
+        atr_multiplier: float = 1.5,
+        hysteresis_enabled: bool = False
     ):
         self.adx_period = adx_period
         self.adx_threshold = adx_threshold
         self.atr_period = atr_period
         self.atr_multiplier = atr_multiplier
+        self.hysteresis_enabled = hysteresis_enabled
+        self.current_regime = MarketRegime.UNCERTAIN
 
     def analyze(self, ohlcv: pd.DataFrame) -> MarketRegime:
         """
@@ -80,15 +83,31 @@ class RegimeClassifier:
                 is_volatile = False
             else:
                 avg_atr = atr_sma.iloc[-1]
-                is_volatile = current_atr > (avg_atr * self.atr_multiplier)
+                if self.hysteresis_enabled:
+                    if self.current_regime == MarketRegime.VOLATILE:
+                        is_volatile = current_atr >= (avg_atr * 1.3)
+                    else:
+                        is_volatile = current_atr > (avg_atr * 1.7)
+                else:
+                    is_volatile = current_atr > (avg_atr * self.atr_multiplier)
+
+            if self.hysteresis_enabled:
+                if self.current_regime == MarketRegime.TRENDING:
+                    is_trending = current_adx >= 22
+                else:
+                    is_trending = current_adx > 28
+            else:
+                is_trending = current_adx > self.adx_threshold
 
             # Classification Logic
             if is_volatile:
-                return MarketRegime.VOLATILE
-            elif current_adx > self.adx_threshold:
-                return MarketRegime.TRENDING
+                self.current_regime = MarketRegime.VOLATILE
+            elif is_trending:
+                self.current_regime = MarketRegime.TRENDING
             else:
-                return MarketRegime.RANGING
+                self.current_regime = MarketRegime.RANGING
+
+            return self.current_regime
 
         except Exception as e:
             logger.error("regime_classification_failed", error=str(e))
