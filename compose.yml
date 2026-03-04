@@ -91,8 +91,7 @@ services:
       - test
 
   postgres:
-    # image: postgres:18-alpine
-    image: postgres:15-alpine
+    image: postgres:18-alpine
     container_name: omnitrader-postgres
     ports:
       - "5432:5432"
@@ -101,7 +100,7 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-omnitrader_password}
       POSTGRES_DB: ${POSTGRES_DB:-trades_db}
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - postgres_data:/var/lib/postgresql
     healthcheck:
       test:
         [
@@ -114,7 +113,7 @@ services:
     restart: unless-stopped
 
   redis:
-    image: redis:7-alpine
+    image: redis:8-alpine
     container_name: omnitrader-redis
     ports:
       - "6379:6379"
@@ -128,7 +127,7 @@ services:
     restart: unless-stopped
 
   ollama:
-    image: ollama/ollama:0.15.2
+    image: ollama/ollama:0.17.6
     container_name: omnitrader-ollama
     environment:
       - OLLAMA_DEBUG=1
