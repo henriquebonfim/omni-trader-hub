@@ -5,8 +5,10 @@ Discord notification config routes.
 from typing import Optional
 
 import yaml
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, HTTPException, Request, Depends
 from pydantic import BaseModel
+
+from src.api.auth import verify_api_key
 
 from .config import _CONFIG_PATH
 
@@ -31,7 +33,7 @@ async def get_discord_config(request: Request):
     }
 
 
-@router.put("/discord")
+@router.put("/discord", dependencies=[Depends(verify_api_key)])
 async def update_discord_config(payload: DiscordWebhookPayload, request: Request):
     """Update Discord webhook URL and persist to config.yaml."""
     bot = request.app.state.bot
@@ -63,7 +65,7 @@ async def update_discord_config(payload: DiscordWebhookPayload, request: Request
     return {"ok": True, "message": "Discord config updated and saved"}
 
 
-@router.post("/discord/test")
+@router.post("/discord/test", dependencies=[Depends(verify_api_key)])
 async def test_discord(request: Request):
     """Fire a test message to the configured webhook."""
     bot = request.app.state.bot

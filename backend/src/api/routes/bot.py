@@ -4,13 +4,15 @@ Bot lifecycle control routes.
 
 import asyncio
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Request, Depends
 from pydantic import BaseModel
+
+from src.api.auth import verify_api_key
 
 router = APIRouter(prefix="/bot", tags=["bot"])
 
 
-@router.post("/start")
+@router.post("/start", dependencies=[Depends(verify_api_key)])
 async def start_bot(request: Request):
     """Start the trading bot (no-op if already running)."""
     bot = request.app.state.bot
@@ -20,7 +22,7 @@ async def start_bot(request: Request):
     return {"ok": True, "message": "Bot started"}
 
 
-@router.post("/stop")
+@router.post("/stop", dependencies=[Depends(verify_api_key)])
 async def stop_bot(request: Request):
     """Gracefully stop the trading bot."""
     bot = request.app.state.bot
@@ -30,7 +32,7 @@ async def stop_bot(request: Request):
     return {"ok": True, "message": "Bot stopped"}
 
 
-@router.post("/restart")
+@router.post("/restart", dependencies=[Depends(verify_api_key)])
 async def restart_bot(request: Request):
     """Stop then start the trading bot."""
     bot = request.app.state.bot
@@ -60,7 +62,7 @@ async def get_state(request: Request):
 class TradeRequest(BaseModel):
     side: str
 
-@router.post("/trade/open")
+@router.post("/trade/open", dependencies=[Depends(verify_api_key)])
 async def manual_open_trade(request: Request, body: TradeRequest):
     bot = request.app.state.bot
     if not bot._running:
@@ -82,7 +84,7 @@ async def manual_open_trade(request: Request, body: TradeRequest):
     
     return {"ok": True, "message": f"Manual {body.side} order initiated"}
 
-@router.post("/trade/close")
+@router.post("/trade/close", dependencies=[Depends(verify_api_key)])
 async def manual_close_trade(request: Request):
     bot = request.app.state.bot
     if not bot._running:

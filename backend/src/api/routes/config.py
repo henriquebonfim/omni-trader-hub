@@ -5,9 +5,10 @@ Config read/write routes.
 from pathlib import Path
 
 import yaml
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, HTTPException, Request, Depends
 
 from src.api.schemas import ConfigUpdate
+from src.api.auth import verify_api_key
 
 router = APIRouter(tags=["config"])
 
@@ -40,7 +41,7 @@ async def get_config(request: Request):
     return cfg
 
 
-@router.put("/config")
+@router.put("/config", dependencies=[Depends(verify_api_key)])
 async def update_config(updates: ConfigUpdate, request: Request):
     """
     Deep-merge `updates` into config.yaml and reload.
