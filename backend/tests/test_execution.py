@@ -273,7 +273,7 @@ async def test_reconcile_positions_fallback(bot):
 
 @pytest.mark.asyncio
 async def test_paper_mode_long_pnl_calculation():
-    from src.exchange import Exchange, Position
+    from src.exchange import Exchange
     
     with patch("src.exchange.get_config") as mock_config:
         mock_config.return_value.exchange.paper_mode = True
@@ -307,7 +307,7 @@ async def test_paper_mode_long_pnl_calculation():
 
 @pytest.mark.asyncio
 async def test_paper_mode_short_pnl_calculation():
-    from src.exchange import Exchange, Position
+    from src.exchange import Exchange
     
     with patch("src.exchange.get_config") as mock_config:
         mock_config.return_value.exchange.paper_mode = True
@@ -516,3 +516,103 @@ def test_paper_mode_no_trigger_on_non_crossing_price():
         assert exchange._paper_position is not None
         assert len(exchange._paper_orders) == 2
         assert exchange._paper_balance == 10000.0
+
+@pytest.mark.asyncio
+async def test_open_position_atr_stops(bot):
+    bot.config.trading.symbol = "BTC/USDT"
+    
+    bot.risk.validate_trade.return_value = MagicMock(approved=True, position_size=1.0)
+    bot.risk.use_atr_stops = True
+    bot.risk.calculate_atr_stops = MagicMock(return_value=(49000.0, 52000.0))
+    
+    bot.exchange.market_long = AsyncMock(return_value={"id": "order123", "average": 50000.0})
+    bot.exchange.cancel_all_orders = AsyncMock()
+    bot.exchange.get_order_fill_details = AsyncMock(return_value={
+        "average_price": 50000.0,
+        "total_fee": 1.0,
+        "fee_currency": "USDT",
+        "confirmed": True
+    })
+    bot.exchange.set_stop_loss = AsyncMock()
+    bot.exchange.set_take_profit = AsyncMock()
+    
+    bot._close_position = AsyncMock()
+    bot.database.log_trade_open = AsyncMock()
+
+    mock_ohlcv = MagicMock()
+    
+    with patch("asyncio.sleep", new_callable=AsyncMock):
+        await bot._open_position("long", 50000.0, 10000.0, "test_reason", ohlcv=mock_ohlcv)
+        
+    bot.risk.calculate_atr_stops.assert_called_once_with(50000.0, "long", mock_ohlcv)
+    bot.exchange.set_stop_loss.assert_called_once_with("BTC/USDT", 49000.0, "long")
+    bot.exchange.set_take_profit.assert_called_once_with("BTC/USDT", 52000.0, "long")
+
+@pytest.mark.asyncio
+async def test_open_position_fallback_fixed_stops(bot):
+    bot.config.trading.symbol = "BTC/USDT"
+    
+    bot.risk.validate_trade.return_value = MagicMock(approved=True, position_size=1.0)
+    bot.risk.use_atr_stops = False
+    bot.risk.calculate_stop_loss = MagicMock(return_value=48000.0)
+    bot.risk.calculate_take_profit = MagicMock(return_value=53000.0)
+    
+    bot.exchange.market_long = AsyncMock(return_value={"id": "order123", "average": 50000.0})
+    bot.exchange.cancel_all_orders = AsyncMock()
+    bot.exchange.get_order_fill_details = AsyncMock(return_value={
+        "average_price": 50000.0,
+        "total_fee": 1.0,
+        "fee_currency": "USDT",
+        "confirmed": True
+    })
+    bot.exchange.set_stop_loss = AsyncMock()
+    bot.exchange.set_take_profit = AsyncMock()
+    
+    bot._close_position = AsyncMock()
+    bot.database.log_trade_open = AsyncMock()
+    
+    with patch("asyncio.sleep", new_callable=AsyncMock):
+        await bot._open_position("long", 50000.0, 10000.0, "test_reason", ohlcv=None)
+        
+    bot.risk.calculate_stop_loss.assert_called_once_with(50000.0, "long")
+    bot.risk.calculate_take_profit.assert_called_once_with(50000.0, "long")
+    bot.exchange.set_stop_loss.assert_called_once_with("BTC/USDT", 48000.0, "long")
+    bot.exchange.set_take_profit.assert_called_once_with("BTC/USDT", 53000.0, "long")
+
+@pytest.mark.asyncio
+async def test_open_position_atr_stops_calculation_failure(bot):
+    bot.config.trading.symbol = "BTC/USDT"
+    
+    bot.risk.validate_trade.return_value = MagicMock(approved=True, position_size=1.0)
+    bot.risk.use_atr_stops = True
+    
+    # Mock to raise an exception, fallback to fixed stops
+    bot.risk.calculate_atr_stops = MagicMock(side_effect=Exception("Data missing or malformed"))
+    
+    bot.risk.calculate_stop_loss = MagicMock(return_value=48000.0)
+    bot.risk.calculate_take_profit = MagicMock(return_value=53000.0)
+    
+    bot.exchange.market_long = AsyncMock(return_value={"id": "order123", "average": 50000.0})
+    bot.exchange.cancel_all_orders = AsyncMock()
+    bot.exchange.get_order_fill_details = AsyncMock(return_value={
+        "average_price": 50000.0,
+        "total_fee": 1.0,
+        "fee_currency": "USDT",
+        "confirmed": True
+    })
+    bot.exchange.set_stop_loss = AsyncMock()
+    bot.exchange.set_take_profit = AsyncMock()
+    
+    bot._close_position = AsyncMock()
+    bot.database.log_trade_open = AsyncMock()
+
+    mock_ohlcv = MagicMock()
+    
+    with patch("asyncio.sleep", new_callable=AsyncMock):
+        await bot._open_position("long", 50000.0, 10000.0, "test_reason", ohlcv=mock_ohlcv)
+        
+    bot.risk.calculate_atr_stops.assert_called_once_with(50000.0, "long", mock_ohlcv)
+    bot.risk.calculate_stop_loss.assert_called_once_with(50000.0, "long")
+    bot.risk.calculate_take_profit.assert_called_once_with(50000.0, "long")
+    bot.exchange.set_stop_loss.assert_called_once_with("BTC/USDT", 48000.0, "long")
+    bot.exchange.set_take_profit.assert_called_once_with("BTC/USDT", 53000.0, "long")

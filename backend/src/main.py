@@ -757,12 +757,12 @@ class OmniTrader:
             # 7. Execute based on signal
             if result.signal == Signal.LONG:
                 await self._open_position(
-                    "long", current_price, balance_info["free"], result.reason
+                    "long", current_price, balance_info["free"], result.reason, primary_ohlcv
                 )
 
             elif result.signal == Signal.SHORT:
                 await self._open_position(
-                    "short", current_price, balance_info["free"], result.reason
+                    "short", current_price, balance_info["free"], result.reason, primary_ohlcv
                 )
 
             elif result.signal in (Signal.EXIT_LONG, Signal.EXIT_SHORT):
@@ -773,14 +773,14 @@ class OmniTrader:
             await self.notifier.error(str(e), "run_cycle")
 
     async def _open_position(
-        self, side: str, current_price: float, balance: float, reason: str = "signal"
+        self, side: str, current_price: float, balance: float, reason: str = "signal", ohlcv=None
     ):
         """Open a new position."""
         symbol = self.config.trading.symbol
 
         # Validate with risk manager
         risk_check = self.risk.validate_trade(
-            side=side, balance=balance, entry_price=current_price, current_positions=0
+            side=side, balance=balance, entry_price=current_price, current_positions=0, ohlcv=ohlcv
         )
 
         if not risk_check.approved:
@@ -832,8 +832,17 @@ class OmniTrader:
             )
 
             # Recalculate SL/TP with actual entry
-            stop_loss = self.risk.calculate_stop_loss(entry_price, side)
-            take_profit = self.risk.calculate_take_profit(entry_price, side)
+            stop_loss = None
+            take_profit = None
+            if self.risk.use_atr_stops and ohlcv is not None:
+                try:
+                    stop_loss, take_profit = self.risk.calculate_atr_stops(entry_price, side, ohlcv)
+                except Exception as e:
+                    logger.error("atr_stops_recalc_failed_fallback_to_fixed", error=str(e))
+            
+            if stop_loss is None or take_profit is None:
+                stop_loss = self.risk.calculate_stop_loss(entry_price, side)
+                take_profit = self.risk.calculate_take_profit(entry_price, side)
 
             # Set stop loss with retries
             sl_success = False
