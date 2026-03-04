@@ -338,3 +338,181 @@ async def test_paper_mode_short_pnl_calculation():
         # PnL = (50000 - 49000) * 2.0 = 2000.0
         assert order["pnl"] == 2000.0
         assert exchange._paper_balance == 12000.0 # 10000 + 2000
+
+def test_paper_mode_long_sl_trigger():
+    from src.exchange import Exchange
+
+    with patch("src.exchange.get_config") as mock_config:
+        mock_config.return_value.exchange.paper_mode = True
+        exchange = Exchange()
+        exchange.paper_mode = True
+        exchange._paper_balance = 10000.0
+
+        exchange._paper_position = {
+            "symbol": "BTC/USDT",
+            "side": "long",
+            "contracts": 1.0,
+            "entryPrice": 50000.0,
+        }
+
+        exchange._paper_orders = [
+            {
+                "id": "sl_1",
+                "symbol": "BTC/USDT",
+                "type": "stop_market",
+                "side": "sell",
+                "stopPrice": 49000.0,
+                "status": "open",
+            }
+        ]
+
+        # Price goes down, hits SL
+        exchange._check_paper_orders(49000.0)
+
+        assert exchange._paper_position is None
+        assert len(exchange._paper_orders) == 0
+        assert exchange._paper_balance == 9000.0  # 10000 - 1000 loss
+
+def test_paper_mode_long_tp_trigger():
+    from src.exchange import Exchange
+
+    with patch("src.exchange.get_config") as mock_config:
+        mock_config.return_value.exchange.paper_mode = True
+        exchange = Exchange()
+        exchange.paper_mode = True
+        exchange._paper_balance = 10000.0
+
+        exchange._paper_position = {
+            "symbol": "BTC/USDT",
+            "side": "long",
+            "contracts": 1.0,
+            "entryPrice": 50000.0,
+        }
+
+        exchange._paper_orders = [
+            {
+                "id": "tp_1",
+                "symbol": "BTC/USDT",
+                "type": "take_profit_market",
+                "side": "sell",
+                "take_profit_price": 51000.0,
+                "status": "open",
+            }
+        ]
+
+        # Price goes up, hits TP
+        exchange._check_paper_orders(51000.0)
+
+        assert exchange._paper_position is None
+        assert len(exchange._paper_orders) == 0
+        assert exchange._paper_balance == 11000.0  # 10000 + 1000 profit
+
+def test_paper_mode_short_sl_trigger():
+    from src.exchange import Exchange
+
+    with patch("src.exchange.get_config") as mock_config:
+        mock_config.return_value.exchange.paper_mode = True
+        exchange = Exchange()
+        exchange.paper_mode = True
+        exchange._paper_balance = 10000.0
+
+        exchange._paper_position = {
+            "symbol": "BTC/USDT",
+            "side": "short",
+            "contracts": 1.0,
+            "entryPrice": 50000.0,
+        }
+
+        exchange._paper_orders = [
+            {
+                "id": "sl_1",
+                "symbol": "BTC/USDT",
+                "type": "stop_market",
+                "side": "buy",
+                "stopPrice": 51000.0,
+                "status": "open",
+            }
+        ]
+
+        # Price goes up, hits short SL
+        exchange._check_paper_orders(51000.0)
+
+        assert exchange._paper_position is None
+        assert len(exchange._paper_orders) == 0
+        assert exchange._paper_balance == 9000.0  # 10000 - 1000 loss
+
+def test_paper_mode_short_tp_trigger():
+    from src.exchange import Exchange
+
+    with patch("src.exchange.get_config") as mock_config:
+        mock_config.return_value.exchange.paper_mode = True
+        exchange = Exchange()
+        exchange.paper_mode = True
+        exchange._paper_balance = 10000.0
+
+        exchange._paper_position = {
+            "symbol": "BTC/USDT",
+            "side": "short",
+            "contracts": 1.0,
+            "entryPrice": 50000.0,
+        }
+
+        exchange._paper_orders = [
+            {
+                "id": "tp_1",
+                "symbol": "BTC/USDT",
+                "type": "take_profit_market",
+                "side": "buy",
+                "take_profit_price": 49000.0,
+                "status": "open",
+            }
+        ]
+
+        # Price goes down, hits short TP
+        exchange._check_paper_orders(49000.0)
+
+        assert exchange._paper_position is None
+        assert len(exchange._paper_orders) == 0
+        assert exchange._paper_balance == 11000.0  # 10000 + 1000 profit
+
+def test_paper_mode_no_trigger_on_non_crossing_price():
+    from src.exchange import Exchange
+
+    with patch("src.exchange.get_config") as mock_config:
+        mock_config.return_value.exchange.paper_mode = True
+        exchange = Exchange()
+        exchange.paper_mode = True
+        exchange._paper_balance = 10000.0
+
+        exchange._paper_position = {
+            "symbol": "BTC/USDT",
+            "side": "long",
+            "contracts": 1.0,
+            "entryPrice": 50000.0,
+        }
+
+        exchange._paper_orders = [
+            {
+                "id": "sl_1",
+                "symbol": "BTC/USDT",
+                "type": "stop_market",
+                "side": "sell",
+                "stopPrice": 49000.0,
+                "status": "open",
+            },
+            {
+                "id": "tp_1",
+                "symbol": "BTC/USDT",
+                "type": "take_profit_market",
+                "side": "sell",
+                "take_profit_price": 51000.0,
+                "status": "open",
+            }
+        ]
+
+        # Price stays between SL and TP
+        exchange._check_paper_orders(50500.0)
+
+        assert exchange._paper_position is not None
+        assert len(exchange._paper_orders) == 2
+        assert exchange._paper_balance == 10000.0
