@@ -88,18 +88,18 @@ class BreakoutStrategy(BaseStrategy):
                 # Handle pandas-ta variations.
                 # Sometimes it returns columns without period if it's default? No, usually follows pattern.
                 if l_col in donchian.columns:
-                    self.lower_channel = donchian[l_col].iloc[-1]
-                    self.mid_channel = donchian[m_col].iloc[-1]
-                    self.upper_channel = donchian[u_col].iloc[-1]
+                    self.lower_channel = donchian[l_col].iloc[-2]
+                    self.mid_channel = donchian[m_col].iloc[-2]
+                    self.upper_channel = donchian[u_col].iloc[-2]
                 else:
                     # Fallback check
                     for col in donchian.columns:
                         if col.startswith("DCL"):
-                            self.lower_channel = donchian[col].iloc[-1]
+                            self.lower_channel = donchian[col].iloc[-2]
                         if col.startswith("DCM"):
-                            self.mid_channel = donchian[col].iloc[-1]
+                            self.mid_channel = donchian[col].iloc[-2]
                         if col.startswith("DCU"):
-                            self.upper_channel = donchian[col].iloc[-1]
+                            self.upper_channel = donchian[col].iloc[-2]
 
         except Exception as e:
             logger.error("breakout_strategy_error", error=str(e))

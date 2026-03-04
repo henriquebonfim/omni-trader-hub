@@ -25,7 +25,7 @@ from src.strategies.z_score import ZScoreStrategy
 def mock_config():
     """Create a mock configuration."""
     config_data = {
-        "trading": {"strategy_name": "ema_volume"},
+        "trading": {"strategy_name": "ema_volume", "timeframe": "1h"},
         "strategy": {
             "ema_fast": 5,
             "ema_slow": 10,
@@ -201,29 +201,77 @@ def test_breakout_strategy(mock_config):
     """Test Breakout Strategy logic."""
     strategy = BreakoutStrategy(mock_config)
 
-    # Mock internal state
-    strategy.upper_channel = 110
-    strategy.lower_channel = 90
-    strategy.mid_channel = 100
+    # Create dummy DataFrame
+    # Need at least period + 1 candles. Period is 20.
+    if hasattr(mock_config.strategy, "breakout"):
+        period = getattr(mock_config.strategy.breakout, "period", 20)
+    else:
+        period = getattr(mock_config.strategy, "donchian_period", 20)
+    dates = pd.date_range("2020-01-01", periods=period + 5, freq="h")
+    
+    # Range bound for the first `period` candles:
+    # High = 100, Low = 90, Close = 95
+    data = {
+        "high": [100.0] * (period + 5),
+        "low": [90.0] * (period + 5),
+        "close": [95.0] * (period + 5),
+        "volume": [1000] * (period + 5),
+    }
+    df = pd.DataFrame(data, index=dates)
 
-    # Case: Long (Price > Upper Channel)
-    strategy.current_price = 111
-    assert strategy.should_long() is True
+    # Case: No breakout (still in range)
+    strategy.update(df.iloc[: period + 1])
+    assert bool(strategy.should_long()) is False
+    assert bool(strategy.should_short()) is False
 
-    strategy.current_price = 109
-    assert strategy.should_long() is False
+    # Case: Long Breakout
+    # Current bar's close breaks above the previous bar's upper channel
+    df.loc[df.index[period + 1], "close"] = 105.0
+    df.loc[df.index[period + 1], "high"] = 105.0 # High follows close to be consistent
+    strategy.update(df.iloc[: period + 2])
+    assert bool(strategy.should_long()) is True
+    assert bool(strategy.should_short()) is False
 
-    # Case: Short (Price < Lower Channel)
-    strategy.current_price = 89
-    assert strategy.should_short() is True
-
-    strategy.current_price = 91
-    assert strategy.should_short() is False
+    # Case: Short Breakdown
+    # Reset current bar, break below previous bar's lower channel
+    df.loc[df.index[period + 1], "close"] = 85.0
+    df.loc[df.index[period + 1], "low"] = 85.0
+    strategy.update(df.iloc[: period + 2])
+    assert bool(strategy.should_long()) is False
+    assert bool(strategy.should_short()) is True
 
     # Case: Exit Long (Price < Mid Channel)
-    strategy.current_position = "long"
-    strategy.current_price = 99
-    assert strategy.should_exit() is True
+    # Mid channel is (100+90)/2 = 95
+    df.loc[df.index[period + 1], "close"] = 94.0
+    strategy.update(df.iloc[: period + 2], current_position="long")
+    assert bool(strategy.should_exit()) is True
+
+    # Test analyze method and entry cooldown
+    # Force trend to neutral to avoid trend filter blocking
+    # Need to reset strategy state first
+    strategy = BreakoutStrategy(mock_config)
+    
+    # Refresh donchian data since we messed with the dataframe
+    df = pd.DataFrame(data, index=dates)
+    df.loc[df.index[period + 1], "close"] = 105.0
+    df.loc[df.index[period + 1], "high"] = 105.0
+    
+    market_data = {"1h": df.iloc[: period + 2]}
+    res = strategy.analyze(market_data, ohlcv=df.iloc[: period + 2])
+    assert res.signal == Signal.LONG
+    
+    # The next bar should be blocked by entry cooldown
+    # Since prices stayed the same, the signal is still logically LONG based on the breakout logic
+    # (since the current close 105 is still > previous upper channel 105 ? No, it's not)
+    # Wait, the previous upper channel will now be 105 (from period + 1). So 95 is not > 105. It'll just be HOLD naturally.
+    # To test cooldown we need the next bar to still trigger a long signal normally, but be blocked.
+    df.loc[df.index[period + 2], "close"] = 106.0
+    df.loc[df.index[period + 2], "high"] = 106.0
+    
+    market_data_next = {"1h": df.iloc[: period + 3]}
+    res_next = strategy.analyze(market_data_next, ohlcv=df.iloc[: period + 3])
+    assert res_next.signal == Signal.HOLD
+    assert "Entry Cooldown" in res_next.reason
 
 
 def test_trailing_stop():
