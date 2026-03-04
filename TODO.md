@@ -56,11 +56,12 @@ Promoted from TASKS.md after institutional audit (2026-03-03).
 - **Completed**: 2026-03-04 | PR #55
 
 ### 7. Add Regime Hysteresis (T13)
-- [ ] Implement Schmitt-trigger: enter TRENDING at ADX > 28, exit at ADX < 22
-- [ ] Same for VOLATILE: enter at ATR > 1.7× baseline, exit at ATR < 1.3× baseline
-- [ ] Persist `current_regime` between cycles (already in memory, just add hysteresis)
-- [ ] Add test: verify regime doesn't flip when ADX oscillates between 23-27
+- [x] Implement Schmitt-trigger: enter TRENDING at ADX > 28, exit at ADX < 22
+- [x] Same for VOLATILE: enter at ATR > 1.7× baseline, exit at ATR < 1.3× baseline
+- [x] Persist `current_regime` between cycles (already in memory, just add hysteresis)
+- [x] Add test: verify regime doesn't flip when ADX oscillates between 23-27
 - **Ref**: TASKS.md T13
+- **Completed**: 2026-03-04 | PR #56
 
 ### 8. Add Entry Cooldown for Level-Based Strategies (T15)
 - [ ] Add `_last_entry_bar` tracking in `BaseStrategy`
