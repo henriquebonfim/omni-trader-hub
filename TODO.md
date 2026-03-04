@@ -49,10 +49,11 @@ Promoted from TASKS.md after institutional audit (2026-03-03).
 - **Completed**: 2026-03-04 | PR #54
 
 ### 6. Add Auth to All Mutation Endpoints (T11)
-- [ ] Add `verify_api_key` dependency to: `/api/bot/*`, `PUT /api/config`, `PUT /api/notifications/*`
-- [ ] Verify all GET endpoints remain readable (status, health)
-- [ ] Add tests: verify 401 on unauthenticated mutation
+- [x] Add `verify_api_key` dependency to: `/api/bot/*`, `PUT /api/config`, `PUT /api/notifications/*`
+- [x] Verify all GET endpoints remain readable (status, health)
+- [x] Add tests: verify 401 on unauthenticated mutation
 - **Ref**: TASKS.md T11
+- **Completed**: 2026-03-04 | PR #55
 
 ### 7. Add Regime Hysteresis (T13)
 - [ ] Implement Schmitt-trigger: enter TRENDING at ADX > 28, exit at ADX < 22
