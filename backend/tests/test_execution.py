@@ -269,3 +269,72 @@ async def test_reconcile_positions_fallback(bot):
 
     # Current price (48000) < SL (49000), so should assume SL hit
     assert call_args["price"] == 49000.0
+
+
+@pytest.mark.asyncio
+async def test_paper_mode_long_pnl_calculation():
+    from src.exchange import Exchange, Position
+    
+    with patch("src.exchange.get_config") as mock_config:
+        mock_config.return_value.exchange.paper_mode = True
+        mock_config.return_value.trading.symbol = "BTC/USDT"
+        
+        exchange = Exchange()
+        exchange.paper_mode = True
+        exchange._paper_balance = 10000.0
+        
+        # Setup paper position
+        exchange._paper_position = {
+            "symbol": "BTC/USDT",
+            "side": "long",
+            "contracts": 2.0, # 2 BTC
+            "entryPrice": 50000.0,
+            "notional": 100000.0,
+            "unrealizedPnl": 0.0,
+            "leverage": 10,
+            "liquidationPrice": 45000.0
+        }
+        
+        # Mock get_ticker for exit price
+        exchange.get_ticker = AsyncMock(return_value={"last": 51000.0})
+        
+        # Call close_position
+        order = await exchange.close_position("BTC/USDT")
+        
+        # PnL = (51000 - 50000) * 2.0 = 2000.0
+        assert order["pnl"] == 2000.0
+        assert exchange._paper_balance == 12000.0 # 10000 + 2000
+
+@pytest.mark.asyncio
+async def test_paper_mode_short_pnl_calculation():
+    from src.exchange import Exchange, Position
+    
+    with patch("src.exchange.get_config") as mock_config:
+        mock_config.return_value.exchange.paper_mode = True
+        mock_config.return_value.trading.symbol = "BTC/USDT"
+        
+        exchange = Exchange()
+        exchange.paper_mode = True
+        exchange._paper_balance = 10000.0
+        
+        # Setup paper position
+        exchange._paper_position = {
+            "symbol": "BTC/USDT",
+            "side": "short",
+            "contracts": 2.0, # 2 BTC
+            "entryPrice": 50000.0,
+            "notional": 100000.0,
+            "unrealizedPnl": 0.0,
+            "leverage": 10,
+            "liquidationPrice": 55000.0
+        }
+        
+        # Mock get_ticker for exit price (price went down, so short makes profit)
+        exchange.get_ticker = AsyncMock(return_value={"last": 49000.0})
+        
+        # Call close_position
+        order = await exchange.close_position("BTC/USDT")
+        
+        # PnL = (50000 - 49000) * 2.0 = 2000.0
+        assert order["pnl"] == 2000.0
+        assert exchange._paper_balance == 12000.0 # 10000 + 2000

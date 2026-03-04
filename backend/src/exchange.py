@@ -43,6 +43,11 @@ class Position:
             self.liquidation_price = float(data.get("liquidationPrice", 0))
 
     @property
+    def contracts(self) -> float:
+        """Alias for size to match standard naming."""
+        return self.size
+
+    @property
     def is_open(self) -> bool:
         return self.size > 0
 
@@ -485,9 +490,9 @@ class Exchange:
 
             # Calculate PnL
             if position.side == "long":
-                pnl = (exit_price - entry_price) / entry_price * position.notional
+                pnl = (exit_price - entry_price) * position.contracts
             else:
-                pnl = (entry_price - exit_price) / entry_price * position.notional
+                pnl = (entry_price - exit_price) * position.contracts
 
             self._paper_balance += pnl
 
