@@ -778,9 +778,20 @@ class OmniTrader:
         """Open a new position."""
         symbol = self.config.trading.symbol
 
+        # Fetch actual current positions count from exchange
+        try:
+            open_positions = await self.exchange.get_open_positions()
+            current_positions_count = len(open_positions)
+        except Exception as e:
+            logger.error("failed_to_fetch_open_positions", error=str(e))
+            # Fallback to zero or reject? Rejecting is safer if we can't verify open positions,
+            # but for MVP we can fall back to 0 to keep trading active or return early.
+            # Returning early to be safe.
+            return
+
         # Validate with risk manager
         risk_check = self.risk.validate_trade(
-            side=side, balance=balance, entry_price=current_price, current_positions=0, ohlcv=ohlcv
+            side=side, balance=balance, entry_price=current_price, current_positions=current_positions_count, ohlcv=ohlcv
         )
 
         if not risk_check.approved:

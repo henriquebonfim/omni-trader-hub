@@ -92,6 +92,7 @@ async def test_bot_logs_warning_on_unconfirmed_fill():
         })
 
         # Mock other stuff to avoid errors
+        bot.exchange.get_open_positions = AsyncMock(return_value=[])
         bot.exchange.cancel_all_orders = AsyncMock()
         bot.exchange.set_stop_loss = AsyncMock()
         bot.exchange.set_take_profit = AsyncMock()

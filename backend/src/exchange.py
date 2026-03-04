@@ -414,6 +414,29 @@ class Exchange:
 
         return Position()  # Empty position
 
+    async def get_open_positions(self) -> list[Position]:
+        """
+        Get all current open positions across all symbols.
+
+        Returns:
+            List of Position objects that are currently open.
+        """
+        if self.paper_mode:
+            if self._paper_position and self._paper_position.get("contracts", 0) > 0:
+                return [Position(self._paper_position)]
+            return []
+
+        await self._rate_limiter.acquire("fetch_positions")
+        # Fetch positions for all symbols by passing no symbol list
+        positions = await self.client.fetch_positions()
+
+        open_positions = []
+        for pos in positions:
+            if float(pos.get("contracts", 0)) > 0:
+                open_positions.append(Position(pos))
+
+        return open_positions
+
     async def fetch_open_orders(self, symbol: str | None = None) -> list:
         """Get all open orders for symbol."""
         symbol = symbol or self.config.trading.symbol

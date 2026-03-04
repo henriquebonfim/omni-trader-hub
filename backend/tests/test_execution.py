@@ -37,6 +37,68 @@ def bot():
             yield bot
 
 @pytest.mark.asyncio
+async def test_max_positions_blocking(bot):
+    bot.config.trading.symbol = "BTC/USDT"
+    bot.config.risk.max_positions = 1
+    
+    # Mock one open position existing
+    existing_pos = Position({"symbol": "ETH/USDT", "side": "long", "contracts": 1.0, "entryPrice": 3000.0})
+    bot.exchange.get_open_positions = AsyncMock(return_value=[existing_pos])
+    
+    # The risk manager uses max_positions = 1 (from config)
+    # Re-init risk manager to pick up mock config
+    from src.risk import RiskManager
+    bot.risk = RiskManager()
+    
+    bot.exchange.market_long = AsyncMock()
+    
+    # Attempt to open position
+    await bot._open_position("long", 50000.0, 10000.0, "test_reason")
+    
+    # Verify the order was NOT placed because max_positions is reached
+    bot.exchange.market_long.assert_not_called()
+
+@pytest.mark.asyncio
+async def test_max_positions_allowing(bot):
+    bot.config.trading.symbol = "BTC/USDT"
+    bot.config.risk.max_positions = 2
+    bot.config.trading.position_size_pct = 10.0
+    bot.config.risk.stop_loss_pct = 1.0
+    bot.config.risk.take_profit_pct = 2.0
+    
+    # Mock one open position existing
+    existing_pos = Position({"symbol": "ETH/USDT", "side": "long", "contracts": 1.0, "entryPrice": 3000.0})
+    bot.exchange.get_open_positions = AsyncMock(return_value=[existing_pos])
+    
+    # Mock exchange calls needed for a successful order
+    bot.exchange.market_long = AsyncMock(return_value={"id": "order123", "average": 50000.0})
+    bot.exchange.cancel_all_orders = AsyncMock()
+    bot.exchange.get_order_fill_details = AsyncMock(return_value={
+        "average_price": 50000.0,
+        "total_fee": 1.0,
+        "fee_currency": "USDT",
+        "confirmed": True
+    })
+    bot.exchange.set_stop_loss = AsyncMock()
+    bot.exchange.set_take_profit = AsyncMock()
+    bot.database.log_trade_open = AsyncMock()
+    
+    # Re-init risk manager to pick up mock config
+    from src.risk import RiskManager
+    bot.risk = RiskManager()
+    
+    # The risk manager needs daily_stats
+    await bot.risk.initialize_daily_stats(10000.0)
+    
+    # Attempt to open position
+    with patch("asyncio.sleep", new_callable=AsyncMock):
+        await bot._open_position("long", 50000.0, 10000.0, "test_reason")
+    
+    # Verify the order WAS placed because 1 < 2
+    bot.exchange.market_long.assert_called_once()
+
+
+@pytest.mark.asyncio
 async def test_open_position_sl_failure_flattens_position(bot):
     bot.config.trading.symbol = "BTC/USDT"
     
@@ -44,6 +106,7 @@ async def test_open_position_sl_failure_flattens_position(bot):
     bot.risk.validate_trade.return_value = MagicMock(approved=True, position_size=1.0)
     
     # Mock exchange
+    bot.exchange.get_open_positions = AsyncMock(return_value=[])
     bot.exchange.market_long = AsyncMock(return_value={"id": "order123", "average": 50000.0})
     bot.exchange.cancel_all_orders = AsyncMock()
     bot.exchange.get_order_fill_details = AsyncMock(return_value={
@@ -80,6 +143,7 @@ async def test_open_position_tp_failure_flattens_position(bot):
     
     bot.risk.validate_trade.return_value = MagicMock(approved=True, position_size=1.0)
     
+    bot.exchange.get_open_positions = AsyncMock(return_value=[])
     bot.exchange.market_long = AsyncMock(return_value={"id": "order123", "average": 50000.0})
     bot.exchange.cancel_all_orders = AsyncMock()
     bot.exchange.get_order_fill_details = AsyncMock(return_value={
@@ -113,6 +177,7 @@ async def test_open_position_success_with_retries(bot):
     
     bot.risk.validate_trade.return_value = MagicMock(approved=True, position_size=1.0)
     
+    bot.exchange.get_open_positions = AsyncMock(return_value=[])
     bot.exchange.market_long = AsyncMock(return_value={"id": "order123", "average": 50000.0})
     bot.exchange.cancel_all_orders = AsyncMock()
     bot.exchange.get_order_fill_details = AsyncMock(return_value={
@@ -525,6 +590,7 @@ async def test_open_position_atr_stops(bot):
     bot.risk.use_atr_stops = True
     bot.risk.calculate_atr_stops = MagicMock(return_value=(49000.0, 52000.0))
     
+    bot.exchange.get_open_positions = AsyncMock(return_value=[])
     bot.exchange.market_long = AsyncMock(return_value={"id": "order123", "average": 50000.0})
     bot.exchange.cancel_all_orders = AsyncMock()
     bot.exchange.get_order_fill_details = AsyncMock(return_value={
@@ -557,6 +623,7 @@ async def test_open_position_fallback_fixed_stops(bot):
     bot.risk.calculate_stop_loss = MagicMock(return_value=48000.0)
     bot.risk.calculate_take_profit = MagicMock(return_value=53000.0)
     
+    bot.exchange.get_open_positions = AsyncMock(return_value=[])
     bot.exchange.market_long = AsyncMock(return_value={"id": "order123", "average": 50000.0})
     bot.exchange.cancel_all_orders = AsyncMock()
     bot.exchange.get_order_fill_details = AsyncMock(return_value={
@@ -592,6 +659,7 @@ async def test_open_position_atr_stops_calculation_failure(bot):
     bot.risk.calculate_stop_loss = MagicMock(return_value=48000.0)
     bot.risk.calculate_take_profit = MagicMock(return_value=53000.0)
     
+    bot.exchange.get_open_positions = AsyncMock(return_value=[])
     bot.exchange.market_long = AsyncMock(return_value={"id": "order123", "average": 50000.0})
     bot.exchange.cancel_all_orders = AsyncMock()
     bot.exchange.get_order_fill_details = AsyncMock(return_value={
