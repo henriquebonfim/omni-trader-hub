@@ -26,11 +26,12 @@ Promoted from TASKS.md after institutional audit (2026-03-03).
 - **Ref**: TASKS.md T7
 - **Completed**: 2026-03-04 | PR #51
 
-### 3. Add Paper SL/TP Simulation (T8)
-- [ ] Add `_check_paper_orders()` method that checks paper orders vs current price each cycle
-- [ ] Trigger SL/TP fills when price crosses levels
-- [ ] Add test: verify paper SL triggers on adverse price move
+### 3. Add Paper SL/TP Simulation (T8) ✅
+- [x] Add `_check_paper_orders()` method that checks paper orders vs current price each cycle
+- [x] Trigger SL/TP fills when price crosses levels
+- [x] Add test: verify paper SL triggers on adverse price move
 - **Ref**: TASKS.md T8
+- **Completed**: 2026-03-04 | PR #52
 
 ### 4. Wire ATR Stops to Exchange Orders (T9)
 - [ ] Pass `ohlcv` DataFrame to `validate_trade()` in `_open_position()`
