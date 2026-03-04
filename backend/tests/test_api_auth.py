@@ -14,11 +14,27 @@ def mock_bot():
     bot.exchange.paper_mode = True
     bot.risk.check_circuit_breaker.return_value = False
     bot.ws_manager = None
+    bot._running = True
 
     # Async mocks
     bot.database.get_recent_trades = AsyncMock(return_value=[])
     bot.database.get_daily_summary = AsyncMock(return_value={"date": "2023-01-01", "pnl": 0})
     bot.database.get_equity_snapshots = AsyncMock(return_value=[])
+    bot.start = AsyncMock()
+    bot.stop = AsyncMock()
+    bot.reload_config = AsyncMock()
+    bot._open_position = AsyncMock()
+    bot._close_position = AsyncMock()
+    
+    mock_position = MagicMock()
+    mock_position.is_open = False
+    bot.exchange.fetch_position = AsyncMock(return_value=mock_position)
+    bot.exchange.fetch_balance = AsyncMock(return_value=1000)
+    
+    bot.notifier = MagicMock()
+    bot.notifier.send = AsyncMock(return_value=True)
+    bot.notifier.enabled = True
+    bot.notifier.webhook_url = "https://discord.com/api/webhooks/test"
 
     return bot
 
@@ -60,6 +76,60 @@ def test_other_routes_unprotected(mock_bot, monkeypatch):
     app = create_api(mock_bot)
     client = TestClient(app)
 
-    # /api/status should still be unprotected (as we only applied to trades.py)
+    # GET /api/status should still be unprotected
     response = client.get("/api/status")
     assert response.status_code == 200
+
+    # GET /api/bot/state should be unprotected
+    response = client.get("/api/bot/state")
+    assert response.status_code == 200
+
+    # GET /api/config should be unprotected
+    response = client.get("/api/config")
+    assert response.status_code == 200
+
+    # GET /api/notifications/discord should be unprotected
+    response = client.get("/api/notifications/discord")
+    assert response.status_code == 200
+
+
+def test_mutation_routes_protected_when_key_set(mock_bot, monkeypatch):
+    monkeypatch.setenv("OMNITRADER_API_KEY", "test-secret")
+
+    app = create_api(mock_bot)
+    client = TestClient(app)
+
+    mutation_endpoints = [
+        ("POST", "/api/bot/start", {}),
+        ("POST", "/api/bot/stop", {}),
+        ("POST", "/api/bot/restart", {}),
+        ("POST", "/api/bot/trade/open", {"side": "buy"}),
+        ("POST", "/api/bot/trade/close", {}),
+        ("PUT", "/api/config", {"strategy": {"name": "ema_volume"}}),
+        ("PUT", "/api/notifications/discord", {"enabled": True}),
+        ("POST", "/api/notifications/discord/test", {}),
+    ]
+
+    for method, endpoint, payload in mutation_endpoints:
+        # Request without token
+        if method == "POST":
+            response = client.post(endpoint, json=payload)
+        else:
+            response = client.put(endpoint, json=payload)
+        assert response.status_code == 401, f"{method} {endpoint} should be 401 without token"
+
+        # Request with invalid token
+        headers = {"Authorization": "Bearer wrong-token"}
+        if method == "POST":
+            response = client.post(endpoint, json=payload, headers=headers)
+        else:
+            response = client.put(endpoint, json=payload, headers=headers)
+        assert response.status_code == 401, f"{method} {endpoint} should be 401 with invalid token"
+
+        # Request with valid token (we just expect it NOT to be 401, could be 200 or 500/400 depending on mock)
+        headers = {"Authorization": "Bearer test-secret"}
+        if method == "POST":
+            response = client.post(endpoint, json=payload, headers=headers)
+        else:
+            response = client.put(endpoint, json=payload, headers=headers)
+        assert response.status_code != 401, f"{method} {endpoint} should not be 401 with valid token"
