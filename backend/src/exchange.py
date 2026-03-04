@@ -99,6 +99,100 @@ class Exchange:
         self._markets_loaded = False
         self._rate_limiter = LeakyBucketRateLimiter()
 
+    def _check_paper_orders(self, current_price: float):
+        """
+        Evaluate active paper protective orders (SL/TP) against current market price.
+        If a crossover occurs, execute the close at the order's trigger price.
+        """
+        if not self.paper_mode or not self._paper_position:
+            return
+
+        side = self._paper_position.get("side")
+        symbol = self._paper_position.get("symbol")
+        contracts = self._paper_position.get("contracts", 0)
+
+        if contracts <= 0:
+            return
+
+        triggered_order = None
+        trigger_price = None
+
+        for order in self._paper_orders:
+            if order.get("status") != "open" or order.get("symbol") != symbol:
+                continue
+
+            order_type = order.get("type")
+            if order_type == "stop_market":
+                stop_price = order.get("stopPrice")
+                if stop_price is None:
+                    continue
+
+                if side == "long" and current_price <= stop_price:
+                    triggered_order = order
+                    trigger_price = stop_price
+                    break
+                elif side == "short" and current_price >= stop_price:
+                    triggered_order = order
+                    trigger_price = stop_price
+                    break
+
+            elif order_type == "take_profit_market":
+                tp_price = order.get("take_profit_price") or order.get("stopPrice")
+                if tp_price is None:
+                    continue
+
+                if side == "long" and current_price >= tp_price:
+                    triggered_order = order
+                    trigger_price = tp_price
+                    break
+                elif side == "short" and current_price <= tp_price:
+                    triggered_order = order
+                    trigger_price = tp_price
+                    break
+
+        if triggered_order and trigger_price is not None:
+            # Execute the order at the trigger price
+            exit_price = trigger_price
+            entry_price = self._paper_position.get("entryPrice", 0.0)
+
+            # Calculate PnL
+            if side == "long":
+                pnl = (exit_price - entry_price) * contracts
+            else:
+                pnl = (entry_price - exit_price) * contracts
+
+            self._paper_balance += pnl
+
+            close_side = "sell" if side == "long" else "buy"
+            order_id = f"paper_close_{int(time.time() * 1000)}_{uuid.uuid4().hex[:6]}"
+
+            self._paper_trades.append({
+                "id": f"trade_{int(time.time() * 1000)}",
+                "order": order_id,
+                "symbol": symbol,
+                "side": close_side,
+                "price": exit_price,
+                "amount": contracts,
+                "cost": contracts * exit_price,
+                "fee": {"cost": contracts * exit_price * 0.0004, "currency": "USDT"},
+                "timestamp": int(time.time() * 1000),
+                "datetime": pd.Timestamp.now(tz="UTC").isoformat(),
+            })
+
+            # Mark order as closed, and reset position and orders
+            triggered_order["status"] = "closed"
+            self._paper_position = None
+            self._paper_orders = []
+
+            logger.info(
+                "paper_order_triggered",
+                symbol=symbol,
+                side=side,
+                order_type=triggered_order.get("type"),
+                trigger_price=trigger_price,
+                pnl=pnl,
+            )
+
     async def _check_rate_limit(self):
         """
         Legacy stub — superseded by the proactive LeakyBucketRateLimiter.
@@ -248,6 +342,9 @@ class Exchange:
         df["timestamp"] = pd.to_datetime(df["timestamp"], unit="ms")
         df.set_index("timestamp", inplace=True)
 
+        if self.paper_mode and not df.empty:
+            self._check_paper_orders(float(df["close"].iloc[-1]))
+
         return df
 
     async def get_ticker(self, symbol: str | None = None) -> dict:
@@ -259,7 +356,14 @@ class Exchange:
             # Fallback for offline paper mode
             return {"last": 50000.0, "symbol": symbol, "timestamp": int(time.time()*1000)}
 
-        return await self.client.fetch_ticker(symbol)
+        ticker = await self.client.fetch_ticker(symbol)
+
+        if self.paper_mode:
+            last_price = ticker.get("last")
+            if last_price is not None:
+                self._check_paper_orders(float(last_price))
+
+        return ticker
 
     async def get_balance(self) -> dict:
         """
