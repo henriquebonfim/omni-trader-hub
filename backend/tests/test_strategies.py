@@ -9,6 +9,7 @@ import pytest
 
 from src.config import Config
 from src.risk import RiskManager
+from src.strategies.base import BaseStrategy, Signal
 from src.strategies import (
     get_strategy,
     list_strategies,
@@ -285,7 +286,9 @@ def test_trailing_stop():
 def test_strategy_required_candles(mock_config):
     """Test that strategies correctly report required candles."""
     ema = EMAVolumeStrategy(mock_config)
-    expected_ema = max(mock_config.strategy.ema_slow, mock_config.strategy.volume_sma) + 2
+    expected_ema = (
+        max(mock_config.strategy.ema_slow, mock_config.strategy.volume_sma) + 2
+    )
     assert ema.required_candles == expected_ema
 
     adx = ADXTrendStrategy(mock_config)
@@ -306,3 +309,84 @@ def test_strategy_required_candles(mock_config):
 
     breakout = BreakoutStrategy(mock_config)
     assert breakout.required_candles == mock_config.strategy.breakout.period + 1
+
+
+class DummyStrategy(BaseStrategy):
+    def __init__(self, config):
+        super().__init__(config)
+        self.long_signal = False
+        self.short_signal = False
+
+    @property
+    def metadata(self):
+        return {}
+
+    @property
+    def valid_regimes(self):
+        return []
+
+    def update(self, ohlcv, current_position=None):
+        pass
+
+    def should_long(self):
+        return self.long_signal
+
+    def should_short(self):
+        return self.short_signal
+
+    def should_exit(self):
+        return False
+
+
+def test_entry_cooldown():
+    from src.strategies.base import Signal
+
+    config_data = {
+        "trading": {"timeframe": "1h"},
+        "strategy": {"min_bars_between_entries": 3},
+    }
+    config = Config(config_data)
+    strategy = DummyStrategy(config)
+
+    # Setup dummy OHLCV
+    dates = pd.date_range("2020-01-01", periods=10, freq="h")
+    df = pd.DataFrame({"close": range(10)}, index=dates)
+
+    strategy.long_signal = True
+
+    # Trigger long
+    market_data = {"1h": df.iloc[:5]}  # Length 5
+    res = strategy.analyze(market_data, ohlcv=None)
+    assert res.signal == Signal.LONG
+
+    # Update state: it should have set last_entry_bar
+    assert strategy._last_entry_side == Signal.LONG.value
+
+    # Next bar (length 6, distance 1)
+    market_data = {"1h": df.iloc[:6]}
+    res = strategy.analyze(market_data, ohlcv=None)
+    assert res.signal == Signal.HOLD
+    assert "Entry Cooldown" in res.reason
+
+    # Next bar (length 7, distance 2)
+    market_data = {"1h": df.iloc[:7]}
+    res = strategy.analyze(market_data, ohlcv=None)
+    assert res.signal == Signal.HOLD
+
+    # Next bar (length 8, distance 3, min_bars_between_entries is 3)
+    market_data = {"1h": df.iloc[:8]}
+    res = strategy.analyze(market_data, ohlcv=None)
+    assert res.signal == Signal.LONG
+
+    # Test that short isn't blocked by long cooldown
+    # Right now last entry is Long at bar length 8
+    strategy.long_signal = False
+    strategy.short_signal = True
+    market_data = {"1h": df.iloc[:9]}  # length 9, distance 1 from last long
+    res = strategy.analyze(market_data, ohlcv=None)
+    assert res.signal == Signal.SHORT
+
+    # Then short should be blocked for the next bar
+    market_data = {"1h": df.iloc[:10]}  # length 10, distance 1 from short
+    res = strategy.analyze(market_data, ohlcv=None)
+    assert res.signal == Signal.HOLD

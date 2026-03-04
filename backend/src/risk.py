@@ -50,14 +50,14 @@ class DailyStats:
     def to_dict(self):
         """Convert to dictionary with date serialized."""
         data = asdict(self)
-        data['date'] = self.date.isoformat()
+        data["date"] = self.date.isoformat()
         return data
 
     @classmethod
     def from_dict(cls, data):
         """Create from dictionary."""
-        if isinstance(data.get('date'), str):
-            data['date'] = date.fromisoformat(data['date'])
+        if isinstance(data.get("date"), str):
+            data["date"] = date.fromisoformat(data["date"])
         return cls(**data)
 
 
@@ -91,9 +91,13 @@ class RiskManager:
         self.max_weekly_loss_pct = getattr(config.risk, "max_weekly_loss_pct", 10.0)
         self.max_positions = config.risk.max_positions
         self.leverage = config.exchange.leverage
-        self.auto_deleverage_threshold = getattr(config.risk, "auto_deleverage_threshold_pct", 10.0)
+        self.auto_deleverage_threshold = getattr(
+            config.risk, "auto_deleverage_threshold_pct", 10.0
+        )
 
-        self.liquidation_buffer_pct = getattr(config.risk, "liquidation_buffer_pct", 0.5)
+        self.liquidation_buffer_pct = getattr(
+            config.risk, "liquidation_buffer_pct", 0.5
+        )
 
         # ATR Stops Config
         self.use_atr_stops = getattr(config.risk, "use_atr_stops", False)
@@ -117,6 +121,7 @@ class RiskManager:
 
         # Persistence
         from .database.factory import DatabaseFactory
+
         self.redis = DatabaseFactory.get_redis_store(config)
         self._redis_key_prefix = "omnitrader:risk:"
 
@@ -125,7 +130,9 @@ class RiskManager:
         logger.info("risk_manager_restoring_state")
         try:
             # Restore Daily Stats
-            daily_stats_data = await self.redis.get(f"{self._redis_key_prefix}daily_stats")
+            daily_stats_data = await self.redis.get(
+                f"{self._redis_key_prefix}daily_stats"
+            )
             is_same_day = False
             if daily_stats_data:
                 stats = DailyStats.from_dict(daily_stats_data)
@@ -135,23 +142,31 @@ class RiskManager:
                     is_same_day = True
                     logger.info("restored_daily_stats", stats=daily_stats_data)
                 else:
-                    logger.info("skipping_stale_daily_stats", stored_date=str(stats.date))
+                    logger.info(
+                        "skipping_stale_daily_stats", stored_date=str(stats.date)
+                    )
 
             # Restore Consecutive Losses (streak carries over days unless reset by win)
             losses = await self.redis.get(f"{self._redis_key_prefix}consecutive_losses")
             if losses is not None:
                 self.consecutive_losses = int(losses)
-                logger.info("restored_consecutive_losses", count=self.consecutive_losses)
+                logger.info(
+                    "restored_consecutive_losses", count=self.consecutive_losses
+                )
 
             # Restore Circuit Breakers
             if is_same_day:
-                cb_active = await self.redis.get(f"{self._redis_key_prefix}circuit_breaker")
+                cb_active = await self.redis.get(
+                    f"{self._redis_key_prefix}circuit_breaker"
+                )
                 if cb_active is not None:
                     self._circuit_breaker_active = bool(cb_active)
             else:
                 self._circuit_breaker_active = False
 
-            wcb_active = await self.redis.get(f"{self._redis_key_prefix}weekly_circuit_breaker")
+            wcb_active = await self.redis.get(
+                f"{self._redis_key_prefix}weekly_circuit_breaker"
+            )
             if wcb_active is not None:
                 self._weekly_circuit_breaker_active = bool(wcb_active)
 
@@ -167,21 +182,19 @@ class RiskManager:
             await self.redis.set(
                 f"{self._redis_key_prefix}daily_stats",
                 self.daily_stats.to_dict(),
-                expire=86400
+                expire=86400,
             )
 
             # Save other fields
             await self.redis.set(
-                f"{self._redis_key_prefix}consecutive_losses",
-                self.consecutive_losses
+                f"{self._redis_key_prefix}consecutive_losses", self.consecutive_losses
             )
             await self.redis.set(
-                f"{self._redis_key_prefix}circuit_breaker",
-                self._circuit_breaker_active
+                f"{self._redis_key_prefix}circuit_breaker", self._circuit_breaker_active
             )
             await self.redis.set(
                 f"{self._redis_key_prefix}weekly_circuit_breaker",
-                self._weekly_circuit_breaker_active
+                self._weekly_circuit_breaker_active,
             )
         except Exception as e:
             logger.error("risk_state_save_failed", error=str(e))
@@ -196,7 +209,9 @@ class RiskManager:
         self.max_positions = config.risk.max_positions
         self.leverage = config.exchange.leverage
 
-        self.liquidation_buffer_pct = getattr(config.risk, "liquidation_buffer_pct", 0.5)
+        self.liquidation_buffer_pct = getattr(
+            config.risk, "liquidation_buffer_pct", 0.5
+        )
 
         # Update ATR stops config
         self.use_atr_stops = getattr(config.risk, "use_atr_stops", False)
@@ -218,7 +233,7 @@ class RiskManager:
             take_profit_pct=self.take_profit_pct,
             max_daily_loss_pct=self.max_daily_loss_pct,
             liquidation_buffer_pct=self.liquidation_buffer_pct,
-            use_atr_stops=self.use_atr_stops
+            use_atr_stops=self.use_atr_stops,
         )
 
     async def initialize_daily_stats(self, current_balance: float):
@@ -268,7 +283,7 @@ class RiskManager:
                 drawdown_pct=self.daily_stats.pnl_pct,
                 threshold=self.auto_deleverage_threshold,
                 original_leverage=self.leverage,
-                new_leverage=1
+                new_leverage=1,
             )
 
         # Risk amount in USDT
@@ -335,7 +350,9 @@ class RiskManager:
         else:  # short
             return entry_price * (1 - self.take_profit_pct / 100)
 
-    def calculate_atr_stops(self, entry_price: float, side: str, ohlcv: pd.DataFrame) -> tuple[float, float]:
+    def calculate_atr_stops(
+        self, entry_price: float, side: str, ohlcv: pd.DataFrame
+    ) -> tuple[float, float]:
         """
         Calculate Stop Loss and Take Profit using ATR.
 
@@ -352,16 +369,18 @@ class RiskManager:
             logger.warning("atr_stops_fallback_no_data")
             return (
                 self.calculate_stop_loss(entry_price, side),
-                self.calculate_take_profit(entry_price, side)
+                self.calculate_take_profit(entry_price, side),
             )
 
         try:
-            atr = ta.atr(ohlcv["high"], ohlcv["low"], ohlcv["close"], length=self.atr_period)
+            atr = ta.atr(
+                ohlcv["high"], ohlcv["low"], ohlcv["close"], length=self.atr_period
+            )
             if atr is None or atr.empty:
                 logger.warning("atr_stops_fallback_calc_failed")
                 return (
                     self.calculate_stop_loss(entry_price, side),
-                    self.calculate_take_profit(entry_price, side)
+                    self.calculate_take_profit(entry_price, side),
                 )
 
             current_atr = atr.iloc[-1]
@@ -380,11 +399,16 @@ class RiskManager:
             # Fallback
             return (
                 self.calculate_stop_loss(entry_price, side),
-                self.calculate_take_profit(entry_price, side)
+                self.calculate_take_profit(entry_price, side),
             )
 
     def validate_trade(
-        self, side: str, balance: float, entry_price: float, current_positions: int = 0, ohlcv: pd.DataFrame = None
+        self,
+        side: str,
+        balance: float,
+        entry_price: float,
+        current_positions: int = 0,
+        ohlcv: pd.DataFrame = None,
     ) -> RiskCheck:
         """
         Validate a potential trade against risk rules.
@@ -536,7 +560,9 @@ class RiskManager:
         """
         return self._circuit_breaker_active or self._weekly_circuit_breaker_active
 
-    async def check_weekly_circuit_breaker(self, weekly_pnl: float, current_balance: float) -> bool:
+    async def check_weekly_circuit_breaker(
+        self, weekly_pnl: float, current_balance: float
+    ) -> bool:
         """
         Check if weekly loss limit is exceeded.
 
@@ -572,7 +598,7 @@ class RiskManager:
                     "weekly_circuit_breaker_triggered",
                     weekly_pnl=weekly_pnl,
                     weekly_pnl_pct=f"{weekly_pnl_pct:.2f}%",
-                    limit=f"-{self.max_weekly_loss_pct}%"
+                    limit=f"-{self.max_weekly_loss_pct}%",
                 )
                 state_changed = True
             result = True
@@ -634,7 +660,7 @@ class RiskManager:
                     volatility_pct=f"{volatility_pct:.2%}",
                     high=high_max,
                     low=low_min,
-                    duration="1h"
+                    duration="1h",
                 )
                 return True
 
@@ -690,7 +716,8 @@ class RiskManager:
     def get_status(self) -> dict:
         """Get current risk status summary."""
         return {
-            "circuit_breaker_active": self._circuit_breaker_active or self._weekly_circuit_breaker_active,
+            "circuit_breaker_active": self._circuit_breaker_active
+            or self._weekly_circuit_breaker_active,
             "daily_breaker": self._circuit_breaker_active,
             "weekly_breaker": self._weekly_circuit_breaker_active,
             "daily_pnl": self.daily_stats.realized_pnl,

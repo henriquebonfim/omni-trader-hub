@@ -18,9 +18,12 @@ def test_drawdown_sizing():
     size = risk.calculate_position_size(10000.0, 1.0)
     assert size == 100.0
 
+
 @pytest.mark.asyncio
 async def test_consecutive_losses_reset():
-    with patch("src.database.factory.DatabaseFactory.get_redis_store") as mock_get_store:
+    with patch(
+        "src.database.factory.DatabaseFactory.get_redis_store"
+    ) as mock_get_store:
         mock_get_store.return_value = AsyncMock()
 
         risk = RiskManager()
@@ -34,9 +37,12 @@ async def test_consecutive_losses_reset():
         await risk.record_trade(-100.0)
         assert risk.consecutive_losses == 1
 
+
 @pytest.mark.asyncio
 async def test_daily_reset_clears_streak(monkeypatch):
-    with patch("src.database.factory.DatabaseFactory.get_redis_store") as mock_get_store:
+    with patch(
+        "src.database.factory.DatabaseFactory.get_redis_store"
+    ) as mock_get_store:
         mock_get_store.return_value = AsyncMock()
 
         risk = RiskManager()

@@ -105,6 +105,7 @@ class OmniTrader:
                 _ws_tfs.append(_trend_tf)
 
         import os
+
         self.ws_feed = WsFeed(
             symbol=self.config.trading.symbol,
             timeframes=_ws_tfs,
@@ -233,7 +234,9 @@ class OmniTrader:
                 since_ts = int(last_open_ts)
                 # Use configured lookback or default to 50
                 limit = getattr(self.config.risk, "reconciliation_lookback_trades", 50)
-                trades = await self.exchange.fetch_my_trades(symbol, since=since_ts, limit=limit)
+                trades = await self.exchange.fetch_my_trades(
+                    symbol, since=since_ts, limit=limit
+                )
 
                 # Filter for trades that closed this position (after open, opposite side)
                 # Note: last_trade['side'] is UPPER ("LONG"/"SHORT"), exchange trade['side'] is lower ("buy"/"sell")
@@ -241,21 +244,24 @@ class OmniTrader:
                 closing_side = "sell" if db_side == "long" else "buy"
 
                 closing_trades = [
-                    t for t in trades
+                    t
+                    for t in trades
                     if t["timestamp"] > last_open_ts and t["side"] == closing_side
                 ]
 
                 if closing_trades:
                     # Calculate weighted average price if multiple fills
                     total_vol = sum(t["amount"] for t in closing_trades)
-                    total_notional = sum(t["amount"] * t["price"] for t in closing_trades)
+                    total_notional = sum(
+                        t["amount"] * t["price"] for t in closing_trades
+                    )
                     if total_vol > 0:
                         exit_price = total_notional / total_vol
                         found_trade = True
                         logger.info(
                             "reconciliation_found_trade",
                             exit_price=exit_price,
-                            trades_count=len(closing_trades)
+                            trades_count=len(closing_trades),
                         )
 
             except Exception as e:
@@ -306,7 +312,7 @@ class OmniTrader:
                 pnl_pct=pnl_pct,
                 reason="reconciliation_detected_close",
                 slippage=slippage,
-                expected_price=exit_price if found_trade else None
+                expected_price=exit_price if found_trade else None,
             )
 
             await self.notifier.send(
@@ -347,7 +353,11 @@ class OmniTrader:
                     # Let's assume the most recent one is the entry.
                     latest_trade = matching_trades[0]
                     open_price = latest_trade["price"]
-                    logger.info("reconciliation_found_open_trade", price=open_price, timestamp=latest_trade["timestamp"])
+                    logger.info(
+                        "reconciliation_found_open_trade",
+                        price=open_price,
+                        timestamp=latest_trade["timestamp"],
+                    )
 
             except Exception as e:
                 logger.error("reconciliation_open_fetch_failed", error=str(e))
@@ -442,12 +452,20 @@ class OmniTrader:
                 self._weekly_check_counter = 0
                 try:
                     today = date.today()
-                    start_of_week = today - timedelta(days=6) # 7 days inclusive
-                    weekly_pnl = await self.database.get_weekly_pnl(start_of_week.isoformat())
+                    start_of_week = today - timedelta(days=6)  # 7 days inclusive
+                    weekly_pnl = await self.database.get_weekly_pnl(
+                        start_of_week.isoformat()
+                    )
 
-                    if await self.risk.check_weekly_circuit_breaker(weekly_pnl, total_balance):
-                        logger.critical("weekly_circuit_breaker_active", status="skipping_cycle")
-                        await self.notifier.send("🚨 **Weekly Circuit Breaker Triggered**! Trading paused.")
+                    if await self.risk.check_weekly_circuit_breaker(
+                        weekly_pnl, total_balance
+                    ):
+                        logger.critical(
+                            "weekly_circuit_breaker_active", status="skipping_cycle"
+                        )
+                        await self.notifier.send(
+                            "🚨 **Weekly Circuit Breaker Triggered**! Trading paused."
+                        )
                         return
                 except Exception as e:
                     logger.error("weekly_circuit_breaker_check_failed", error=str(e))
@@ -478,7 +496,9 @@ class OmniTrader:
                 # Task says > 3x normal. Normal = 0.01%. So > 0.03% (0.0003).
                 if abs(funding_rate) > 0.0003:
                     logger.warning("high_funding_rate", rate=funding_rate)
-                    await self.notifier.send(f"⚠️ **High Funding Rate**: {funding_rate*100:.4f}% for {symbol}")
+                    await self.notifier.send(
+                        f"⚠️ **High Funding Rate**: {funding_rate * 100:.4f}% for {symbol}"
+                    )
 
                 # Log payment estimation if in position
                 if position.is_open:
@@ -496,7 +516,7 @@ class OmniTrader:
                         symbol=symbol,
                         rate=funding_rate,
                         payment=cost,
-                        position_size=position.size
+                        position_size=position.size,
                     )
 
             # 3. Update daily stats with current balance
@@ -548,7 +568,9 @@ class OmniTrader:
 
             # 4a. Check Trend (if enabled)
             market_trend = "neutral"
-            trend_filter_enabled = getattr(self.config.strategy, "trend_filter_enabled", False)
+            trend_filter_enabled = getattr(
+                self.config.strategy, "trend_filter_enabled", False
+            )
             if trend_filter_enabled:
                 trend_tf = getattr(self.config.strategy, "trend_timeframe", "4h")
                 try:
@@ -570,10 +592,14 @@ class OmniTrader:
                 try:
                     if position.is_open:
                         logger.critical("black_swan_flattening_positions")
-                        await self._close_position(position, current_price, "black_swan_emergency_exit")
+                        await self._close_position(
+                            position, current_price, "black_swan_emergency_exit"
+                        )
                 except Exception as e:
                     logger.error("black_swan_close_failed", error=str(e))
-                await self.notifier.send("🚨 **BLACK SWAN DETECTED**: >10% move in 1h. Positions flattened. Bot stopping.")
+                await self.notifier.send(
+                    "🚨 **BLACK SWAN DETECTED**: >10% move in 1h. Positions flattened. Bot stopping."
+                )
                 await self.stop("Black Swan Event")
                 return
 
@@ -614,14 +640,19 @@ class OmniTrader:
                     "celery_dispatch_failed_using_local_fallback",
                     error=str(celery_exc),
                 )
-                result = self.strategy.analyze(market_data, current_side, market_trend=market_trend)
+                result = self.strategy.analyze(
+                    market_data, current_side, market_trend=market_trend
+                )
                 current_regime = self.regime_classifier.analyze(primary_ohlcv)
 
             # 5b. Regime Gating
             # If current regime is not in strategy's valid regimes, force HOLD for entries.
             # We allow exits to proceed even in wrong regime (to get out of trouble).
             if current_regime not in self.strategy.valid_regimes:
-                if result.signal in (Signal.LONG, Signal.SHORT) and not position.is_open:
+                if (
+                    result.signal in (Signal.LONG, Signal.SHORT)
+                    and not position.is_open
+                ):
                     logger.warning(
                         "signal_rejected_regime_mismatch",
                         signal=result.signal,
@@ -703,7 +734,9 @@ class OmniTrader:
             if position.is_open:
                 # Check Liquidation Risk
                 if self.risk.check_liquidation_risk(position, current_price):
-                    await self._close_position(position, current_price, "liquidation_risk_exit")
+                    await self._close_position(
+                        position, current_price, "liquidation_risk_exit"
+                    )
                     await self.notifier.send(
                         f"🚨 **URGENT**: Position closed due to liquidation risk! Price: {current_price}, Liq: {position.liquidation_price}"
                     )
@@ -757,12 +790,20 @@ class OmniTrader:
             # 7. Execute based on signal
             if result.signal == Signal.LONG:
                 await self._open_position(
-                    "long", current_price, balance_info["free"], result.reason, primary_ohlcv
+                    "long",
+                    current_price,
+                    balance_info["free"],
+                    result.reason,
+                    primary_ohlcv,
                 )
 
             elif result.signal == Signal.SHORT:
                 await self._open_position(
-                    "short", current_price, balance_info["free"], result.reason, primary_ohlcv
+                    "short",
+                    current_price,
+                    balance_info["free"],
+                    result.reason,
+                    primary_ohlcv,
                 )
 
             elif result.signal in (Signal.EXIT_LONG, Signal.EXIT_SHORT):
@@ -773,7 +814,12 @@ class OmniTrader:
             await self.notifier.error(str(e), "run_cycle")
 
     async def _open_position(
-        self, side: str, current_price: float, balance: float, reason: str = "signal", ohlcv=None
+        self,
+        side: str,
+        current_price: float,
+        balance: float,
+        reason: str = "signal",
+        ohlcv=None,
     ):
         """Open a new position."""
         symbol = self.config.trading.symbol
@@ -791,7 +837,11 @@ class OmniTrader:
 
         # Validate with risk manager
         risk_check = self.risk.validate_trade(
-            side=side, balance=balance, entry_price=current_price, current_positions=current_positions_count, ohlcv=ohlcv
+            side=side,
+            balance=balance,
+            entry_price=current_price,
+            current_positions=current_positions_count,
+            ohlcv=ohlcv,
         )
 
         if not risk_check.approved:
@@ -813,14 +863,20 @@ class OmniTrader:
                 )
 
             # Verify fills and get actual price/fees
-            fill_details = await self.exchange.get_order_fill_details(order["id"], symbol)
-            entry_price = float(fill_details["average_price"] or order.get("average", current_price))
+            fill_details = await self.exchange.get_order_fill_details(
+                order["id"], symbol
+            )
+            entry_price = float(
+                fill_details["average_price"] or order.get("average", current_price)
+            )
             total_fee = fill_details["total_fee"]
             fee_currency = fill_details["fee_currency"]
             is_confirmed = fill_details.get("confirmed", False)
 
             if not is_confirmed:
-                logger.warning("order_fill_not_confirmed", order_id=order["id"], symbol=symbol)
+                logger.warning(
+                    "order_fill_not_confirmed", order_id=order["id"], symbol=symbol
+                )
 
             notional = risk_check.position_size * entry_price
 
@@ -839,7 +895,7 @@ class OmniTrader:
                 expected=current_price,
                 actual=entry_price,
                 slippage=slippage,
-                fee=fill_details.get("fee")
+                fee=fill_details.get("fee"),
             )
 
             # Recalculate SL/TP with actual entry
@@ -847,10 +903,14 @@ class OmniTrader:
             take_profit = None
             if self.risk.use_atr_stops and ohlcv is not None:
                 try:
-                    stop_loss, take_profit = self.risk.calculate_atr_stops(entry_price, side, ohlcv)
+                    stop_loss, take_profit = self.risk.calculate_atr_stops(
+                        entry_price, side, ohlcv
+                    )
                 except Exception as e:
-                    logger.error("atr_stops_recalc_failed_fallback_to_fixed", error=str(e))
-            
+                    logger.error(
+                        "atr_stops_recalc_failed_fallback_to_fixed", error=str(e)
+                    )
+
             if stop_loss is None or take_profit is None:
                 stop_loss = self.risk.calculate_stop_loss(entry_price, side)
                 take_profit = self.risk.calculate_take_profit(entry_price, side)
@@ -864,8 +924,12 @@ class OmniTrader:
                     break
                 except Exception as e:
                     if attempt < 3:
-                        logger.warning("set_stop_loss_failed_retrying", attempt=attempt+1, error=str(e))
-                        await asyncio.sleep(1 * (2 ** attempt))
+                        logger.warning(
+                            "set_stop_loss_failed_retrying",
+                            attempt=attempt + 1,
+                            error=str(e),
+                        )
+                        await asyncio.sleep(1 * (2**attempt))
                     else:
                         logger.error("set_stop_loss_failed_final", error=str(e))
 
@@ -873,7 +937,9 @@ class OmniTrader:
                 logger.critical("flattening_position_due_to_sl_failure")
                 pos = await self.exchange.get_position(symbol)
                 if pos.is_open:
-                    await self._close_position(pos, entry_price, "emergency_close_sl_placement_failed")
+                    await self._close_position(
+                        pos, entry_price, "emergency_close_sl_placement_failed"
+                    )
                 return
 
             # Set take profit with retries
@@ -885,8 +951,12 @@ class OmniTrader:
                     break
                 except Exception as e:
                     if attempt < 3:
-                        logger.warning("set_take_profit_failed_retrying", attempt=attempt+1, error=str(e))
-                        await asyncio.sleep(1 * (2 ** attempt))
+                        logger.warning(
+                            "set_take_profit_failed_retrying",
+                            attempt=attempt + 1,
+                            error=str(e),
+                        )
+                        await asyncio.sleep(1 * (2**attempt))
                     else:
                         logger.error("set_take_profit_failed_final", error=str(e))
 
@@ -894,7 +964,9 @@ class OmniTrader:
                 logger.critical("flattening_position_due_to_tp_failure")
                 pos = await self.exchange.get_position(symbol)
                 if pos.is_open:
-                    await self._close_position(pos, entry_price, "emergency_close_tp_placement_failed")
+                    await self._close_position(
+                        pos, entry_price, "emergency_close_tp_placement_failed"
+                    )
                 return
 
             # Log to database
@@ -960,14 +1032,25 @@ class OmniTrader:
                 return
 
             # Verify fills and get actual price/fees
-            fill_details = await self.exchange.get_order_fill_details(order["id"], symbol)
-            exit_price = float(fill_details["average_price"] or order.get("average") or order.get("price") or current_price)
+            fill_details = await self.exchange.get_order_fill_details(
+                order["id"], symbol
+            )
+            exit_price = float(
+                fill_details["average_price"]
+                or order.get("average")
+                or order.get("price")
+                or current_price
+            )
             total_fee = fill_details["total_fee"]
             fee_currency = fill_details["fee_currency"]
             is_confirmed = fill_details.get("confirmed", False)
 
             if not is_confirmed:
-                logger.warning("close_order_fill_not_confirmed", order_id=order["id"], symbol=symbol)
+                logger.warning(
+                    "close_order_fill_not_confirmed",
+                    order_id=order["id"],
+                    symbol=symbol,
+                )
 
             # Calculate Slippage (Positive = Bad, Negative = Good)
             # Long Exit (Sell): Expected - Actual
@@ -1024,7 +1107,7 @@ class OmniTrader:
                 price=exit_price,
                 size=position.size,
                 notional=position.size * exit_price,
-                pnl=pnl,       # Log Gross PnL
+                pnl=pnl,  # Log Gross PnL
                 pnl_pct=pnl_pct,
                 reason=reason,
                 expected_price=expected_price,

@@ -94,32 +94,39 @@ class MarketStructure:
             # Check for Swing High
             is_high = True
             for j in range(1, self.swing_window + 1):
-                if df["high"].iloc[i - j] > current_high or df["high"].iloc[i + j] > current_high:
+                if (
+                    df["high"].iloc[i - j] > current_high
+                    or df["high"].iloc[i + j] > current_high
+                ):
                     is_high = False
                     break
 
             if is_high:
-                swings.append(Swing(
-                    index=i,
-                    time=df.index[i], # Assuming DatetimeIndex
-                    price=current_high,
-                    type=SwingType.HIGH
-                ))
+                swings.append(
+                    Swing(
+                        index=i,
+                        time=df.index[i],  # Assuming DatetimeIndex
+                        price=current_high,
+                        type=SwingType.HIGH,
+                    )
+                )
 
             # Check for Swing Low
             is_low = True
             for j in range(1, self.swing_window + 1):
-                if df["low"].iloc[i - j] < current_low or df["low"].iloc[i + j] < current_low:
+                if (
+                    df["low"].iloc[i - j] < current_low
+                    or df["low"].iloc[i + j] < current_low
+                ):
                     is_low = False
                     break
 
             if is_low:
-                swings.append(Swing(
-                    index=i,
-                    time=df.index[i],
-                    price=current_low,
-                    type=SwingType.LOW
-                ))
+                swings.append(
+                    Swing(
+                        index=i, time=df.index[i], price=current_low, type=SwingType.LOW
+                    )
+                )
 
         # Sort by index
         swings.sort(key=lambda x: x.index)
@@ -132,7 +139,9 @@ class MarketStructure:
         swings = self.detect_swings(df)
         return self._analyze_events_robust(df, swings)
 
-    def _analyze_events_robust(self, df: pd.DataFrame, swings: List[Swing]) -> MarketStructureResult:
+    def _analyze_events_robust(
+        self, df: pd.DataFrame, swings: List[Swing]
+    ) -> MarketStructureResult:
         events = []
         trend = Trend.NEUTRAL
 
@@ -182,7 +191,9 @@ class MarketStructure:
                 if active_high and current_close > active_high.price:
                     if active_high.index != last_broken_high_idx:
                         # Valid new BOS
-                        evt = StructureEvent(i, current_time, current_close, "BOS", trend)
+                        evt = StructureEvent(
+                            i, current_time, current_close, "BOS", trend
+                        )
                         events.append(evt)
                         last_bos_event = evt
                         last_broken_high_idx = active_high.index
@@ -199,7 +210,9 @@ class MarketStructure:
                 # BOS: Break below active low
                 if active_low and current_close < active_low.price:
                     if active_low.index != last_broken_low_idx:
-                        evt = StructureEvent(i, current_time, current_close, "BOS", trend)
+                        evt = StructureEvent(
+                            i, current_time, current_close, "BOS", trend
+                        )
                         events.append(evt)
                         last_bos_event = evt
                         last_broken_low_idx = active_low.index
@@ -219,5 +232,5 @@ class MarketStructure:
             last_swing_high=active_high,
             last_swing_low=active_low,
             last_bos=last_bos_event,
-            last_choch=last_choch_event
+            last_choch=last_choch_event,
         )

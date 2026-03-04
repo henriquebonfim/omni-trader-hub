@@ -7,8 +7,9 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 # Security scheme for Bearer token
 security = HTTPBearer(auto_error=False)
 
+
 async def verify_api_key(
-    credentials: HTTPAuthorizationCredentials = Security(security), # noqa: B008
+    credentials: HTTPAuthorizationCredentials = Security(security),  # noqa: B008
 ):
     """
     Verify the API key provided in the Authorization header.
@@ -23,7 +24,9 @@ async def verify_api_key(
         return None
 
     # If a key is configured but no credentials provided or they don't match
-    if not credentials or not hmac.compare_digest(credentials.credentials, expected_key):
+    if not credentials or not hmac.compare_digest(
+        credentials.credentials, expected_key
+    ):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid or missing API key",

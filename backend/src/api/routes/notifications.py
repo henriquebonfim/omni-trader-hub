@@ -5,7 +5,7 @@ Discord notification config routes.
 from typing import Optional
 
 import yaml
-from fastapi import APIRouter, HTTPException, Request, Depends
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
 
 from src.api.auth import verify_api_key
@@ -72,5 +72,7 @@ async def test_discord(request: Request):
     if not bot.notifier.enabled or not bot.notifier.webhook_url:
         return {"ok": False, "message": "Discord not configured or disabled"}
 
-    sent = await bot.notifier.send("🤖 OmniTrader test notification — webhook is working!")
+    sent = await bot.notifier.send(
+        "🤖 OmniTrader test notification — webhook is working!"
+    )
     return {"ok": sent, "message": "Test sent" if sent else "Send failed"}

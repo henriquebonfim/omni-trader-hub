@@ -30,7 +30,7 @@ class RegimeClassifier:
         adx_threshold: int = 25,
         atr_period: int = 14,
         atr_multiplier: float = 1.5,
-        hysteresis_enabled: bool = False
+        hysteresis_enabled: bool = False,
     ):
         self.adx_period = adx_period
         self.adx_threshold = adx_threshold
@@ -54,7 +54,9 @@ class RegimeClassifier:
 
         try:
             # Calculate ADX for Trend Strength
-            adx_df = ta.adx(ohlcv["high"], ohlcv["low"], ohlcv["close"], length=self.adx_period)
+            adx_df = ta.adx(
+                ohlcv["high"], ohlcv["low"], ohlcv["close"], length=self.adx_period
+            )
             if adx_df is None or adx_df.empty:
                 return MarketRegime.UNCERTAIN
 
@@ -66,7 +68,9 @@ class RegimeClassifier:
             current_adx = adx_df[adx_col].iloc[-1]
 
             # Calculate ATR for Volatility
-            atr = ta.atr(ohlcv["high"], ohlcv["low"], ohlcv["close"], length=self.atr_period)
+            atr = ta.atr(
+                ohlcv["high"], ohlcv["low"], ohlcv["close"], length=self.atr_period
+            )
             if atr is None or atr.empty:
                 return MarketRegime.UNCERTAIN
 

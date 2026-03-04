@@ -5,10 +5,10 @@ Config read/write routes.
 from pathlib import Path
 
 import yaml
-from fastapi import APIRouter, HTTPException, Request, Depends
+from fastapi import APIRouter, Depends, HTTPException, Request
 
-from src.api.schemas import ConfigUpdate
 from src.api.auth import verify_api_key
+from src.api.schemas import ConfigUpdate
 
 router = APIRouter(tags=["config"])
 

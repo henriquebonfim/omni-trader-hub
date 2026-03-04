@@ -78,7 +78,7 @@ class WsFeed:
             "enableRateLimit": True,
             "options": {"defaultType": "swap"},
         }
-        
+
         if not self._paper_mode:
             exchange_config["apiKey"] = api_key
             exchange_config["secret"] = api_secret
@@ -101,9 +101,7 @@ class WsFeed:
     async def start(self) -> None:
         """Launch background WebSocket streaming tasks."""
         self._stopped = False
-        self._tasks.append(
-            asyncio.create_task(self._stream_ticker(), name="ws-ticker")
-        )
+        self._tasks.append(asyncio.create_task(self._stream_ticker(), name="ws-ticker"))
         for tf in self._timeframes:
             self._tasks.append(
                 asyncio.create_task(self._stream_ohlcv(tf), name=f"ws-ohlcv-{tf}")

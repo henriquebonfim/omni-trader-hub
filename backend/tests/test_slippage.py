@@ -28,7 +28,7 @@ async def test_slippage_calculation_long():
     bot.exchange.get_order_fill_details.return_value = {
         "average_price": 50100.0,
         "total_fee": 1.0,
-        "fee_currency": "USDT"
+        "fee_currency": "USDT",
     }
 
     await bot._open_position("long", 50000.0, 1000.0)
@@ -36,8 +36,9 @@ async def test_slippage_calculation_long():
     # Verify DB Log
     bot.database.log_trade_open.assert_called_once()
     kwargs = bot.database.log_trade_open.call_args[1]
-    assert kwargs['expected_price'] == 50000.0
-    assert kwargs['slippage'] == 100.0
+    assert kwargs["expected_price"] == 50000.0
+    assert kwargs["slippage"] == 100.0
+
 
 @pytest.mark.asyncio
 async def test_slippage_favorable():
@@ -60,12 +61,13 @@ async def test_slippage_favorable():
     bot.exchange.get_order_fill_details.return_value = {
         "average_price": 49900.0,
         "total_fee": 1.0,
-        "fee_currency": "USDT"
+        "fee_currency": "USDT",
     }
     await bot._open_position("long", 50000.0, 1000.0)
 
     kwargs = bot.database.log_trade_open.call_args[1]
-    assert kwargs['slippage'] == -100.0
+    assert kwargs["slippage"] == -100.0
+
 
 @pytest.mark.asyncio
 async def test_slippage_zero():
@@ -84,12 +86,13 @@ async def test_slippage_zero():
     bot.exchange.get_order_fill_details.return_value = {
         "average_price": 50000.0,
         "total_fee": 1.0,
-        "fee_currency": "USDT"
+        "fee_currency": "USDT",
     }
     await bot._open_position("long", 50000.0, 1000.0)
 
     kwargs = bot.database.log_trade_open.call_args[1]
-    assert kwargs['slippage'] == 0.0
+    assert kwargs["slippage"] == 0.0
+
 
 @pytest.mark.asyncio
 async def test_slippage_calculation_short():
@@ -114,7 +117,7 @@ async def test_slippage_calculation_short():
     bot.exchange.get_order_fill_details.return_value = {
         "average_price": 49900.0,
         "total_fee": 1.0,
-        "fee_currency": "USDT"
+        "fee_currency": "USDT",
     }
 
     await bot._open_position("short", 50000.0, 1000.0)
@@ -122,5 +125,5 @@ async def test_slippage_calculation_short():
     # Verify DB Log
     bot.database.log_trade_open.assert_called_once()
     kwargs = bot.database.log_trade_open.call_args[1]
-    assert kwargs['expected_price'] == 50000.0
-    assert kwargs['slippage'] == 100.0
+    assert kwargs["expected_price"] == 50000.0
+    assert kwargs["slippage"] == 100.0

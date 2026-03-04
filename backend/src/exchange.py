@@ -166,18 +166,23 @@ class Exchange:
             close_side = "sell" if side == "long" else "buy"
             order_id = f"paper_close_{int(time.time() * 1000)}_{uuid.uuid4().hex[:6]}"
 
-            self._paper_trades.append({
-                "id": f"trade_{int(time.time() * 1000)}",
-                "order": order_id,
-                "symbol": symbol,
-                "side": close_side,
-                "price": exit_price,
-                "amount": contracts,
-                "cost": contracts * exit_price,
-                "fee": {"cost": contracts * exit_price * 0.0004, "currency": "USDT"},
-                "timestamp": int(time.time() * 1000),
-                "datetime": pd.Timestamp.now(tz="UTC").isoformat(),
-            })
+            self._paper_trades.append(
+                {
+                    "id": f"trade_{int(time.time() * 1000)}",
+                    "order": order_id,
+                    "symbol": symbol,
+                    "side": close_side,
+                    "price": exit_price,
+                    "amount": contracts,
+                    "cost": contracts * exit_price,
+                    "fee": {
+                        "cost": contracts * exit_price * 0.0004,
+                        "currency": "USDT",
+                    },
+                    "timestamp": int(time.time() * 1000),
+                    "datetime": pd.Timestamp.now(tz="UTC").isoformat(),
+                }
+            )
 
             # Mark order as closed, and reset position and orders
             triggered_order["status"] = "closed"
@@ -273,7 +278,9 @@ class Exchange:
             self._markets_loaded = True
         except Exception as e:
             if self.paper_mode:
-                logger.warning("exchange_connection_failed_paper_mode_offline", error=str(e))
+                logger.warning(
+                    "exchange_connection_failed_paper_mode_offline", error=str(e)
+                )
                 self._markets_loaded = False
                 # Continue in offline paper mode
             else:
@@ -354,7 +361,11 @@ class Exchange:
 
         if self.paper_mode and not self._markets_loaded:
             # Fallback for offline paper mode
-            return {"last": 50000.0, "symbol": symbol, "timestamp": int(time.time()*1000)}
+            return {
+                "last": 50000.0,
+                "symbol": symbol,
+                "timestamp": int(time.time() * 1000),
+            }
 
         ticker = await self.client.fetch_ticker(symbol)
 
@@ -493,22 +504,26 @@ class Exchange:
                 "average": price,
                 "filled": amount,
                 "status": "closed",
-                "fees": [{"cost": amount * price * 0.0004, "currency": "USDT"}],  # 0.04% fee simulation
+                "fees": [
+                    {"cost": amount * price * 0.0004, "currency": "USDT"}
+                ],  # 0.04% fee simulation
             }
 
             # Log paper trade
-            self._paper_trades.append({
-                "id": f"trade_{int(time.time() * 1000)}",
-                "order": order_id,
-                "symbol": symbol,
-                "side": "buy",
-                "price": price,
-                "amount": amount,
-                "cost": notional,
-                "fee": {"cost": amount * price * 0.0004, "currency": "USDT"},
-                "timestamp": int(time.time() * 1000),
-                "datetime": pd.Timestamp.now(tz="UTC").isoformat(),
-            })
+            self._paper_trades.append(
+                {
+                    "id": f"trade_{int(time.time() * 1000)}",
+                    "order": order_id,
+                    "symbol": symbol,
+                    "side": "buy",
+                    "price": price,
+                    "amount": amount,
+                    "cost": notional,
+                    "fee": {"cost": amount * price * 0.0004, "currency": "USDT"},
+                    "timestamp": int(time.time() * 1000),
+                    "datetime": pd.Timestamp.now(tz="UTC").isoformat(),
+                }
+            )
 
             logger.info("paper_long_opened", symbol=symbol, amount=amount, price=price)
             return order
@@ -570,18 +585,20 @@ class Exchange:
             }
 
             # Log paper trade
-            self._paper_trades.append({
-                "id": f"trade_{int(time.time() * 1000)}",
-                "order": order_id,
-                "symbol": symbol,
-                "side": "sell",
-                "price": price,
-                "amount": amount,
-                "cost": notional,
-                "fee": {"cost": amount * price * 0.0004, "currency": "USDT"},
-                "timestamp": int(time.time() * 1000),
-                "datetime": pd.Timestamp.now(tz="UTC").isoformat(),
-            })
+            self._paper_trades.append(
+                {
+                    "id": f"trade_{int(time.time() * 1000)}",
+                    "order": order_id,
+                    "symbol": symbol,
+                    "side": "sell",
+                    "price": price,
+                    "amount": amount,
+                    "cost": notional,
+                    "fee": {"cost": amount * price * 0.0004, "currency": "USDT"},
+                    "timestamp": int(time.time() * 1000),
+                    "datetime": pd.Timestamp.now(tz="UTC").isoformat(),
+                }
+            )
 
             logger.info("paper_short_opened", symbol=symbol, amount=amount, price=price)
             return order
@@ -641,18 +658,23 @@ class Exchange:
             }
 
             # Log paper trade
-            self._paper_trades.append({
-                "id": f"trade_{int(time.time() * 1000)}",
-                "order": order_id,
-                "symbol": symbol,
-                "side": side,
-                "price": exit_price,
-                "amount": position.size,
-                "cost": position.size * exit_price,
-                "fee": {"cost": position.size * exit_price * 0.0004, "currency": "USDT"},
-                "timestamp": int(time.time() * 1000),
-                "datetime": pd.Timestamp.now(tz="UTC").isoformat(),
-            })
+            self._paper_trades.append(
+                {
+                    "id": f"trade_{int(time.time() * 1000)}",
+                    "order": order_id,
+                    "symbol": symbol,
+                    "side": side,
+                    "price": exit_price,
+                    "amount": position.size,
+                    "cost": position.size * exit_price,
+                    "fee": {
+                        "cost": position.size * exit_price * 0.0004,
+                        "currency": "USDT",
+                    },
+                    "timestamp": int(time.time() * 1000),
+                    "datetime": pd.Timestamp.now(tz="UTC").isoformat(),
+                }
+            )
 
             self._paper_position = None
             self._paper_orders = []  # Cancel all paper orders
@@ -917,12 +939,17 @@ class Exchange:
         try:
             # CCXT stores last response headers in client.last_response_headers
             # Binance headers: x-mbx-used-weight, x-mbx-used-weight-1m
-            if hasattr(self.client, "last_response_headers") and self.client.last_response_headers:
+            if (
+                hasattr(self.client, "last_response_headers")
+                and self.client.last_response_headers
+            ):
                 headers = self.client.last_response_headers
                 used_weight_1m = headers.get("x-mbx-used-weight-1m")
                 used_weight = headers.get("x-mbx-used-weight")
 
-                result["binance_used_weight_1m"] = int(used_weight_1m) if used_weight_1m else 0
+                result["binance_used_weight_1m"] = (
+                    int(used_weight_1m) if used_weight_1m else 0
+                )
                 result["binance_used_weight"] = int(used_weight) if used_weight else 0
         except Exception:
             pass
@@ -930,7 +957,11 @@ class Exchange:
         return result
 
     async def get_order_fill_details(
-        self, order_id: str, symbol: str | None = None, retries: int = 5, delay: float = 1.0
+        self,
+        order_id: str,
+        symbol: str | None = None,
+        retries: int = 5,
+        delay: float = 1.0,
     ) -> dict:
         """
         Verify order fills and return actual average price and fees.
@@ -953,18 +984,24 @@ class Exchange:
                 # Fetch trades for this specific order
                 # Note: Some exchanges support fetching order with trades, others require fetch_my_trades
                 # Binance supports fetch_my_trades, filtering by order id client-side is robust
-                trades = await self.fetch_my_trades(symbol, limit=50) # fetch recent trades
+                trades = await self.fetch_my_trades(
+                    symbol, limit=50
+                )  # fetch recent trades
 
                 # Filter for this order
-                order_trades = [t for t in trades if str(t.get("order")) == str(order_id)]
+                order_trades = [
+                    t for t in trades if str(t.get("order")) == str(order_id)
+                ]
 
                 if not order_trades:
                     # If paper mode, it should be instant. If live, might take a moment.
                     if self.paper_mode:
                         # Should have been recorded immediately
-                        logger.warning("paper_trade_not_found_retrying", order_id=order_id)
+                        logger.warning(
+                            "paper_trade_not_found_retrying", order_id=order_id
+                        )
                     else:
-                        logger.debug("no_fills_found_retrying", attempt=attempt+1)
+                        logger.debug("no_fills_found_retrying", attempt=attempt + 1)
 
                     await asyncio.sleep(delay)
                     continue
@@ -989,7 +1026,11 @@ class Exchange:
 
                 if total_amount == 0:
                     logger.warning("zero_amount_filled", order_id=order_id)
-                    return {"average_price": 0.0, "total_fee": 0.0, "fee_currency": None}
+                    return {
+                        "average_price": 0.0,
+                        "total_fee": 0.0,
+                        "fee_currency": None,
+                    }
 
                 average_price = total_cost / total_amount
 
@@ -998,20 +1039,27 @@ class Exchange:
                     order_id=order_id,
                     avg_price=average_price,
                     total_fee=total_fee,
-                    currency=fee_currency
+                    currency=fee_currency,
                 )
 
                 return {
                     "average_price": average_price,
                     "total_fee": total_fee,
                     "fee_currency": fee_currency,
-                    "confirmed": True
+                    "confirmed": True,
                 }
 
             except Exception as e:
-                logger.error("order_verification_failed", error=str(e), attempt=attempt+1)
+                logger.error(
+                    "order_verification_failed", error=str(e), attempt=attempt + 1
+                )
                 await asyncio.sleep(delay)
 
         # Fallback if verification fails
         logger.error("order_verification_timeout", order_id=order_id)
-        return {"average_price": 0.0, "total_fee": 0.0, "fee_currency": None, "confirmed": False}
+        return {
+            "average_price": 0.0,
+            "total_fee": 0.0,
+            "fee_currency": None,
+            "confirmed": False,
+        }

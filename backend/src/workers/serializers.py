@@ -41,7 +41,9 @@ def market_data_to_json(market_data: dict[str, pd.DataFrame]) -> str:
 
     Returns a JSON object mapping timeframe → split-oriented DataFrame payload.
     """
-    return json.dumps({tf: json.loads(df_to_json(df)) for tf, df in market_data.items()})
+    return json.dumps(
+        {tf: json.loads(df_to_json(df)) for tf, df in market_data.items()}
+    )
 
 
 def json_to_market_data(json_str: str) -> dict[str, pd.DataFrame]:

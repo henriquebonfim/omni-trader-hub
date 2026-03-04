@@ -13,19 +13,33 @@ async def test_order_fill_confirmation_success():
     config_data = {
         "trading": {"symbol": "BTC/USDT", "timeframe": "15min"},
         "strategy": {"bias_confirmation": False},
-        "exchange": {"paper_mode": True}
+        "exchange": {"paper_mode": True},
     }
     config = Config(config_data)
 
-    with patch("src.exchange.ccxt.binance"), \
-         patch("src.exchange.get_config", return_value=config):
+    with (
+        patch("src.exchange.ccxt.binance"),
+        patch("src.exchange.get_config", return_value=config),
+    ):
         exchange = Exchange()
-        exchange.paper_mode = False # Force non-paper mode for trade fetching logic
+        exchange.paper_mode = False  # Force non-paper mode for trade fetching logic
 
         # Mock fetch_my_trades to return trades for the order
         mock_trades = [
-            {"order": "123", "amount": 0.5, "price": 50000.0, "cost": 25000.0, "fee": {"cost": 10, "currency": "USDT"}},
-            {"order": "123", "amount": 0.5, "price": 51000.0, "cost": 25500.0, "fee": {"cost": 10, "currency": "USDT"}}
+            {
+                "order": "123",
+                "amount": 0.5,
+                "price": 50000.0,
+                "cost": 25000.0,
+                "fee": {"cost": 10, "currency": "USDT"},
+            },
+            {
+                "order": "123",
+                "amount": 0.5,
+                "price": 51000.0,
+                "cost": 25500.0,
+                "fee": {"cost": 10, "currency": "USDT"},
+            },
         ]
         exchange.fetch_my_trades = AsyncMock(return_value=mock_trades)
 
@@ -35,17 +49,20 @@ async def test_order_fill_confirmation_success():
         assert result["average_price"] == 50500.0
         assert result["total_fee"] == 20.0
 
+
 @pytest.mark.asyncio
 async def test_order_fill_confirmation_timeout():
     config_data = {
         "trading": {"symbol": "BTC/USDT", "timeframe": "15min"},
         "strategy": {"bias_confirmation": False},
-        "exchange": {"paper_mode": True}
+        "exchange": {"paper_mode": True},
     }
     config = Config(config_data)
 
-    with patch("src.exchange.ccxt.binance"), \
-         patch("src.exchange.get_config", return_value=config):
+    with (
+        patch("src.exchange.ccxt.binance"),
+        patch("src.exchange.get_config", return_value=config),
+    ):
         exchange = Exchange()
         exchange.paper_mode = False
 
@@ -53,21 +70,25 @@ async def test_order_fill_confirmation_timeout():
         exchange.fetch_my_trades = AsyncMock(return_value=[])
 
         # Use small retries and delay to speed up test
-        result = await exchange.get_order_fill_details("123", "BTC/USDT", retries=2, delay=0.1)
+        result = await exchange.get_order_fill_details(
+            "123", "BTC/USDT", retries=2, delay=0.1
+        )
 
         assert result["confirmed"] is False
         assert result["average_price"] == 0.0
 
+
 @pytest.mark.asyncio
 async def test_bot_logs_warning_on_unconfirmed_fill():
     # Setup bot with mocked exchange
-    with patch("src.main.Exchange") as MockExchange, \
-         patch("src.main.DatabaseFactory"), \
-         patch("src.main.RiskManager") as MockRiskManager, \
-         patch("src.main.Notifier") as MockNotifier, \
-         patch("src.main.get_config") as mock_get_config, \
-         patch("src.main.get_strategy"):
-
+    with (
+        patch("src.main.Exchange") as MockExchange,
+        patch("src.main.DatabaseFactory"),
+        patch("src.main.RiskManager") as MockRiskManager,
+        patch("src.main.Notifier") as MockNotifier,
+        patch("src.main.get_config") as mock_get_config,
+        patch("src.main.get_strategy"),
+    ):
         MockNotifier.return_value = AsyncMock()
         mock_config = MagicMock()
         mock_config.trading.symbol = "BTC/USDT"
@@ -84,12 +105,14 @@ async def test_bot_logs_warning_on_unconfirmed_fill():
         bot.exchange.market_long = AsyncMock(return_value={"id": "123"})
 
         # Mock UNCONFIRMED fill
-        bot.exchange.get_order_fill_details = AsyncMock(return_value={
-            "average_price": 50000.0,
-            "total_fee": 10.0,
-            "fee_currency": "USDT",
-            "confirmed": False # <--- UNCONFIRMED
-        })
+        bot.exchange.get_order_fill_details = AsyncMock(
+            return_value={
+                "average_price": 50000.0,
+                "total_fee": 10.0,
+                "fee_currency": "USDT",
+                "confirmed": False,  # <--- UNCONFIRMED
+            }
+        )
 
         # Mock other stuff to avoid errors
         bot.exchange.get_open_positions = AsyncMock(return_value=[])
@@ -102,4 +125,6 @@ async def test_bot_logs_warning_on_unconfirmed_fill():
             await bot._open_position("long", 50000.0, 10000.0)
 
             # Check if warning was logged
-            mock_logger.warning.assert_any_call("order_fill_not_confirmed", order_id="123", symbol="BTC/USDT")
+            mock_logger.warning.assert_any_call(
+                "order_fill_not_confirmed", order_id="123", symbol="BTC/USDT"
+            )

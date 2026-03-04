@@ -135,7 +135,11 @@ class LeakyBucketRateLimiter:
             Explicit weight override.  Falls back to :data:`ENDPOINT_WEIGHTS`
             then :data:`DEFAULT_WEIGHT`.
         """
-        cost = weight if weight is not None else ENDPOINT_WEIGHTS.get(endpoint, DEFAULT_WEIGHT)
+        cost = (
+            weight
+            if weight is not None
+            else ENDPOINT_WEIGHTS.get(endpoint, DEFAULT_WEIGHT)
+        )
 
         async with self._lock:
             while True:
@@ -191,7 +195,9 @@ class LeakyBucketRateLimiter:
 class _ThrottleContext:
     """Async context manager returned by :meth:`LeakyBucketRateLimiter.throttle`."""
 
-    def __init__(self, limiter: LeakyBucketRateLimiter, endpoint: str, weight: int | None):
+    def __init__(
+        self, limiter: LeakyBucketRateLimiter, endpoint: str, weight: int | None
+    ):
         self._limiter = limiter
         self._endpoint = endpoint
         self._weight = weight

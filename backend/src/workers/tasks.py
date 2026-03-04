@@ -16,7 +16,6 @@ analyze_regime
 Both tasks are **idempotent** (read-only, stateless) — safe to retry.
 """
 
-
 import structlog
 
 from src.workers import celery_app
@@ -28,6 +27,7 @@ logger = structlog.get_logger()
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _build_config(config_dict: dict):
     """
@@ -49,6 +49,7 @@ def _build_config(config_dict: dict):
 # ---------------------------------------------------------------------------
 # Tasks
 # ---------------------------------------------------------------------------
+
 
 @celery_app.task(bind=True, name="omnitrader.analyze_strategy", max_retries=2)
 def analyze_strategy(
@@ -108,7 +109,9 @@ def analyze_strategy(
         }
 
     except Exception as exc:
-        logger.error("analyze_strategy_task_failed", error=str(exc), strategy=strategy_name)
+        logger.error(
+            "analyze_strategy_task_failed", error=str(exc), strategy=strategy_name
+        )
         raise self.retry(exc=exc, countdown=1)
 
 

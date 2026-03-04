@@ -22,7 +22,9 @@ class SMCAnalyzer:
     def __init__(self, swing_window: int = 5):
         self.structure_analyzer = MarketStructure(swing_window)
 
-    def analyze(self, market_data: Dict[str, pd.DataFrame]) -> Dict[str, MarketStructureResult]:
+    def analyze(
+        self, market_data: Dict[str, pd.DataFrame]
+    ) -> Dict[str, MarketStructureResult]:
         """
         Analyze structure for all provided timeframes.
 
@@ -45,7 +47,9 @@ class SMCAnalyzer:
 
         return results
 
-    def get_bias(self, results: Dict[str, MarketStructureResult], bias_tf: str = "4h") -> Trend:
+    def get_bias(
+        self, results: Dict[str, MarketStructureResult], bias_tf: str = "4h"
+    ) -> Trend:
         """Get the trend bias from a higher timeframe."""
         res = results.get(bias_tf)
         if res:
