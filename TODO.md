@@ -33,12 +33,13 @@ Promoted from TASKS.md after institutional audit (2026-03-03).
 - **Ref**: TASKS.md T8
 - **Completed**: 2026-03-04 | PR #52
 
-### 4. Wire ATR Stops to Exchange Orders (T9)
-- [ ] Pass `ohlcv` DataFrame to `validate_trade()` in `_open_position()`
-- [ ] When `use_atr_stops` is enabled, use ATR-derived prices for `set_stop_loss()` / `set_take_profit()`
-- [ ] Fallback to fixed % if OHLCV data insufficient for ATR calculation
-- [ ] Add test: verify ATR stop prices are used when config enabled
+### 4. Wire ATR Stops to Exchange Orders (T9) ✅
+- [x] Pass `ohlcv` DataFrame to `validate_trade()` in `_open_position()`
+- [x] When `use_atr_stops` is enabled, use ATR-derived prices for `set_stop_loss()` / `set_take_profit()`
+- [x] Fallback to fixed % if OHLCV data insufficient for ATR calculation
+- [x] Add test: verify ATR stop prices are used when config enabled
 - **Ref**: TASKS.md T9
+- **Completed**: 2026-03-04 | PR #53
 
 ### 5. Fix `current_positions` Hardcoded to 0 (T10)
 - [ ] Query actual open position count from exchange state
