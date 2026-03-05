@@ -863,6 +863,8 @@ class OmniTrader:
             side=side,
             balance=balance,
             entry_price=current_price,
+            symbol=symbol,
+            exchange=self.exchange,
             current_positions=current_positions_count,
             ohlcv=ohlcv,
         )

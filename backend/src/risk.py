@@ -442,6 +442,8 @@ class RiskManager:
         side: str,
         balance: float,
         entry_price: float,
+        symbol: str = "BTC/USDT",
+        exchange=None,
         current_positions: int = 0,
         ohlcv: pd.DataFrame = None,
     ) -> RiskCheck:
@@ -452,6 +454,8 @@ class RiskManager:
             side: "long" or "short"
             balance: Available balance
             entry_price: Expected entry price
+            symbol: Trading symbol (e.g., "BTC/USDT") for exchange market info
+            exchange: Exchange instance to fetch market minimum order size
             current_positions: Number of open positions
             ohlcv: OHLCV DataFrame for dynamic stop calculations
 
@@ -489,12 +493,29 @@ class RiskManager:
             stop_loss = self.calculate_stop_loss(entry_price, side)
             take_profit = self.calculate_take_profit(entry_price, side)
 
-        # Validate position size
-        min_size = 0.001  # Minimum BTC size
+        # Validate position size - fetch min from exchange if available
+        min_size = 0.001  # Fallback default (BTC)
+        if exchange is not None and symbol in exchange.markets:
+            try:
+                limit_info = exchange.markets[symbol].get("limits", {}).get("amount", {})
+                exchange_min = limit_info.get("min")
+                if exchange_min is not None:
+                    min_size = exchange_min
+                    logger.info(
+                        "using_exchange_min_size", symbol=symbol, min_size=min_size
+                    )
+            except (KeyError, AttributeError, TypeError) as e:
+                logger.warning(
+                    "failed_to_fetch_exchange_min_size",
+                    symbol=symbol,
+                    error=str(e),
+                    fallback_min_size=min_size,
+                )
+
         if position_size < min_size:
             return RiskCheck(
                 approved=False,
-                reason=f"Position too small: {position_size:.6f} < {min_size}",
+                reason=f"Position too small: {position_size:.6f} < {min_size} ({symbol})",
             )
 
         return RiskCheck(
