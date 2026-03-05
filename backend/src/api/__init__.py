@@ -5,7 +5,6 @@ FastAPI application factory. Call `create_api(bot)` to get a configured app
 that can be run alongside the trading loop via asyncio.gather().
 """
 
-import os
 from datetime import datetime, timezone
 
 import structlog

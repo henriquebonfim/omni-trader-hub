@@ -1,8 +1,8 @@
 import hmac
 import os
 import secrets
-import structlog
 
+import structlog
 from fastapi import HTTPException, Security, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
