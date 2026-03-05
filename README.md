@@ -26,9 +26,20 @@ Self-hosted BTC/USDT Futures trading system with pluggable strategies, regime de
 ### Docker Compose (Recommended)
 
 ```bash
-cp .env.example .env          # Configure API keys, Discord webhook
-# IMPORTANT: You MUST set POSTGRES_PASSWORD in your .env file
-docker compose up -d --build   # Start full stack
+# Initial setup: create .env and build images
+make setup
+
+# Edit .env file to configure (POSTGRES_PASSWORD is required)
+nano .env
+
+# Start all services in background
+make start
+
+# View logs
+make logs
+
+# Stop all services
+make stop
 ```
 
 - **Dashboard**: http://localhost:3000
@@ -47,7 +58,16 @@ python -m src.main
 ### Make Targets
 
 ```bash
+make setup      # Initial setup (create .env, build images)
+make start      # Start application in background
+make stop       # Stop all containers  
 make test       # Run pytest + frontend tests via Docker
+make logs       # View container logs
+make build      # Rebuild Docker images
+make dev        # Start in foreground with live logs
+make lint       # Run linters (ruff)
+make typecheck  # Run type checking (mypy)
+```
 make lint       # Ruff + frontend lint
 make build      # Build all Docker images
 make dev        # Start in development mode

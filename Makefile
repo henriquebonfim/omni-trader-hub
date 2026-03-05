@@ -5,6 +5,13 @@
 .PHONY: help docker-ps
 
 help:
+	@echo "=== Quick Start ==="
+	@echo "  make setup  - Initial setup (create .env, build images)"
+	@echo "  make start  - Start application in background"
+	@echo "  make stop   - Stop all containers"
+	@echo "  make test   - Run all tests inside Docker"
+	@echo "  make logs   - View container logs"
+	@echo ""
 	@echo "=== Project Commands ==="
 	@$(MAKE) --no-print-directory -f .agent/make/stack.make stack-info
 	@echo ""
