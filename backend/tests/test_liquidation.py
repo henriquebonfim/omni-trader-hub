@@ -41,6 +41,12 @@ async def test_liquidation_risk_trigger(mock_get_store):
     bot.strategy.required_candles = 100
     bot.strategy.analyze.return_value = MagicMock(signal=Signal.HOLD, indicators={})
 
+    # Mock WS Feed to prevent staleness
+    bot.ws_feed = MagicMock()
+    bot.ws_feed.ticker_age.return_value = 10.0
+    bot.ws_feed.latest_ticker.return_value = {"last": 44000.0}
+    bot.ws_feed.latest_ohlcv.return_value = None
+
     # Mock OHLCV
     ohlcv_mock = MagicMock()
     ohlcv_mock.iloc = MagicMock()
@@ -130,6 +136,12 @@ async def test_liquidation_risk_safe(mock_get_store):
     bot.risk = RiskManager()
     bot.risk.liquidation_buffer_pct = 0.5
     await bot.risk.initialize_daily_stats(10000.0)
+
+    # Mock WS Feed to prevent staleness
+    bot.ws_feed = MagicMock()
+    bot.ws_feed.ticker_age.return_value = 10.0
+    bot.ws_feed.latest_ticker.return_value = {"last": 48000.0}
+    bot.ws_feed.latest_ohlcv.return_value = None
 
     # Mock Strategy
     bot.strategy = MagicMock()
