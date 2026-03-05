@@ -760,3 +760,49 @@ async def test_open_position_atr_stops_calculation_failure(bot):
     bot.risk.calculate_take_profit.assert_called_once_with(50000.0, "long")
     bot.exchange.set_stop_loss.assert_called_once_with("BTC/USDT", 48000.0, "long")
     bot.exchange.set_take_profit.assert_called_once_with("BTC/USDT", 53000.0, "long")
+
+
+@pytest.mark.asyncio
+async def test_market_long_invalid_amount():
+    from src.exchange import Exchange
+
+    with patch("src.exchange.get_config") as mock_config:
+        mock_config.return_value.exchange.paper_mode = True
+        mock_config.return_value.trading.symbol = "BTC/USDT"
+        exchange = Exchange()
+
+        with pytest.raises(
+            ValueError, match="market_long requires amount > 0, got None"
+        ):
+            await exchange.market_long(symbol="BTC/USDT", amount=None)
+
+        with pytest.raises(ValueError, match="market_long requires amount > 0, got 0"):
+            await exchange.market_long(symbol="BTC/USDT", amount=0)
+
+        with pytest.raises(
+            ValueError, match="market_long requires amount > 0, got -1.5"
+        ):
+            await exchange.market_long(symbol="BTC/USDT", amount=-1.5)
+
+
+@pytest.mark.asyncio
+async def test_market_short_invalid_amount():
+    from src.exchange import Exchange
+
+    with patch("src.exchange.get_config") as mock_config:
+        mock_config.return_value.exchange.paper_mode = True
+        mock_config.return_value.trading.symbol = "BTC/USDT"
+        exchange = Exchange()
+
+        with pytest.raises(
+            ValueError, match="market_short requires amount > 0, got None"
+        ):
+            await exchange.market_short(symbol="BTC/USDT", amount=None)
+
+        with pytest.raises(ValueError, match="market_short requires amount > 0, got 0"):
+            await exchange.market_short(symbol="BTC/USDT", amount=0)
+
+        with pytest.raises(
+            ValueError, match="market_short requires amount > 0, got -1.5"
+        ):
+            await exchange.market_short(symbol="BTC/USDT", amount=-1.5)

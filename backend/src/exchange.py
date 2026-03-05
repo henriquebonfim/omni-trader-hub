@@ -474,6 +474,9 @@ class Exchange:
         Returns:
             Order result
         """
+        if amount is None or amount <= 0:
+            raise ValueError(f"market_long requires amount > 0, got {amount}")
+
         symbol = symbol or self.config.trading.symbol
 
         if self.paper_mode:
@@ -551,6 +554,9 @@ class Exchange:
         Returns:
             Order result
         """
+        if amount is None or amount <= 0:
+            raise ValueError(f"market_short requires amount > 0, got {amount}")
+
         symbol = symbol or self.config.trading.symbol
 
         if self.paper_mode:
