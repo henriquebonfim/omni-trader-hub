@@ -11,8 +11,9 @@ from src.database.postgres import PostgresDatabase
 
 
 @pytest.mark.asyncio
-async def test_backup_db_success():
+async def test_backup_db_success(monkeypatch):
     """Test successful database backup."""
+    monkeypatch.setenv("POSTGRES_PASSWORD", "test_password")
     db = PostgresDatabase(
         connection_string="postgresql://user:pass@localhost:5432/testdb"
     )
@@ -35,8 +36,9 @@ async def test_backup_db_success():
 
 
 @pytest.mark.asyncio
-async def test_backup_db_failure():
+async def test_backup_db_failure(monkeypatch):
     """Test database backup failure handling."""
+    monkeypatch.setenv("POSTGRES_PASSWORD", "test_password")
     db = PostgresDatabase(
         connection_string="postgresql://user:pass@localhost:5432/testdb"
     )

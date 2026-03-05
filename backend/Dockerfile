@@ -13,7 +13,11 @@ RUN apt-get update && apt-get install -y \
 
 # Install Python dependencies
 COPY requirements.txt .
+ARG DEV=false
 RUN pip install --no-cache-dir -r requirements.txt
+# If DEV=true, we would copy and install requirements-dev.txt here,
+# but it's excluded by .dockerignore by default.
+# For a full dev build, you would need to adjust .dockerignore.
 
 # Copy source
 COPY src/ ./src/

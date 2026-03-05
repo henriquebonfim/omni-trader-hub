@@ -5,7 +5,6 @@ FastAPI application factory. Call `create_api(bot)` to get a configured app
 that can be run alongside the trading loop via asyncio.gather().
 """
 
-import os
 from datetime import datetime, timezone
 
 import structlog
@@ -52,11 +51,16 @@ def create_api(bot_instance) -> FastAPI:
         allow_headers=["*"],
     )
 
-    # Check for API key and log warning if missing
-    if not os.getenv("OMNITRADER_API_KEY"):
+    # Initialize authentication
+    from .auth import init_auth, is_dev_mode
+    init_auth()
+
+    # Warn if auth is auto-generated in production
+    paper_mode = getattr(bot_instance.config.exchange, "paper_mode", True)
+    if is_dev_mode() and not paper_mode:
         logger.warning(
-            "api_auth_disabled",
-            message="OMNITRADER_API_KEY not set in environment. API endpoints are UNPROTECTED.",
+            "auth_dev_mode_in_production",
+            message="OMNITRADER_API_KEY is not set while paper_mode is False. Auth is auto-generated in production!",
         )
 
     # Mount routers
