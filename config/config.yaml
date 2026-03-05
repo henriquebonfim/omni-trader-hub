@@ -34,7 +34,7 @@ exchange:
 
 database:
   type: postgres
-  connection_string: "postgresql://omnitrader:omnitrader_password@postgres:5432/trades_db"
+  connection_string: "postgresql://omnitrader:${POSTGRES_PASSWORD}@postgres:5432/trades_db"
 
 notifications:
   discord_webhook_url: ""

@@ -16,6 +16,11 @@ from .base import BaseDatabase
 logger = structlog.get_logger()
 
 
+class ConfigError(Exception):
+    """Exception raised for errors in the configuration."""
+    pass
+
+
 class PostgresDatabase(BaseDatabase):
     """
     PostgreSQL database for trade history and statistics.
@@ -23,7 +28,13 @@ class PostgresDatabase(BaseDatabase):
 
     def __init__(self, connection_string: str = None):
         self.user = os.getenv("POSTGRES_USER", "omnitrader")
-        self.password = os.getenv("POSTGRES_PASSWORD", "omnitrader_password")
+        
+        # Require POSTGRES_PASSWORD with no fallback default
+        password = os.getenv("POSTGRES_PASSWORD")
+        if not password:
+            raise ConfigError("POSTGRES_PASSWORD environment variable is required")
+        self.password = password
+        
         self.db_name = os.getenv("POSTGRES_DB", "trades_db")
         self.host = os.getenv("POSTGRES_HOST", "localhost")
         self.port = os.getenv("POSTGRES_PORT", "5432")
@@ -160,6 +171,23 @@ class PostgresDatabase(BaseDatabase):
                     rate DOUBLE PRECISION NOT NULL,
                     payment DOUBLE PRECISION NOT NULL,
                     position_size DOUBLE PRECISION NOT NULL
+                );
+
+                CREATE TABLE IF NOT EXISTS positions (
+                    id SERIAL PRIMARY KEY,
+                    symbol TEXT NOT NULL,
+                    side TEXT NOT NULL,
+                    size DOUBLE PRECISION NOT NULL,
+                    entry_price DOUBLE PRECISION NOT NULL,
+                    unrealized_pnl DOUBLE PRECISION,
+                    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+                );
+
+                CREATE TABLE IF NOT EXISTS state_persistence (
+                    key TEXT PRIMARY KEY,
+                    value JSONB NOT NULL,
+                    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
                 );
 
                 CREATE INDEX IF NOT EXISTS idx_trades_timestamp ON trades(timestamp);
@@ -441,3 +469,76 @@ class PostgresDatabase(BaseDatabase):
             rate=rate,
             payment=payment,
         )
+
+    # --- Position CRUD Operations ---
+    async def create_position(self, symbol: str, side: str, size: float, entry_price: float) -> int:
+        async with self._pool.acquire() as conn:
+            pos_id = await conn.fetchval(
+                """
+                INSERT INTO positions (symbol, side, size, entry_price, created_at, updated_at)
+                VALUES ($1, $2, $3, $4, NOW(), NOW())
+                RETURNING id
+                """,
+                symbol, side, size, entry_price
+            )
+            return pos_id
+            
+    async def get_position(self, pos_id: int) -> Optional[dict]:
+        async with self._pool.acquire() as conn:
+            row = await conn.fetchrow("SELECT * FROM positions WHERE id = $1", pos_id)
+            if row:
+                d = dict(row)
+                d["created_at"] = d["created_at"].isoformat()
+                d["updated_at"] = d["updated_at"].isoformat()
+                return d
+            return None
+            
+    async def update_position(self, pos_id: int, size: float, unrealized_pnl: float):
+        async with self._pool.acquire() as conn:
+            await conn.execute(
+                """
+                UPDATE positions
+                SET size = $1, unrealized_pnl = $2, updated_at = NOW()
+                WHERE id = $3
+                """,
+                size, unrealized_pnl, pos_id
+            )
+            
+    async def delete_position(self, pos_id: int):
+        async with self._pool.acquire() as conn:
+            await conn.execute("DELETE FROM positions WHERE id = $1", pos_id)
+
+    # --- State Persistence CRUD Operations ---
+    async def set_state(self, key: str, value: dict):
+        async with self._pool.acquire() as conn:
+            await conn.execute(
+                """
+                INSERT INTO state_persistence (key, value, updated_at)
+                VALUES ($1, $2::jsonb, NOW())
+                ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()
+                """,
+                key, json.dumps(value)
+            )
+
+    async def get_state(self, key: str) -> Optional[dict]:
+        async with self._pool.acquire() as conn:
+            row = await conn.fetchrow("SELECT value FROM state_persistence WHERE key = $1", key)
+            if row:
+                return json.loads(row["value"])
+            return None
+            
+    async def delete_state(self, key: str):
+        async with self._pool.acquire() as conn:
+            await conn.execute("DELETE FROM state_persistence WHERE key = $1", key)
+
+    async def update_trade(self, trade_id: int, price: float, size: float):
+        async with self._pool.acquire() as conn:
+            await conn.execute(
+                "UPDATE trades SET price = $1, size = $2 WHERE id = $3",
+                price, size, trade_id
+            )
+
+    async def delete_trade(self, trade_id: int):
+        async with self._pool.acquire() as conn:
+            await conn.execute("DELETE FROM trades WHERE id = $1", trade_id)
+

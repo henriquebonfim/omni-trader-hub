@@ -1,0 +1,28 @@
+# Dev dependencies
+requirements-dev.txt
+
+# Tests
+tests/
+
+# Git
+.git
+.gitignore
+
+# Cache and compiled code
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# Data
+data/
+*.db
+*.sqlite3
+
+# Env
+.env
+
+# Other
+scripts/

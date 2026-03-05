@@ -41,20 +41,35 @@ def mock_bot():
     return bot
 
 
-def test_trades_unprotected_when_no_key_set(mock_bot, monkeypatch):
+def test_trades_protected_when_no_key_set_uses_generated_key(mock_bot, monkeypatch):
     # Ensure OMNITRADER_API_KEY is NOT set
     monkeypatch.delenv("OMNITRADER_API_KEY", raising=False)
+    
+    # Reset the singleton in auth.py for testing
+    import src.api.auth as auth
+    auth._API_KEY = None
+    auth._AUTH_DEV_MODE = False
 
     app = create_api(mock_bot)
     client = TestClient(app)
 
+    # It should be protected, so missing token should be 401
     response = client.get("/api/trades")
-    assert response.status_code == 200
+    assert response.status_code == 401
 
+    # Using the generated key should succeed
+    generated_key = auth.get_api_key()
+    response = client.get("/api/trades", headers={"Authorization": f"Bearer {generated_key}"})
+    assert response.status_code == 200
 
 def test_trades_protected_when_key_set(mock_bot, monkeypatch):
     # Set the API key
     monkeypatch.setenv("OMNITRADER_API_KEY", "test-secret")
+    
+    # Reset the singleton in auth.py for testing
+    import src.api.auth as auth
+    auth._API_KEY = None
+    auth._AUTH_DEV_MODE = False
 
     app = create_api(mock_bot)
     client = TestClient(app)
@@ -77,6 +92,11 @@ def test_trades_protected_when_key_set(mock_bot, monkeypatch):
 def test_other_routes_unprotected(mock_bot, monkeypatch):
     # Set the API key
     monkeypatch.setenv("OMNITRADER_API_KEY", "test-secret")
+    
+    # Reset the singleton in auth.py for testing
+    import src.api.auth as auth
+    auth._API_KEY = None
+    auth._AUTH_DEV_MODE = False
 
     app = create_api(mock_bot)
     client = TestClient(app)
@@ -100,6 +120,11 @@ def test_other_routes_unprotected(mock_bot, monkeypatch):
 
 def test_mutation_routes_protected_when_key_set(mock_bot, monkeypatch):
     monkeypatch.setenv("OMNITRADER_API_KEY", "test-secret")
+    
+    # Reset the singleton in auth.py for testing
+    import src.api.auth as auth
+    auth._API_KEY = None
+    auth._AUTH_DEV_MODE = False
 
     app = create_api(mock_bot)
     client = TestClient(app)

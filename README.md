@@ -27,6 +27,7 @@ Self-hosted BTC/USDT Futures trading system with pluggable strategies, regime de
 
 ```bash
 cp .env.example .env          # Configure API keys, Discord webhook
+# IMPORTANT: You MUST set POSTGRES_PASSWORD in your .env file
 docker compose up -d --build   # Start full stack
 ```
 

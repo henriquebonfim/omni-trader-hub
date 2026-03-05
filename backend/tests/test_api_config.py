@@ -24,25 +24,33 @@ def mock_bot():
 
 
 def test_config_validation(mock_bot, monkeypatch):
-    monkeypatch.delenv("OMNITRADER_API_KEY", raising=False)
+    # Reset auth module globals and set a test API key
+    import src.api.auth as auth_module
+    auth_module._API_KEY = None
+    auth_module._AUTH_DEV_MODE = False
+    test_api_key = "test_key_12345"
+    monkeypatch.setenv("OMNITRADER_API_KEY", test_api_key)
     app = create_api(mock_bot)
     client = TestClient(app)
+    
+    # Set up auth header for all requests
+    headers = {"Authorization": f"Bearer {test_api_key}"}
 
     # 1. Valid partial update should be accepted
-    response = client.put("/api/config", json={"strategy": {"ema_fast": 10}})
+    response = client.put("/api/config", json={"strategy": {"ema_fast": 10}}, headers=headers)
     assert response.status_code == 200
 
     # 2. Invalid field type
-    response = client.put("/api/config", json={"strategy": {"ema_fast": "not_an_int"}})
+    response = client.put("/api/config", json={"strategy": {"ema_fast": "not_an_int"}}, headers=headers)
     assert response.status_code == 422
 
     # 3. Unknown field rejected (extra=forbid)
-    response = client.put("/api/config", json={"unknown_field": 123})
+    response = client.put("/api/config", json={"unknown_field": 123}, headers=headers)
     assert response.status_code == 422
 
     # 4. Constraint violations
-    response = client.put("/api/config", json={"exchange": {"leverage": 200}})
+    response = client.put("/api/config", json={"exchange": {"leverage": 200}}, headers=headers)
     assert response.status_code == 422
 
-    response = client.put("/api/config", json={"risk": {"stop_loss_pct": -5}})
+    response = client.put("/api/config", json={"risk": {"stop_loss_pct": -5}}, headers=headers)
     assert response.status_code == 422
