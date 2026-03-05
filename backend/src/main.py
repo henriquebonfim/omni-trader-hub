@@ -562,7 +562,7 @@ class OmniTrader:
 
             # Check WebSocket staleness
             ticker_age = self.ws_feed.ticker_age()
-            
+
             if ticker_age > 120.0:
                 logger.warning(
                     "ws_ticker_extremely_stale",

@@ -53,6 +53,7 @@ def create_api(bot_instance) -> FastAPI:
 
     # Initialize authentication
     from .auth import init_auth, is_dev_mode
+
     init_auth()
 
     # Warn if auth is auto-generated in production

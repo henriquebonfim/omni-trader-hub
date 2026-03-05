@@ -14,13 +14,14 @@ security = HTTPBearer(auto_error=False)
 _API_KEY = None
 _AUTH_DEV_MODE = False
 
+
 def init_auth():
     """
     Initialize authentication key and mode.
     If OMNITRADER_API_KEY is not set, generate a random 32-character hex key.
     """
     global _API_KEY, _AUTH_DEV_MODE
-    
+
     if _API_KEY is not None:
         return  # Already initialized
 
@@ -31,8 +32,12 @@ def init_auth():
     else:
         _API_KEY = secrets.token_hex(32)
         _AUTH_DEV_MODE = True
-        print(f"\n{'='*50}\nAUTO-GENERATED API KEY: {_API_KEY}\nKEEP THIS SECURE!\n{'='*50}\n")
-        logger.info("auth_dev_mode_enabled", message="Generated random API key for dev mode.")
+        print(
+            f"\n{'='*50}\nAUTO-GENERATED API KEY: {_API_KEY}\nKEEP THIS SECURE!\n{'='*50}\n"
+        )
+        logger.info(
+            "auth_dev_mode_enabled", message="Generated random API key for dev mode."
+        )
 
 
 def get_api_key():
@@ -40,10 +45,12 @@ def get_api_key():
         init_auth()
     return _API_KEY
 
+
 def is_dev_mode():
     if _API_KEY is None:
         init_auth()
     return _AUTH_DEV_MODE
+
 
 async def verify_api_key(
     credentials: HTTPAuthorizationCredentials = Security(security),  # noqa: B008

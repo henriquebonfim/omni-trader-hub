@@ -8,8 +8,8 @@ Sends alerts for:
 - Daily summaries
 """
 
-from datetime import datetime, timedelta
 from collections import deque
+from datetime import datetime, timedelta
 
 import httpx
 import structlog
@@ -99,15 +99,15 @@ class Notifier:
 
         # Check rate limit before sending
         if not self._check_rate_limit():
-            logger.warning("notification_rate_limited", requests_in_window=len(self._request_times))
+            logger.warning(
+                "notification_rate_limited", requests_in_window=len(self._request_times)
+            )
             return False
 
         try:
             payload = {"content": message}
             client = self._get_client()
-            response = await client.post(
-                self.webhook_url, json=payload
-            )
+            response = await client.post(self.webhook_url, json=payload)
 
             if response.status_code in (200, 204):
                 logger.debug("notification_sent", message=message[:50])

@@ -497,7 +497,9 @@ class RiskManager:
         min_size = 0.001  # Fallback default (BTC)
         if exchange is not None and symbol in exchange.markets:
             try:
-                limit_info = exchange.markets[symbol].get("limits", {}).get("amount", {})
+                limit_info = (
+                    exchange.markets[symbol].get("limits", {}).get("amount", {})
+                )
                 exchange_min = limit_info.get("min")
                 if exchange_min is not None:
                     min_size = exchange_min

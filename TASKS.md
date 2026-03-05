@@ -77,11 +77,12 @@ Institutional-grade audit completed **2026-03-03** — findings integrated below
     - **Fix**: Enter TRENDING when ADX > 28, exit to RANGING only when ADX < 22. Same pattern for VOLATILE (ATR > 1.7× to enter, < 1.3× to exit). Track `current_regime` state between cycles.
 
 ### T14. Breakout Strategy Donchian Bug
-- [ ] **Fix: Use prior-bar Donchian channel for breakout signals**
+- [x] **Fix: Use prior-bar Donchian channel for breakout signals**
     - **Risk Level**: 🟠 High
     - **Location**: `src/strategies/breakout.py` — `pandas_ta.donchian()` includes the current bar in the rolling max/min. `close > upper_channel` at `iloc[-1]` requires close to exceed the current bar's own high-of-highs — nearly impossible.
     - **Impact**: Strategy generates almost no signals. Effectively dead code.
     - **Fix**: Compare `close.iloc[-1]` against `donchian_upper.iloc[-2]` (prior bar's channel), which is the classic Turtle system definition.
+    - **Completed**: 2026-03-04 | PR #59 (merged)
 
 ### T15. Level-Based Signals Without Cooldown
 - [x] **Add `min_bars_between_entries` cooldown**
@@ -91,11 +92,12 @@ Institutional-grade audit completed **2026-03-03** — findings integrated below
     - **Fix**: Add `_last_entry_bar` tracking in `BaseStrategy`. Block new entries for N bars (configurable, default 10) after any entry.
 
 ### T16. Drawdown Uses Daily PnL Not Peak-Equity HWM
-- [ ] **Fix: Implement peak-equity high-water mark tracking**
+- [x] **Fix: Implement peak-equity high-water mark tracking**
     - **Risk Level**: 🟠 High
     - **Location**: `src/risk.py` `calculate_position_size()` — auto-deleverage uses `daily_pnl_pct` as proxy for drawdown. Resets every UTC midnight.
     - **Impact**: A 9% loss on Day 1 + 9% loss on Day 2 = 18% real drawdown, but auto-deleverage (10% threshold) never triggers.
     - **Fix**: Track `peak_equity` in Redis. Calculate `current_drawdown = (peak - current) / peak`. Use this for auto-deleverage instead of daily PnL.
+    - **Completed**: 2026-03-05 | PR #60 (merged)
 
 ### T17. Consecutive Loss Streak Resets at Midnight
 - [x] **Fix: Carry loss streaks across day boundaries**
