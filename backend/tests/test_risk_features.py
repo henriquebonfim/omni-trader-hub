@@ -84,3 +84,68 @@ def test_black_swan_detector_normal():
 
     triggered = risk.check_black_swan(df)
     assert triggered is False
+
+
+@pytest.mark.asyncio
+@patch("src.database.factory.DatabaseFactory.get_redis_store")
+async def test_auto_deleverage_drawdown_across_days(mock_get_store):
+    mock_get_store.return_value = AsyncMock()
+    risk = RiskManager()
+    risk.auto_deleverage_threshold = 15.0  # 15% threshold
+    risk.position_size_pct = 10.0  # Risk 10% of balance per trade
+    risk.leverage = 5
+
+    # Initial state
+    initial_balance = 10000.0
+    await risk.initialize_daily_stats(initial_balance)
+    assert risk.peak_equity == 10000.0
+
+    # Normal position sizing (No drawdown)
+    # Risk amount = 10000 * 0.10 = 1000
+    # Notional = 1000 * 5 (leverage) = 5000
+    # Position size = 5000 / 50000 = 0.1
+    size_normal = risk.calculate_position_size(10000.0, 50000.0)
+    assert size_normal == pytest.approx(0.1)
+
+    # Day 1: Lose 10% (Balance: 9000, Peak: 10000)
+    # Drawdown = 10%. Threshold is 15%. No auto-deleverage yet.
+    # Risk amount = 9000 * 0.10 = 900
+    # Notional = 900 * 5 = 4500
+    # Position size = 4500 / 50000 = 0.09
+    size_day1 = risk.calculate_position_size(9000.0, 50000.0)
+    assert size_day1 == pytest.approx(0.09)
+
+    # Simulate Day 2 Reset
+    # Peak equity should remain 10000.0
+    risk.daily_stats.date = pd.Timestamp.now().date() - timedelta(days=1)
+    await risk.initialize_daily_stats(9000.0)
+    assert risk.peak_equity == 10000.0
+
+    # Day 2: Lose another 10% from original peak (Balance: 8000, Peak: 10000)
+    # Drawdown = 20%. Threshold is 15%. Auto-deleverage SHOULD trigger.
+    # Leverage drops to 1.
+    # Risk amount = 8000 * 0.10 = 800
+    # Notional = 800 * 1 (leverage) = 800
+    # Position size = 800 / 50000 = 0.016
+    size_day2 = risk.calculate_position_size(8000.0, 50000.0)
+    assert size_day2 == pytest.approx(0.016)
+
+    # Recover slightly (Balance: 8600, Peak: 10000)
+    # Drawdown = 14%. Auto-deleverage OFF.
+    # Leverage returns to 5.
+    # Risk amount = 8600 * 0.10 = 860
+    # Notional = 860 * 5 = 4300
+    # Position size = 4300 / 50000 = 0.086
+    size_recovery = risk.calculate_position_size(8600.0, 50000.0)
+    assert size_recovery == pytest.approx(0.086)
+
+    # Reach new all-time high (Balance: 12000)
+    await risk.initialize_daily_stats(12000.0)
+    assert risk.peak_equity == 12000.0
+
+    # Drawdown resets against new peak
+    size_ath = risk.calculate_position_size(12000.0, 50000.0)
+    # Risk amount = 12000 * 0.10 = 1200
+    # Notional = 1200 * 5 = 6000
+    # Size = 6000 / 50000 = 0.12
+    assert size_ath == pytest.approx(0.12)
