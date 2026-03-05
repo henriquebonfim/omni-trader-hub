@@ -23,6 +23,7 @@ Usage::
 """
 
 import asyncio
+import time
 from collections import deque
 
 import ccxt.pro as ccxtpro
@@ -87,6 +88,7 @@ class WsFeed:
 
         # Caches
         self._ticker: dict | None = None
+        self._last_ticker_update_time: float = 0.0
         self._ohlcv: dict[str, pd.DataFrame] = {}
         self._fills: deque[dict] = deque(maxlen=50)
 
@@ -155,6 +157,15 @@ class WsFeed:
         """Return the most recent ticker dict, or *None* if not yet received."""
         return self._ticker
 
+    def ticker_age(self) -> float:
+        """
+        Return the age of the latest ticker update in seconds.
+        Returns float('inf') if no ticker has been received yet.
+        """
+        if self._last_ticker_update_time == 0.0:
+            return float("inf")
+        return time.time() - self._last_ticker_update_time
+
     def latest_ohlcv(self, timeframe: str) -> pd.DataFrame | None:
         """Return the most recent OHLCV DataFrame for *timeframe*, or *None*."""
         return self._ohlcv.get(timeframe)
@@ -195,6 +206,7 @@ class WsFeed:
             try:
                 ticker = await self._client.watch_ticker(self._symbol)
                 self._ticker = ticker
+                self._last_ticker_update_time = time.time()
             except asyncio.CancelledError:
                 break
             except Exception as exc:

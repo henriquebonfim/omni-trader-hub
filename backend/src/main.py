@@ -559,12 +559,35 @@ class OmniTrader:
             # Get primary OHLCV for price and risk checks
             primary_ohlcv = market_data[primary_tf]
 
-            # Prefer real-time WS ticker price over last-close REST proxy
-            ws_ticker = self.ws_feed.latest_ticker()
-            if ws_ticker and ws_ticker.get("last"):
-                current_price = float(ws_ticker["last"])
+            # Check WebSocket staleness
+            ticker_age = self.ws_feed.ticker_age()
+            
+            if ticker_age > 120.0:
+                logger.warning(
+                    "ws_ticker_extremely_stale",
+                    age=ticker_age,
+                    status="pausing_trading",
+                )
+                await self.notifier.send(
+                    f"⚠️ **Stale Data Alert**: WS ticker is {ticker_age:.0f}s old. Trading paused."
+                )
+                return
+
+            if ticker_age > 60.0:
+                logger.warning(
+                    "ws_ticker_stale",
+                    age=ticker_age,
+                    status="falling_back_to_rest",
+                )
+                rest_ticker = await self.exchange.get_ticker(symbol)
+                current_price = float(rest_ticker["last"])
             else:
-                current_price = float(primary_ohlcv["close"].iloc[-1])
+                # Prefer real-time WS ticker price over last-close REST proxy
+                ws_ticker = self.ws_feed.latest_ticker()
+                if ws_ticker and ws_ticker.get("last"):
+                    current_price = float(ws_ticker["last"])
+                else:
+                    current_price = float(primary_ohlcv["close"].iloc[-1])
 
             # 4a. Check Trend (if enabled)
             market_trend = "neutral"

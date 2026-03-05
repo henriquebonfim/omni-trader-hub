@@ -213,6 +213,19 @@ def test_merge_ohlcv_trims_to_max():
 # ---------------------------------------------------------------------------
 
 
+def test_ticker_age_inf_initially():
+    feed = _make_feed()
+    assert feed.ticker_age() == float("inf")
+
+
+@patch("src.ws_feed.time.time")
+def test_ticker_age_returns_correct_age(mock_time):
+    feed = _make_feed()
+    feed._last_ticker_update_time = 1000.0
+    mock_time.return_value = 1015.0
+    assert feed.ticker_age() == 15.0
+
+
 def test_latest_ticker_none_initially():
     feed = _make_feed()
     assert feed.latest_ticker() is None
