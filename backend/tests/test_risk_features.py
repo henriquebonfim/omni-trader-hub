@@ -149,3 +149,51 @@ async def test_auto_deleverage_drawdown_across_days(mock_get_store):
     # Notional = 1200 * 5 = 6000
     # Size = 6000 / 50000 = 0.12
     assert size_ath == pytest.approx(0.12)
+
+
+@pytest.mark.asyncio
+@patch("src.database.factory.DatabaseFactory.get_redis_store")
+async def test_consecutive_losses_carry_across_days(mock_get_store):
+    mock_get_store.return_value = AsyncMock()
+    risk = RiskManager()
+    risk.position_size_pct = 10.0
+    risk.leverage = 1
+
+    # Initial state Day 1
+    await risk.initialize_daily_stats(10000.0)
+
+    # 2 losses on Day 1
+    await risk.record_trade(-100.0)
+    await risk.record_trade(-100.0)
+
+    assert risk.consecutive_losses == 2
+
+    # Simulate Day 2 Reset
+    risk.daily_stats.date = pd.Timestamp.now().date() - timedelta(days=1)
+    await risk.initialize_daily_stats(9800.0)
+
+    # Consecutive losses should NOT reset
+    assert risk.consecutive_losses == 2
+
+    # 1 more loss on Day 2 -> total 3 consecutive losses
+    await risk.record_trade(-100.0)
+    assert risk.consecutive_losses == 3
+
+    # Position size should be reduced by 50%
+    # Balance: 9700. Risk amount = 9700 * 0.10 = 970
+    # Expected size before reduction: 970 / 50000 = 0.0194
+    # Expected size after 50% reduction: 0.0097
+    size_reduced = risk.calculate_position_size(9700.0, 50000.0)
+    assert size_reduced == pytest.approx(0.0097)
+
+    # Record a win on Day 2
+    await risk.record_trade(200.0)
+
+    # Consecutive losses should reset on win
+    assert risk.consecutive_losses == 0
+
+    # Position size should be normal
+    # Balance: 9900. Risk amount = 9900 * 0.10 = 990
+    # Expected size: 990 / 50000 = 0.0198
+    size_normal = risk.calculate_position_size(9900.0, 50000.0)
+    assert size_normal == pytest.approx(0.0198)

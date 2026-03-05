@@ -39,7 +39,8 @@ async def test_consecutive_losses_reset():
 
 
 @pytest.mark.asyncio
-async def test_daily_reset_clears_streak(monkeypatch):
+async def test_daily_reset_preserves_streak(monkeypatch):
+    """T17: Consecutive loss streak should persist across day boundaries, not reset on daily_stats reset."""
     with patch(
         "src.database.factory.DatabaseFactory.get_redis_store"
     ) as mock_get_store:
@@ -64,4 +65,5 @@ async def test_daily_reset_clears_streak(monkeypatch):
         monkeypatch.setattr("src.risk.date", MockDate)
         await risk.initialize_daily_stats(10000.0)
 
-        assert risk.consecutive_losses == 0
+        # T17: consecutive_losses should persist across day boundaries
+        assert risk.consecutive_losses == 3
