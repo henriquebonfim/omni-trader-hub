@@ -425,6 +425,7 @@ class OmniTrader:
         # Close connections
         await self.exchange.close()
         await self.database.close()
+        await self.notifier.close()
 
         logger.info("omnitrader_stopped")
 

@@ -8,7 +8,8 @@ Sends alerts for:
 - Daily summaries
 """
 
-from datetime import datetime
+from datetime import datetime, timedelta
+from collections import deque
 
 import httpx
 import structlog
@@ -22,7 +23,9 @@ class Notifier:
     """
     Discord webhook notifier.
 
-    Sends formatted messages to Discord for trade alerts and system notifications.
+    Features:
+    - Session-pooled HTTP client (connection reuse)
+    - Simple rate limiter (30 requests / 60 seconds)
     """
 
     def __init__(self):
@@ -34,9 +37,54 @@ class Notifier:
             logger.warning("discord_webhook_not_configured")
             self.enabled = False
 
+        # Session pooling
+        self.client = None  # Will be created on first use
+        self._client_created = False
+
+        # Rate limiting (Discord webhook limit: ~30 req/60s)
+        self._rate_limit_window = 60  # seconds
+        self._rate_limit_max_requests = 30
+        self._request_times = deque()  # Track request times for rate limiting
+
+    def _get_client(self) -> httpx.AsyncClient:
+        """Create or return existing client (lazy initialization)."""
+        if self.client is None:
+            self.client = httpx.AsyncClient(timeout=10.0)
+            self._client_created = True
+        return self.client
+
+    async def close(self):
+        """Close the HTTP session."""
+        if self.client is not None:
+            await self.client.aclose()
+            self.client = None
+
+    def _check_rate_limit(self) -> bool:
+        """
+        Check if we're within rate limits.
+        Returns True if request is allowed, False if rate limited.
+        """
+        now = datetime.now()
+        cutoff_time = now - timedelta(seconds=self._rate_limit_window)
+
+        # Remove old request times outside the window
+        while self._request_times and self._request_times[0] < cutoff_time:
+            self._request_times.popleft()
+
+        if len(self._request_times) >= self._rate_limit_max_requests:
+            # Rate limited
+            return False
+
+        # Record this request
+        self._request_times.append(now)
+        return True
+
     async def send(self, message: str, title: str = None) -> bool:
         """
         Send a message to Discord.
+
+        Implements rate limiting (30 messages / 60 seconds).
+        Uses pooled HTTP session for connection reuse.
 
         Args:
             message: Message content
@@ -49,24 +97,28 @@ class Notifier:
             logger.debug("notification_skipped", reason="disabled")
             return False
 
+        # Check rate limit before sending
+        if not self._check_rate_limit():
+            logger.warning("notification_rate_limited", requests_in_window=len(self._request_times))
+            return False
+
         try:
             payload = {"content": message}
+            client = self._get_client()
+            response = await client.post(
+                self.webhook_url, json=payload
+            )
 
-            async with httpx.AsyncClient() as client:
-                response = await client.post(
-                    self.webhook_url, json=payload, timeout=10.0
+            if response.status_code in (200, 204):
+                logger.debug("notification_sent", message=message[:50])
+                return True
+            else:
+                logger.warning(
+                    "notification_failed",
+                    status=response.status_code,
+                    response=response.text,
                 )
-
-                if response.status_code in (200, 204):
-                    logger.debug("notification_sent", message=message[:50])
-                    return True
-                else:
-                    logger.warning(
-                        "notification_failed",
-                        status=response.status_code,
-                        response=response.text,
-                    )
-                    return False
+                return False
 
         except Exception as e:
             logger.error("notification_error", error=str(e))
