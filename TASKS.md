@@ -98,79 +98,91 @@ Institutional-grade audit completed **2026-03-03** — findings integrated below
     - **Fix**: Track `peak_equity` in Redis. Calculate `current_drawdown = (peak - current) / peak`. Use this for auto-deleverage instead of daily PnL.
 
 ### T17. Consecutive Loss Streak Resets at Midnight
-- [ ] **Fix: Carry loss streaks across day boundaries**
+- [x] **Fix: Carry loss streaks across day boundaries**
     - **Risk Level**: 🟠 High
     - **Location**: `src/risk.py` `_ensure_daily_init()` — `self.consecutive_losses = 0` on new day.
     - **Impact**: A 3-loss streak spanning midnight is forgotten. Size reduction (50% after 3 consecutive losses) never triggers.
     - **Fix**: Persist `consecutive_losses` in Redis independently of daily stats. Only reset on consecutive wins, not on calendar boundary.
+    - **Completed**: 2026-03-05 | PR #61 (merged)
 
 ### T18. No Market Order Size Validation at Exchange Boundary
-- [ ] **Fix: Validate `amount` parameter in `market_long` / `market_short`**
+- [x] **Fix: Validate `amount` parameter in `market_long` / `market_short`**
     - **Risk Level**: 🟠 High
     - **Location**: `src/exchange.py` — `amount` defaults to `None` and is never validated before CCXT call.
     - **Impact**: A refactoring error bypassing `validate_trade()` would send a None/0/negative-sized market order to the exchange.
     - **Fix**: Add `assert amount is not None and amount > 0` guard at the top of both methods. Return error, don't throw.
+    - **Completed**: 2026-03-05 | PR #62 (merged)
 
 ### T19. WebSocket Feed No Stale-Data Detection
-- [ ] **Fix: Add timestamp-based staleness check**
+- [x] **Fix: Add timestamp-based staleness check**
     - **Risk Level**: 🟠 High
     - **Location**: `src/ws_feed.py` — streaming loops reconnect on exception but no mechanism detects silently stale data.
     - **Impact**: Bot trades on minutes-old prices after silent WS disconnection.
     - **Fix**: Track `last_ticker_update_time`. In `run_cycle()`, if ticker age > 60s, fall back to REST and log warning. If > 120s, pause trading.
+    - **Completed**: 2026-03-05 | PR #63 (merged)
 
 ### T20. Postgres Implementation Completely Untested
-- [ ] **Add Postgres integration tests**
+- [x] **Add Postgres integration tests**
     - **Risk Level**: 🟠 High
     - **Location**: `tests/` — all 20 test files use SQLite in-memory. Zero Postgres coverage.
     - **Impact**: Schema divergence (TIMESTAMPTZ vs TEXT, JSONB vs TEXT) means Postgres could fail in production with no warning.
     - **Fix**: Add `test_database_postgres.py` using testcontainers or a compose-based test PostgreSQL. Test all CRUD operations, schema creation, and migration edge cases.
+    - **Completed**: 2026-03-05 | PR #64 (merged, consolidated with T22+T23)
 
 ### T21. No Database Migration Framework
-- [ ] **Implement Alembic or equivalent migration system**
+- [x] **Implement Alembic or equivalent migration system**
     - **Risk Level**: 🟠 High
     - **Location**: `src/database/postgres.py`, `sqlite.py` — DDL via inline `CREATE TABLE IF NOT EXISTS`. SQLite has ad-hoc `ALTER TABLE` migration; Postgres has none.
     - **Impact**: Adding columns to Postgres requires manual SQL intervention. Schema drift between environments.
     - **Fix**: Add Alembic with version-tracked migrations. Generate initial migration from current schema. All future changes via migration files.
+    - **Completed**: 2026-03-05 | PR #65 (merged)
 
 ---
 
 ## 🟡 Medium Priority (Hardening & Hygiene)
 
 ### T22. Auth is Fail-Open by Default
-- [ ] **Fix: Require API key even in development**
+- [x] **Fix: Require API key even in development**
     - **Location**: `src/api/auth.py` — if `OMNITRADER_API_KEY` env var not set, all auth is bypassed.
     - **Fix**: Generate a random key on first startup if none configured. Log it once. Never allow zero-auth.
+    - **Completed**: 2026-03-05 | PR #64 (merged, consolidated with T20+T23)
 
 ### T23. Hardcoded Postgres Password
-- [ ] **Fix: Remove default password fallbacks**
+- [x] **Fix: Remove default password fallbacks**
     - **Location**: `compose.yml`, `config/config.yaml`, `src/database/postgres.py` — `omnitrader_password` is hardcoded as fallback everywhere.
     - **Fix**: Require `POSTGRES_PASSWORD` env var with no default. Fail startup if not set.
+    - **Completed**: 2026-03-05 | PR #64 (merged, consolidated with T20+T22)
 
 ### T24. Dev Dependencies in Production Image
-- [ ] **Fix: Separate dev/prod requirements**
+- [x] **Fix: Separate dev/prod requirements**
     - **Location**: `requirements.txt` — `pytest`, `ruff`, `pre-commit` installed in production Docker image.
     - **Fix**: Split into `requirements.txt` (prod) and `requirements-dev.txt` (test/lint). Update Dockerfile to install only prod deps.
+    - **Completed**: 2026-03-05 | PR #64 (merged)
 
 ### T25. No Dependency Lockfile
-- [ ] **Fix: Pin all versions, generate lockfile**
+- [x] **Fix: Pin all versions, generate lockfile**
     - **Location**: `requirements.txt` — all deps use floor pins (`>=`). `pandas-ta>=0.3.14b` is **unmaintained** (last release 2022).
     - **Impact**: Builds are not reproducible. A dep update can silently break the system.
     - **Fix**: `pip freeze > requirements.lock`. Pin exact versions. Evaluate `pandas-ta` replacement (e.g., `ta-lib` or manual indicator implementations).
+    - **Completed**: 2026-03-05 | Commit af77a64
 
 ### T26. Celery Dispatch No Circuit Breaker
-- [ ] **Fix: Add Celery health circuit breaker in `dispatch.py`**
+- [x] **Fix: Add Celery health circuit breaker in `dispatch.py`**
     - **Location**: `src/workers/dispatch.py` — if Celery worker dies, `dispatch()` blocks for 30s per cycle (timeout). `ThreadPoolExecutor(max_workers=4)` can be exhausted.
     - **Fix**: Track consecutive Celery failures. After 3 failures, skip Celery for 5 minutes and fall back to local execution. Log prominently.
+    - **Completed**: 2026-03-05 | Commit e04467c
 
 ### T27. `min_size` Hardcoded for BTC
-- [ ] **Fix: Fetch minimum order size from exchange**
+- [x] **Fix: Fetch minimum order size from exchange**
     - **Location**: `src/risk.py` — `min_size = 0.001` hardcoded. Breaks if multi-asset is added (e.g., ETH min = 0.01).
     - **Fix**: Use `exchange.markets[symbol]['limits']['amount']['min']` from CCXT market info.
+    - **Completed**: 2026-03-05 | Commit fbdbf8c
 
 ### T28. Notifier Creates New HTTP Client Per Message
-- [ ] **Fix: Use session-scoped `httpx.AsyncClient`**
+- [x] **Fix: Use session-scoped `httpx.AsyncClient`**
     - **Location**: `src/notifier.py` — creates new `httpx.AsyncClient` per notification. No connection pooling, no Discord rate limiting.
     - **Fix**: Initialize client once in `__init__`. Add simple rate limiter (30 req/60s for Discord webhooks).
+    - **Completed**: 2026-03-05 | Commit 1ef1cb9
 
 ---
 
