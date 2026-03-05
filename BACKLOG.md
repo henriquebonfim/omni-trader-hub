@@ -2,7 +2,7 @@
 
 Items requiring design decisions, external dependencies, or are lower-priority long-term investments. Reviewed each sprint — promote to TODO when scoped and ready.
 
-> Last updated: 2026-03-03 by Institutional Audit
+> Last updated: 2026-03-05 | Promoted: B1→T29, B4→T30, B14→T31 | Completed: B8, B9
 
 ---
 
@@ -10,33 +10,25 @@ Items requiring design decisions, external dependencies, or are lower-priority l
 
 ### B1. Build Backtesting Engine
 - **Priority**: CRITICAL — **no statistical evidence of edge exists without this**
-- **Depends on**: Historical data pipeline (Binance API or Kaggle/Tardis)
-- **Design needed**:
-    - Data source: Binance historical klines API vs. third-party (Tardis, Kaiko)
-    - Walk-forward framework: rolling window or expanding window?
-    - Cost modeling: spread, slippage, funding rates, commission
-    - Execution simulation: fill at close vs. VWAP of next bar
-    - Minimum dataset: 2+ years BTC/USDT 15m OHLCV across bull/bear/range
-- **Acceptance**: Sharpe, Sortino, max drawdown, profit factor, win rate output per strategy. Walk-forward with minimum 6-month out-of-sample holdout.
+- **Status**: ✅ **PROMOTED to TASKS.md T29** (2026-03-05)
+- **Next**: Design data pipeline and simulation engine
 
 ### B2. Walk-Forward Validation Framework
 - **Priority**: CRITICAL
-- **Depends on**: B1 (backtesting engine)
+- **Depends on**: T29 (backtesting engine)
 - **Design needed**: Rolling train/test splits. Parameter stability analysis across windows. Detect overfitting via in-sample vs. out-of-sample performance decay.
+- **Status**: Waiting on T29 completion
 
 ### B3. Monte Carlo Stress Testing
 - **Priority**: HIGH
-- **Depends on**: B1 (backtesting engine)
+- **Depends on**: T29 (backtesting engine)
 - **Design needed**: Bootstrap trade sequences. Randomize entry timing ±N bars. Simulate 10,000 equity paths. Report: probability of >15% drawdown, >25% drawdown, risk of ruin.
+- **Status**: Waiting on T29 completion
 
 ### B4. Geopolitical & Macro Risk Module
 - **Priority**: HIGH — **active crisis (Iran/Hormuz) exposes total lack of macro awareness**
-- **Design needed**:
-    - **Data sources**: Fear & Greed Index (Alternative.me), DXY (FRED/Yahoo), oil futures (for Hormuz-class events), VIX equivalent for crypto
-    - **Crisis-mode protocol**: Configurable override that reduces leverage to 1×, cuts position_size_pct to 0.5%, enables only ADX strategy, tightens daily loss to 2%, adds manual approval gate
-    - **Sentiment-reality divergence detector**: When greed index is high but geopolitical risk is elevated (e.g., active conflict + supply disruption), flag as "greed noise" — mean-reversion signals become unreliable, reduce confidence in all signals
-    - **Integration point**: New field in `config.yaml` for `crisis_mode: true/false` that overrides risk parameters. Dashboard toggle.
-- **Context**: As of 2026-03-03, Day 3 of US-Israeli war with Iran; Strait of Hormuz closed. Oil spike → inflation fears → risk-off. BTC correlation to equities increases during systemic stress. The system has zero macro awareness and no mechanism to distinguish "greed noise" from genuine bullish sentiment.
+- **Status**: ✅ **PROMOTED to TASKS.md T30** (2026-03-05)
+- **Next**: Design data sources and crisis-mode protocol
 
 ### B5. Complete SMC Integration
 - **Priority**: MEDIUM
@@ -65,15 +57,11 @@ Items requiring design decisions, external dependencies, or are lower-priority l
     - Stop-limit vs. stop-market tradeoff (stop-limit avoids bad fills but risks no fill)
 
 ### B8. Alembic Migration Framework
-- **Priority**: MEDIUM
-- **Depends on**: Decision on primary DB (Postgres vs. SQLite for dev)
-- **Design needed**: Generate initial migration from current inline DDL. Version-track all schema changes. Handle SQLite→Postgres migration path.
+- **Status**: ✅ **COMPLETED** as T21 (2026-03-05)
 - **Ref**: TASKS.md T21
 
 ### B9. Postgres Integration Testing
-- **Priority**: MEDIUM
-- **Depends on**: CI/CD setup or local testcontainers
-- **Design needed**: Docker-based test Postgres. Test all CRUD operations, schema creation, type differences (TIMESTAMPTZ, JSONB). Validate SQLite↔Postgres behavioral parity.
+- **Status**: ✅ **COMPLETED** as T20 (2026-03-05)
 - **Ref**: TASKS.md T20
 
 ### B10. Factor Decomposition & Beta Hedging
@@ -98,4 +86,5 @@ Items requiring design decisions, external dependencies, or are lower-priority l
 - Local LLM for trade post-mortems, market narrative summaries, sentiment filtering. Phase 4 vision item.
 
 ### B14. Semi-Automatic Mode
-- Dashboard trade approval gate for first 2 weeks of live trading. Button to approve/reject each signal before execution.
+- **Status**: ✅ **PROMOTED to TASKS.md T31** (2026-03-05)
+- **Next**: Design approval UI and timeout logic

@@ -60,7 +60,7 @@ python -m src.main
 ```bash
 make setup      # Initial setup (create .env, build images)
 make start      # Start application in background
-make stop       # Stop all containers  
+make stop       # Stop all containers
 make test       # Run pytest + frontend tests via Docker
 make logs       # View container logs
 make build      # Rebuild Docker images
