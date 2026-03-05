@@ -35,8 +35,9 @@ jobs:
         env:
           POSTGRES_PASSWORD: omnitrader_password
         run: |
+          echo "POSTGRES_PASSWORD=omnitrader_password" > .env
           cd backend
-          python -m pytest tests/ -v
+          POSTGRES_PASSWORD=omnitrader_password python -m pytest tests/ -v
 
   frontend-build:
     name: Frontend Build & Type Check
