@@ -45,7 +45,9 @@ class RedisStore:
             self._client = None
             logger.info("redis_disconnected")
 
-    async def set(self, key: str, value: Any, expire: Optional[int] = None, critical: bool = False):
+    async def set(
+        self, key: str, value: Any, expire: Optional[int] = None, critical: bool = False
+    ):
         """
         Save value to Redis as JSON.
 
@@ -67,7 +69,9 @@ class RedisStore:
         except Exception as e:
             logger.error("redis_set_failed", key=key, error=str(e))
             if critical:
-                raise RuntimeError(f"Critical Redis SET failure for key {key}: {str(e)}") from e
+                raise RuntimeError(
+                    f"Critical Redis SET failure for key {key}: {str(e)}"
+                ) from e
 
     async def get(self, key: str, critical: bool = False) -> Optional[Any]:
         """
@@ -91,12 +95,14 @@ class RedisStore:
         except Exception as e:
             logger.error("redis_get_failed", key=key, error=str(e))
             if critical:
-                raise RuntimeError(f"Critical Redis GET failure for key {key}: {str(e)}") from e
+                raise RuntimeError(
+                    f"Critical Redis GET failure for key {key}: {str(e)}"
+                ) from e
             return None
 
     async def delete(self, key: str, critical: bool = False):
         """Delete key from Redis.
-        
+
         Args:
             key: Storage key
             critical: If True, raise exception on failure
@@ -109,4 +115,6 @@ class RedisStore:
         except Exception as e:
             logger.error("redis_delete_failed", key=key, error=str(e))
             if critical:
-                raise RuntimeError(f"Critical Redis DELETE failure for key {key}: {str(e)}") from e
+                raise RuntimeError(
+                    f"Critical Redis DELETE failure for key {key}: {str(e)}"
+                ) from e

@@ -116,7 +116,7 @@ class RiskManager:
         # Daily tracking
         self.daily_stats = DailyStats()
         self.consecutive_losses = 0  # Track consecutive losses for drawdown sizing
-        self.peak_equity = 0.0       # Track peak equity for max drawdown sizing
+        self.peak_equity = 0.0  # Track peak equity for max drawdown sizing
         self._circuit_breaker_active = False
         self._weekly_circuit_breaker_active = False
 
@@ -132,8 +132,7 @@ class RiskManager:
         try:
             # Restore Daily Stats
             daily_stats_data = await self.redis.get(
-                f"{self._redis_key_prefix}daily_stats",
-                critical=True
+                f"{self._redis_key_prefix}daily_stats", critical=True
             )
             is_same_day = False
             if daily_stats_data:
@@ -150,8 +149,7 @@ class RiskManager:
 
             # Restore Consecutive Losses (streak carries over days unless reset by win)
             losses = await self.redis.get(
-                f"{self._redis_key_prefix}consecutive_losses",
-                critical=True
+                f"{self._redis_key_prefix}consecutive_losses", critical=True
             )
             if losses is not None:
                 self.consecutive_losses = int(losses)
@@ -161,20 +159,16 @@ class RiskManager:
 
             # Restore Peak Equity
             peak_eq = await self.redis.get(
-                f"{self._redis_key_prefix}peak_equity",
-                critical=True
+                f"{self._redis_key_prefix}peak_equity", critical=True
             )
             if peak_eq is not None:
                 self.peak_equity = float(peak_eq)
-                logger.info(
-                    "restored_peak_equity", peak_equity=self.peak_equity
-                )
+                logger.info("restored_peak_equity", peak_equity=self.peak_equity)
 
             # Restore Circuit Breakers
             if is_same_day:
                 cb_active = await self.redis.get(
-                    f"{self._redis_key_prefix}circuit_breaker",
-                    critical=True
+                    f"{self._redis_key_prefix}circuit_breaker", critical=True
                 )
                 if cb_active is not None:
                     self._circuit_breaker_active = bool(cb_active)
@@ -182,8 +176,7 @@ class RiskManager:
                 self._circuit_breaker_active = False
 
             wcb_active = await self.redis.get(
-                f"{self._redis_key_prefix}weekly_circuit_breaker",
-                critical=True
+                f"{self._redis_key_prefix}weekly_circuit_breaker", critical=True
             )
             if wcb_active is not None:
                 self._weekly_circuit_breaker_active = bool(wcb_active)
@@ -202,29 +195,27 @@ class RiskManager:
                 f"{self._redis_key_prefix}daily_stats",
                 self.daily_stats.to_dict(),
                 expire=86400,
-                critical=True
+                critical=True,
             )
 
             # Save other fields
             await self.redis.set(
                 f"{self._redis_key_prefix}consecutive_losses",
                 self.consecutive_losses,
-                critical=True
+                critical=True,
             )
             await self.redis.set(
-                f"{self._redis_key_prefix}peak_equity",
-                self.peak_equity,
-                critical=True
+                f"{self._redis_key_prefix}peak_equity", self.peak_equity, critical=True
             )
             await self.redis.set(
                 f"{self._redis_key_prefix}circuit_breaker",
                 self._circuit_breaker_active,
-                critical=True
+                critical=True,
             )
             await self.redis.set(
                 f"{self._redis_key_prefix}weekly_circuit_breaker",
                 self._weekly_circuit_breaker_active,
-                critical=True
+                critical=True,
             )
         except Exception as e:
             logger.error("risk_state_save_failed_critical", error=str(e))
@@ -280,7 +271,6 @@ class RiskManager:
                 previous_pnl=self.daily_stats.realized_pnl,
             )
             self.daily_stats = DailyStats(date=today, starting_balance=current_balance)
-            self.consecutive_losses = 0  # Reset streak for new day
             self._circuit_breaker_active = False
             state_changed = True
         elif self.daily_stats.starting_balance == 0:
@@ -290,7 +280,11 @@ class RiskManager:
 
         # Update peak equity
         if current_balance > self.peak_equity:
-            logger.info("peak_equity_updated", old_peak=self.peak_equity, new_peak=current_balance)
+            logger.info(
+                "peak_equity_updated",
+                old_peak=self.peak_equity,
+                new_peak=current_balance,
+            )
             self.peak_equity = current_balance
             state_changed = True
 

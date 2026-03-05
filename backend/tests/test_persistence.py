@@ -141,24 +141,28 @@ async def test_risk_manager_state_persistence_critical_failure():
     ) as mock_get_store:
         mock_redis_instance = AsyncMock()
         mock_get_store.return_value = mock_redis_instance
-        
+
         # Setup mock behavior to raise Exception on critical ops
         mock_redis_instance.get.side_effect = Exception("Redis down")
         mock_redis_instance.set.side_effect = Exception("Redis down")
 
         risk = RiskManager()
-        
+
         # Test load_state fails fast
         with pytest.raises(Exception) as excinfo:
             await risk.load_state()
-        
-        assert "Redis GET failure" in str(excinfo.value) or "Redis down" in str(excinfo.value)
+
+        assert "Redis GET failure" in str(excinfo.value) or "Redis down" in str(
+            excinfo.value
+        )
 
         # Test save_state fails fast
         with pytest.raises(Exception) as excinfo:
             await risk.save_state()
-            
-        assert "Redis SET failure" in str(excinfo.value) or "Redis down" in str(excinfo.value)
+
+        assert "Redis SET failure" in str(excinfo.value) or "Redis down" in str(
+            excinfo.value
+        )
 
 
 @pytest.mark.asyncio
@@ -167,28 +171,28 @@ async def test_redis_store_critical_kwarg():
     with patch("redis.asyncio.from_url") as mock_from_url:
         mock_client = AsyncMock()
         mock_from_url.return_value = mock_client
-        
+
         # Setup mock behavior to raise exception
         mock_client.get.side_effect = Exception("Connection refused")
         mock_client.set.side_effect = Exception("Connection refused")
         mock_client.delete.side_effect = Exception("Connection refused")
 
         store = RedisStore()
-        
+
         # Non-critical operations should NOT raise (returns None or completes silently)
         val = await store.get("test_key")
         assert val is None
-        
-        await store.set("test_key", {"foo": "bar"}) # Should not raise
-        await store.delete("test_key") # Should not raise
-        
+
+        await store.set("test_key", {"foo": "bar"})  # Should not raise
+        await store.delete("test_key")  # Should not raise
+
         # Critical operations should raise RuntimeError
         with pytest.raises(RuntimeError, match="Critical Redis GET failure"):
             await store.get("test_key", critical=True)
-            
+
         with pytest.raises(RuntimeError, match="Critical Redis SET failure"):
             await store.set("test_key", {"foo": "bar"}, critical=True)
-            
+
         with pytest.raises(RuntimeError, match="Critical Redis DELETE failure"):
             await store.delete("test_key", critical=True)
 

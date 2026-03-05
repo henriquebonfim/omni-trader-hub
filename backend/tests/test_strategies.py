@@ -208,7 +208,7 @@ def test_breakout_strategy(mock_config):
     else:
         period = getattr(mock_config.strategy, "donchian_period", 20)
     dates = pd.date_range("2020-01-01", periods=period + 5, freq="h")
-    
+
     # Range bound for the first `period` candles:
     # High = 100, Low = 90, Close = 95
     data = {
@@ -227,7 +227,7 @@ def test_breakout_strategy(mock_config):
     # Case: Long Breakout
     # Current bar's close breaks above the previous bar's upper channel
     df.loc[df.index[period + 1], "close"] = 105.0
-    df.loc[df.index[period + 1], "high"] = 105.0 # High follows close to be consistent
+    df.loc[df.index[period + 1], "high"] = 105.0  # High follows close to be consistent
     strategy.update(df.iloc[: period + 2])
     assert bool(strategy.should_long()) is True
     assert bool(strategy.should_short()) is False
@@ -250,16 +250,16 @@ def test_breakout_strategy(mock_config):
     # Force trend to neutral to avoid trend filter blocking
     # Need to reset strategy state first
     strategy = BreakoutStrategy(mock_config)
-    
+
     # Refresh donchian data since we messed with the dataframe
     df = pd.DataFrame(data, index=dates)
     df.loc[df.index[period + 1], "close"] = 105.0
     df.loc[df.index[period + 1], "high"] = 105.0
-    
+
     market_data = {"1h": df.iloc[: period + 2]}
     res = strategy.analyze(market_data, ohlcv=df.iloc[: period + 2])
     assert res.signal == Signal.LONG
-    
+
     # The next bar should be blocked by entry cooldown
     # Since prices stayed the same, the signal is still logically LONG based on the breakout logic
     # (since the current close 105 is still > previous upper channel 105 ? No, it's not)
@@ -267,7 +267,7 @@ def test_breakout_strategy(mock_config):
     # To test cooldown we need the next bar to still trigger a long signal normally, but be blocked.
     df.loc[df.index[period + 2], "close"] = 106.0
     df.loc[df.index[period + 2], "high"] = 106.0
-    
+
     market_data_next = {"1h": df.iloc[: period + 3]}
     res_next = strategy.analyze(market_data_next, ohlcv=df.iloc[: period + 3])
     assert res_next.signal == Signal.HOLD
