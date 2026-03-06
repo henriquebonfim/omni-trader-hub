@@ -10,7 +10,29 @@ Full issue triage, implementation, and PR creation pipeline.
 
 ## Execution Sequence
 
-### 1 — Environment Setup
+### 1 — SOP Validation Gate
+
+```bash
+python3 .agent/scripts/orchestrator.py handle-issues
+ENFORCE_EXIT=$?
+[ $ENFORCE_EXIT -ne 0 ] && echo "❌ SOP validation failed" && exit 1
+
+WORKFLOW_NAME="handle-issues"
+cleanup_workflow() {
+  EXIT_CODE=$?
+  if [ $EXIT_CODE -ne 0 ]; then
+    python3 .agent/scripts/friction_logger.py \
+      --task "$WORKFLOW_NAME" \
+      --type "Workflow" \
+      --friction "Workflow exited with code $EXIT_CODE" \
+      --resolution "Inspect workflow output and rerun after fix" || true
+  fi
+  make clean-tmp >/dev/null 2>&1 || true
+}
+trap cleanup_workflow EXIT
+```
+
+### 2 — Environment Setup
 
 ```bash
 mkdir -p .agent/tmp
@@ -18,19 +40,12 @@ grep -qxF '.agent/tmp/' .gitignore \
   || echo '.agent/tmp/' >> .gitignore
 ```
 
-### 2 — Load Skill
+> **sequential-thinking**: Review open issues → assess priority signals (labels, age, assignee) → evaluate scope and risk → determine triage strategy.
+
+### 3 — Load Skill
 
 ```
 issue-task-orchestrator
-```
-
-### 3 — Branch Safety
-
-```bash
-BRANCH=$(git branch --show-current)
-if [[ "$BRANCH" == "main" || "$BRANCH" == "master" || "$BRANCH" == "production" ]]; then
-  git checkout -b "feature/issues-batch-$(date +%Y%m%d%H%M%S)"
-fi
 ```
 
 ### 4 — Fetch & Score Issues
@@ -67,13 +82,13 @@ For each CONFIRMED issue in priority order:
 
 Each commit must include `Closes #<N>`.
 
-### 8 — Generate TASKS.md
+### 9 — Generate TASKS.md
 
 ```bash
 make issue-tasks
 ```
 
-### 9 — Create Batch PR
+### 10 — Create Batch PR
 
 ```bash
 ISSUE_CLOSES=$(jq -r '.[] | select(.status=="CONFIRMED") | "Closes #\(.issue_number)"' .agent/tmp/issue-matrix.json 2>/dev/null || true)
@@ -93,13 +108,13 @@ $(git log origin/main..HEAD --oneline --no-merges)
 - [ ] No unrelated changes"
 ```
 
-### 10 — Cleanup
+### 11 — Cleanup
 
 ```bash
 make clean-tmp
 ```
 
-### 11 — Final Validation
+### 12 — Final Validation
 
 ```bash
 gh pr view  # Confirm PR created

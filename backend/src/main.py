@@ -72,9 +72,9 @@ class OmniTrader:
     def __init__(self):
         self.config = get_config()
         self.exchange = Exchange()
-        self.risk = RiskManager()
-        self.notifier = Notifier()
         self.database = DatabaseFactory.get_database(self.config)
+        self.risk = RiskManager(database=self.database)
+        self.notifier = Notifier()
         self.regime_classifier = RegimeClassifier()
 
         # Load strategy dynamically

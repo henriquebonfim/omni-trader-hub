@@ -13,19 +13,19 @@ help:
 	@echo "  make logs   - View container logs"
 	@echo ""
 	@echo "=== Project Commands ==="
-	@$(MAKE) --no-print-directory -f .agent/make/stack.make stack-info
+	@$(MAKE) --no-print-directory -f .agent/scripts/make/stack.make stack-info
 	@echo ""
 	@echo "=== Agent Commands ==="
-	@$(MAKE) --no-print-directory -f .agent/make/agents.make agent-help
+	@$(MAKE) --no-print-directory -f .agent/scripts/make/agents.make agent-help
 	@echo ""
-	@$(MAKE) --no-print-directory -f .agent/make/jules.make j-help
+	@$(MAKE) --no-print-directory -f .agent/scripts/make/jules.make j-help
 	@echo ""
-	@$(MAKE) --no-print-directory -f .agent/make/gh.make gh-help
+	@$(MAKE) --no-print-directory -f .agent/scripts/make/gh.make gh-help
 
-include .agent/make/stack.make
-include .agent/make/agents.make
-include .agent/make/jules.make
-include .agent/make/gh.make
+include .agent/scripts/make/stack.make
+include .agent/scripts/make/agents.make
+include .agent/scripts/make/jules.make
+include .agent/scripts/make/gh.make
 
 docker-ps:
 	docker compose ps

@@ -21,9 +21,7 @@ def test_drawdown_sizing():
 
 @pytest.mark.asyncio
 async def test_consecutive_losses_reset():
-    with patch(
-        "src.database.factory.DatabaseFactory.get_redis_store"
-    ) as mock_get_store:
+    with patch("src.database.factory.DatabaseFactory.get_database") as mock_get_store:
         mock_get_store.return_value = AsyncMock()
 
         risk = RiskManager()
@@ -41,9 +39,7 @@ async def test_consecutive_losses_reset():
 @pytest.mark.asyncio
 async def test_daily_reset_preserves_streak(monkeypatch):
     """T17: Consecutive loss streak should persist across day boundaries, not reset on daily_stats reset."""
-    with patch(
-        "src.database.factory.DatabaseFactory.get_redis_store"
-    ) as mock_get_store:
+    with patch("src.database.factory.DatabaseFactory.get_database") as mock_get_store:
         mock_get_store.return_value = AsyncMock()
 
         risk = RiskManager()

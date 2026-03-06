@@ -2,7 +2,7 @@
 
 Items requiring design decisions, external dependencies, or are lower-priority long-term investments. Reviewed each sprint — promote to TODO when scoped and ready.
 
-> Last updated: 2026-03-05 | Promoted: B1→T29, B4→T30, B14→T31 | Completed: B8, B9
+> Last updated: 2026-03-05 | **MAJOR CONSOLIDATION (2026-03-05)**: Memgraph replaces PostgreSQL + Neo4j + QuestDB. B1→T35, B4→T34, B11/B12→Memgraph, B13→T33, B14→absorbed into T34. Completed: B8, B9
 
 ---
 
@@ -10,8 +10,9 @@ Items requiring design decisions, external dependencies, or are lower-priority l
 
 ### B1. Build Backtesting Engine
 - **Priority**: CRITICAL — **no statistical evidence of edge exists without this**
-- **Status**: ✅ **PROMOTED to TASKS.md T29** (2026-03-05)
-- **Next**: Design data pipeline and simulation engine
+- **Status**: ✅ **PROMOTED to TASKS.md T35** (2026-03-05) — consolidated into Memgraph unified architecture
+- **Change**: Historical candles stored as `:Candle` nodes in Memgraph; no need for separate QuestDB
+- **Phasing**: After T32-T34 stabilize
 
 ### B2. Walk-Forward Validation Framework
 - **Priority**: CRITICAL
@@ -26,8 +27,9 @@ Items requiring design decisions, external dependencies, or are lower-priority l
 - **Status**: Waiting on T29 completion
 
 ### B4. Geopolitical & Macro Risk Module
-- **Priority**: HIGH — **active crisis (Iran/Hormuz) exposes total lack of macro awareness**
-- **Status**: ✅ **PROMOTED to TASKS.md T30** (2026-03-05)
+- **Priority**: HIGH — **active crisis (I4 (Graph Analytics)** (2026-03-05) — consolidated into graph layer
+- **Change**: Crisis mode + macro indicators are graph queries, not separate module. Macro data as `:MacroIndicator` nodes
+- **Now includes**: Crisis detection, sentiment-reality divergence, sector contagion alerts)
 - **Next**: Design data sources and crisis-mode protocol
 
 ### B5. Complete SMC Integration
@@ -55,33 +57,50 @@ Items requiring design decisions, external dependencies, or are lower-priority l
     - TWAP/VWAP for larger positions (relevant only at >$50k notional)
     - Adaptive execution: market orders for urgency, limit for patience
     - Stop-limit vs. stop-market tradeoff (stop-limit avoids bad fills but risks no fill)
-
-### B8. Alembic Migration Framework
-- **Status**: ✅ **COMPLETED** as T21 (2026-03-05)
-- **Ref**: TASKS.md T21
+ELIMINATED** (2026-03-05) — Memgraph is schemaless; no migrations needed
+- **Note**: Alembic directory deleted, replaced by Memgraph index creation on startup
 
 ### B9. Postgres Integration Testing
-- **Status**: ✅ **COMPLETED** as T20 (2026-03-05)
-- **Ref**: TASKS.md T20
+- **Status**: ✅ **COMPLETED** (2026-03-05) as T20
+- **Note**: Postgres completely removed 2026-03-05 during Memgraph consolidation
 
-### B10. Factor Decomposition & Beta Hedging
+### B11. QuestDB Time-Series Scaling
+- **Status**: ✅ **ELIMINATED** (2026-03-05) — Memgraph replaces
+- **Rationale**: `:Candle` node storage + indexes sufficient for single-pair LFT/MFT. QuestDB only needed at multi-pair production scale
+
+### B12. Cross-Exchange Arbitrage (Neo4j)
+- **Status**: ✅ **REPLACED BY MEMGRAPH** (2026-03-05)
+- **Rationale**: Memgraph is Cypher-compatible with superior real-time performance. Neo4j no longer needed
+
+### B13. Ollama Intelligence Sidecar
+- **Status**: ✅ **PROMOTED to T33** (2026-03-05) — news NLP entity extraction
+- **Active**: Ollama uncommented in compose.yml, GPU-enabled
+
+### B14. Semi-Automatic Mode
+- **Status**: ✅ **ABSORBED (deferred)** (2026-03-05) — lower priority than T32-T34-T35
+- **Rationale**: Approval gate is institutional feature; graph intelligence + backtesting are foundation requirements
+- **Timeline**: Post-Phase-4, if needed for production deployment
+
+---
+
+### B15. Factor Decomposition & Beta Hedging
 - **Priority**: LOW (institutional-grade upgrade)
 - **Design needed**:
     - Factor model: crypto beta, momentum, carry (funding rate), value
     - Decompose strategy returns into factor exposures vs. true alpha
     - Beta hedging mechanism (if correlated to BTC spot, hedge with inverse position)
     - Data sources: BTC dominance, sector indices, funding rate history
+- **Deferred**: Post-backtesting validation (after T35)
 
 ---
 
-## 🟡 Nice-to-Have / Future Phases
+## 🟡 Future Phases
 
-### B11. QuestDB Time-Series Scaling
-- Migrate OHLCV and tick data to QuestDB for high-performance ingestion. Needed for multi-pair at scale.
-
-### B12. Cross-Exchange Arbitrage (Neo4j)
-- Graph-based pathfinding for multi-exchange profit loops. Phase 4 vision item.
-
+### Phase 5: GPU Acceleration (deferred)
+- Upgrade Memgraph to CUDA: `memgraph/memgraph-mage:3.8.0-relwithdebinfo-cuda`
+- Implement MAGE GPU algorithms: Louvain community detection, Betweenness centrality
+- GNN model training via PyTorch Geometric
+- Timeline: When multi-pair scaling or GPU hardware justified
 ### B13. Ollama Intelligence Sidecar
 - Local LLM for trade post-mortems, market narrative summaries, sentiment filtering. Phase 4 vision item.
 

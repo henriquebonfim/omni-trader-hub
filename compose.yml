@@ -14,10 +14,12 @@ services:
     env_file:
       - .env
     depends_on:
-      postgres:
+      memgraph:
         condition: service_healthy
       redis:
         condition: service_healthy
+      ollama:
+        condition: service_started
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/api/health"]
@@ -92,26 +94,38 @@ services:
     profiles:
       - test
 
-  postgres:
-    image: postgres:18-alpine
-    container_name: omnitrader-postgres
+  memgraph:
+    image: memgraph/memgraph-mage:3.8.0-relwithdebinfo
+    container_name: omnitrader-memgraph
     ports:
-      - "5432:5432"
-    environment:
-      POSTGRES_USER: ${POSTGRES_USER:-omnitrader}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD environment variable is required}
-      POSTGRES_DB: ${POSTGRES_DB:-trades_db}
+      - "7687:7687"
     volumes:
-      - postgres_data:/var/lib/postgresql
+      - memgraph_data:/var/lib/memgraph
+    environment:
+      - MEMGRAPH_DATA_DIR=/var/lib/memgraph
     healthcheck:
       test:
         [
-          "CMD-SHELL",
-          "pg_isready -U ${POSTGRES_USER:-omnitrader} -d ${POSTGRES_DB:-trades_db}",
+          "CMD",
+          "python3",
+          "-c",
+          "import socket; s=socket.socket(); s.settimeout(2); s.connect(('localhost',7687)); s.close()",
         ]
       interval: 10s
       timeout: 5s
       retries: 5
+    restart: unless-stopped
+
+  memgraph-lab:
+    image: memgraph/lab:latest
+    container_name: omnitrader-memgraph-lab
+    ports:
+      - "3001:3000"
+    depends_on:
+      memgraph:
+        condition: service_healthy
+    environment:
+      - NEXTAUTH_URL=http://localhost:3001
     restart: unless-stopped
 
   redis:
@@ -128,24 +142,18 @@ services:
       retries: 5
     restart: unless-stopped
 
-  # ollama:
-  #   image: ollama/ollama:0.17.6
-  #   container_name: omnitrader-ollama
-  #   environment:
-  #     - OLLAMA_DEBUG=1
-  #   ports:
-  #     - "11434:11434"
-  #   volumes:
-  #     - ollama_data:/root/.ollama
-  #   deploy:
-  #     resources:
-  #       reservations:
-  #         devices:
-  #           - driver: nvidia
-  #             count: 1
-  #             capabilities: [gpu]
+  ollama:
+    image: ollama/ollama:0.17.6
+    container_name: omnitrader-ollama
+    environment:
+      - OLLAMA_DEBUG=1
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    restart: unless-stopped
 
 volumes:
-  postgres_data:
+  memgraph_data:
   redis_data:
   ollama_data:

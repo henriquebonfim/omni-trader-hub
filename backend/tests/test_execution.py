@@ -65,7 +65,7 @@ async def test_max_positions_blocking(bot):
 
 
 @pytest.mark.asyncio
-@patch("src.database.factory.DatabaseFactory.get_redis_store")
+@patch("src.database.factory.DatabaseFactory.get_database")
 async def test_max_positions_allowing(mock_get_store, bot):
     mock_get_store.return_value = AsyncMock()
     bot.config.trading.symbol = "BTC/USDT"

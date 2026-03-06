@@ -4,6 +4,17 @@ exchange:
   name: binance
   paper_mode: true
   testnet: false
+database:
+  encrypted: false
+  host: ${MEMGRAPH_HOST}
+  password: ${MEMGRAPH_PASSWORD}
+  port: ${MEMGRAPH_PORT}
+  type: memgraph
+  username: ${MEMGRAPH_USERNAME}
+redis:
+  db: 1
+  host: ${REDIS_HOST}
+  port: ${REDIS_PORT}
 notifications:
   discord_webhook: ${DISCORD_WEBHOOK_URL}
   enabled: true

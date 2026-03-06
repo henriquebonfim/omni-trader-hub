@@ -9,7 +9,7 @@ from src.strategies.base import Signal
 
 
 @pytest.mark.asyncio
-@patch("src.database.factory.DatabaseFactory.get_redis_store")
+@patch("src.database.factory.DatabaseFactory.get_database")
 async def test_liquidation_risk_trigger(mock_get_store):
     mock_get_store.return_value = AsyncMock()
     # Setup
@@ -112,7 +112,7 @@ async def test_liquidation_risk_trigger(mock_get_store):
 
 
 @pytest.mark.asyncio
-@patch("src.database.factory.DatabaseFactory.get_redis_store")
+@patch("src.database.factory.DatabaseFactory.get_database")
 async def test_liquidation_risk_safe(mock_get_store):
     mock_get_store.return_value = AsyncMock()
     # Setup

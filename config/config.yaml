@@ -33,8 +33,17 @@ exchange:
   margin_type: isolated
 
 database:
-  type: postgres
-  connection_string: "postgresql://omnitrader:${POSTGRES_PASSWORD}@postgres:5432/trades_db"
+  type: memgraph
+  host: ${MEMGRAPH_HOST}
+  port: ${MEMGRAPH_PORT}
+  encrypted: false
+  username: ${MEMGRAPH_USERNAME}
+  password: ${MEMGRAPH_PASSWORD}
+
+redis:
+  host: ${REDIS_HOST}
+  port: ${REDIS_PORT}
+  db: 1
 
 notifications:
   discord_webhook_url: ""

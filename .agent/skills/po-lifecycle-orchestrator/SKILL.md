@@ -1,6 +1,6 @@
 ---
 name: po-lifecycle-orchestrator
-description: Complete Product Owner lifecycle orchestrator. Aggregates GitHub issues, TASKS.md, TODO.md, BACKLOG.md, runs Docker + test suite via `make build` and `make test`, visually reviews the product via browser-agent live review, then triages every item into the correct planning file: BACKLOG.md (long-term), TODO.md (next sprint), TASKS.md (immediate priority). Use for "PO review", "triage the backlog", "product review", "what should we work on next", "update the backlog", "run the full product review", "review product health", or any request to organize and prioritize work. Also triggers at the start of any sprint or planning session.
+description: Complete Product Owner lifecycle orchestrator. Aggregates GitHub issues, tasks/TASKS.md, tasks/TODO.md, tasks/BACKLOG.md, runs Docker + test suite via `make build` and `make test`, visually reviews the product via browser-agent live review, then triages every item into the correct planning file: tasks/BACKLOG.md (long-term), tasks/TODO.md (next sprint), tasks/TASKS.md (immediate priority). Use for "PO review", "triage the backlog", "product review", "what should we work on next", "update the backlog", "run the full product review", "review product health", or any request to organize and prioritize work. Also triggers at the start of any sprint or planning session.
 ---
 
 # PO Lifecycle Orchestrator
@@ -32,12 +32,12 @@ Read everything before deciding anything:
 # Product context
 [ -f README.md ]    && cat README.md | head -100
 [ -f PRODUCT.md ]   && cat PRODUCT.md
-[ -f ROADMAP.md ]   && cat ROADMAP.md
+[ -f tasks/ROADMAP.md ]   && cat tasks/ROADMAP.md
 
 # Existing planning files — read current state first
-[ -f TASKS.md ]     && cat TASKS.md
-[ -f TODO.md ]      && cat TODO.md
-[ -f BACKLOG.md ]   && cat BACKLOG.md
+[ -f tasks/TASKS.md ]     && cat tasks/TASKS.md
+[ -f tasks/TODO.md ]      && cat tasks/TODO.md
+[ -f tasks/BACKLOG.md ]   && cat tasks/BACKLOG.md
 
 # Package.json / pyproject for product name + version
 [ -f package.json ]    && jq -r '"Product: \(.name) v\(.version)"' package.json

@@ -1,13 +1,34 @@
-# OmniTrader — Technical Debt & Audit Findings
 
-Single source of truth for all technical work: architecture items, audit-discovered bugs, and risk gaps.
-Institutional-grade audit completed **2026-03-03** — findings integrated below.
+## ✅ Completed (Audit Trail)
 
-> Last updated: 2026-03-05 | Sprint promotion: T29-T31 added
+<details>
+<summary>Previously completed items (T1–T5)</summary>
 
----
+### T1. Database Infrastructure Migration
+- [x] **Migrate to High-Performance Database**
+    - **Status**: ✅ Implemented (`src/database/postgres.py`). Ready for config switch.
+    - **Completed**: 2026-02 | **Note**: Postgres untested in production — see T20.
 
-## 🔴 Critical (Capital-at-Risk Bugs)
+### T2. State Persistence Implementation
+- [x] **Implement "Anti-Amnesia" Persistence Layer**
+    - **Status**: ✅ Implemented (`src/database/redis_store.py`).
+    - **Completed**: 2026-02 | **Note**: Redis failures silently swallowed — see T12.
+
+### T3. Advanced Rate Limiting
+- [x] **Implement Leaky-Bucket Rate Limiter**
+    - **Status**: ✅ Implemented (`src/rate_limiter.py`). Capacity=2000, refill 40 units/s. All CCXT call-sites wired.
+    - **Completed**: 2026-02
+
+### T4. Event Loop Optimization (Worker Offloading)
+- [x] **Implement Celery + Redis Worker Architecture**
+    - **Status**: ✅ Implemented. Celery worker offloads `analyze_strategy` + `analyze_regime` tasks. 12 new tests.
+    - **Completed**: 2026-02 | **Note**: No Celery circuit breaker — see T26.
+
+### T5. WebSocket Integration
+- [x] **CCXT WebSocket Integration**
+    - **Status**: ✅ Implemented (`src/ws_feed.py`). Streams ticker, OHLCV, orders. 23 new tests.
+    - **Completed**: 2026-02 | **Note**: No stale-data detection — see T19.
+
 
 ### T6. SL/TP Placement Failure is Non-Fatal
 - [x] **Fix: Retry 3× or flatten position immediately**
@@ -64,10 +85,6 @@ Institutional-grade audit completed **2026-03-03** — findings integrated below
     - **Vulnerability**: Risk state persistence failures are invisible. `RiskManager.save_state()` could fail silently → consecutive loss counter resets → bot continues at full size after a losing streak.
     - **Impact**: Circuit breakers and loss-streak sizing become unreliable.
     - **Fix**: For critical risk state keys, raise on Redis failure or implement in-memory fallback that preserves the last known state.
-
----
-
-## 🟠 High Priority (Correctness & Reliability)
 
 ### T13. Regime Classifier No Hysteresis
 - [x] **Add Schmitt-trigger hysteresis to regime detection**
@@ -139,10 +156,6 @@ Institutional-grade audit completed **2026-03-03** — findings integrated below
     - **Fix**: Add Alembic with version-tracked migrations. Generate initial migration from current schema. All future changes via migration files.
     - **Completed**: 2026-03-05 | PR #65 (merged)
 
----
-
-## 🟡 Medium Priority (Hardening & Hygiene)
-
 ### T22. Auth is Fail-Open by Default
 - [x] **Fix: Require API key even in development**
     - **Location**: `src/api/auth.py` — if `OMNITRADER_API_KEY` env var not set, all auth is bypassed.
@@ -186,101 +199,6 @@ Institutional-grade audit completed **2026-03-03** — findings integrated below
     - **Fix**: Initialize client once in `__init__`. Add simple rate limiter (30 req/60s for Discord webhooks).
     - **Completed**: 2026-03-05 | Commit 1ef1cb9
 
----
-
-## ✅ Completed (Audit Trail)
-
-<details>
-<summary>Previously completed items (T1–T5)</summary>
-
-### T1. Database Infrastructure Migration
-- [x] **Migrate to High-Performance Database**
-    - **Status**: ✅ Implemented (`src/database/postgres.py`). Ready for config switch.
-    - **Completed**: 2026-02 | **Note**: Postgres untested in production — see T20.
-
-### T2. State Persistence Implementation
-- [x] **Implement "Anti-Amnesia" Persistence Layer**
-    - **Status**: ✅ Implemented (`src/database/redis_store.py`).
-    - **Completed**: 2026-02 | **Note**: Redis failures silently swallowed — see T12.
-
-### T3. Advanced Rate Limiting
-- [x] **Implement Leaky-Bucket Rate Limiter**
-    - **Status**: ✅ Implemented (`src/rate_limiter.py`). Capacity=2000, refill 40 units/s. All CCXT call-sites wired.
-    - **Completed**: 2026-02
-
-### T4. Event Loop Optimization (Worker Offloading)
-- [x] **Implement Celery + Redis Worker Architecture**
-    - **Status**: ✅ Implemented. Celery worker offloads `analyze_strategy` + `analyze_regime` tasks. 12 new tests.
-    - **Completed**: 2026-02 | **Note**: No Celery circuit breaker — see T26.
-
-### T5. WebSocket Integration
-- [x] **CCXT WebSocket Integration**
-    - **Status**: ✅ Implemented (`src/ws_feed.py`). Streams ticker, OHLCV, orders. 23 new tests.
-    - **Completed**: 2026-02 | **Note**: No stale-data detection — see T19.
-
 </details>
 
 ---
-
-## 🔴 New Critical Sprint (Post-v1.0.0)
-
-### T29. Build Backtesting Engine
-- [ ] **Implement statistical validation framework**
-    - **Priority**: 🔴 CRITICAL — **no statistical evidence of edge exists without this**
-    - **Status**: Promoted from BACKLOG.md B1 (2026-03-05)
-    - **Depends on**: Historical data pipeline (Binance API or Kaggle/Tardis)
-    - **Design decisions needed**:
-        - Data source: Binance historical klines API vs. third-party (Tardis, Kaiko)
-        - Walk-forward framework: rolling window or expanding window?
-        - Cost modeling: spread, slippage, funding rates, commission
-        - Execution simulation: fill at close vs. VWAP of next bar
-        - Minimum dataset: 2+ years BTC/USDT 15m OHLCV across bull/bear/range
-    - **Acceptance criteria**:
-        - Sharpe, Sortino, max drawdown, profit factor, win rate output per strategy
-        - Walk-forward with minimum 6-month out-of-sample holdout
-        - Cost model includes 0.04% maker/taker + configurable slippage
-        - Bootstrap validation (1000+ runs) to establish confidence intervals
-    - **Implementation phases**:
-        1. Historical data ingestion (Binance `/api/v3/klines`)
-        2. Event-driven simulation engine with proper lookahead bias prevention
-        3. Cost model integration (spread, commission, slippage, funding)
-        4. Walk-forward validation framework
-        5. Performance metrics calculation & reporting
-    - **Ref**: BACKLOG.md B1
-
----
-
-## 🟠 New High Priority Sprint
-
-### T30. Geopolitical & Macro Risk Module
-- [ ] **Implement crisis-mode protocol and sentiment-reality divergence detection**
-    - **Priority**: 🟠 HIGH — **active crisis (Iran/Hormuz) exposes total lack of macro awareness**
-    - **Status**: Promoted from BACKLOG.md B4 (2026-03-05)
-    - **Context**: As of 2026-03-03, Day 3 of US-Israeli war with Iran; Strait of Hormuz closed. System has zero macro awareness.
-    - **Design decisions needed**:
-        - **Data sources**: Fear & Greed Index (Alternative.me), DXY (FRED/Yahoo), oil futures, VIX equivalent for crypto
-        - **Crisis-mode protocol**: Configurable override that reduces leverage to 1×, cuts position_size_pct to 0.5%, enables only ADX strategy, tightens daily loss to 2%, adds manual approval gate
-        - **Sentiment-reality divergence**: When greed index high but geopolitical risk elevated, flag as "greed noise"
-    - **Integration point**: New field in `config.yaml` for `crisis_mode: true/false` that overrides risk parameters. Dashboard toggle.
-    - **Acceptance criteria**:
-        - Crisis mode can be toggled via API and persists across restarts
-        - When enabled, all risk parameters are overridden per spec
-        - Divergence detector logs warnings when greed + elevated macro risk detected
-        - Dashboard shows current macro state (DXY, oil, VIX proxy, Fear & Greed)
-    - **Ref**: BACKLOG.md B4
-
-### T31. Semi-Automatic Mode (Manual Approval Gate)
-- [ ] **Dashboard trade approval gate for initial live trading**
-    - **Priority**: 🟠 HIGH — **safety mechanism for first 2 weeks of live trading**
-    - **Status**: Promoted from BACKLOG.md B14 (2026-03-05)
-    - **Design**:
-        - When `semi_automatic_mode: true` in config, every trade signal requires manual approval
-        - Frontend shows pending signal with: symbol, side, entry price, SL, TP, reasoning, risk metrics
-        - Approval buttons: Approve (execute immediately), Reject (skip signal), Modify (adjust size/stops)
-        - Auto-reject after 60s if no action (market conditions changed)
-    - **Acceptance criteria**:
-        - Config flag `semi_automatic_mode` gates all trade execution
-        - WebSocket push notification to frontend on new signal
-        - Approval/reject logged to database with timestamp and user decision
-        - After 20 approved trades or 2 weeks, suggest switching to full auto
-    - **Ref**: BACKLOG.md B14

@@ -1,54 +1,46 @@
-"""
-Tests for database backup functionality.
-"""
+"""Tests for Memgraph backup functionality."""
 
-import subprocess
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock
 
 import pytest
 
-from src.database.postgres import PostgresDatabase
+from src.database.memgraph import MemgraphDatabase
 
 
 @pytest.mark.asyncio
-async def test_backup_db_success(monkeypatch):
-    """Test successful database backup."""
-    monkeypatch.setenv("POSTGRES_PASSWORD", "test_password")
-    db = PostgresDatabase(
-        connection_string="postgresql://user:pass@localhost:5432/testdb"
-    )
+async def test_backup_db_success():
+    """Backup command runs successfully and returns timestamp."""
+    db = MemgraphDatabase(host="localhost", port=7687)
 
-    with patch("subprocess.run") as mock_run:
-        mock_run.return_value = MagicMock(returncode=0)
+    mock_result = AsyncMock()
+    mock_result.single.return_value = {"ok": 1}
 
-        await db.backup_db()
+    mock_session = AsyncMock()
+    mock_session.run.return_value = mock_result
 
-        mock_run.assert_called_once()
-        args, kwargs = mock_run.call_args
-        cmd = args[0]
+    mock_driver = AsyncMock()
+    mock_driver.session.return_value.__aenter__.return_value = mock_session
 
-        assert cmd[0] == "pg_dump"
-        assert "-h" in cmd
-        assert "-p" in cmd
-        assert "-U" in cmd
-        assert "-d" in cmd
-        assert "PGPASSWORD" in kwargs["env"]
+    db._driver = mock_driver
+
+    backup_id = await db.backup_db()
+
+    assert isinstance(backup_id, str)
+    mock_session.run.assert_awaited_once_with("CREATE SNAPSHOT;")
 
 
 @pytest.mark.asyncio
-async def test_backup_db_failure(monkeypatch):
-    """Test database backup failure handling."""
-    monkeypatch.setenv("POSTGRES_PASSWORD", "test_password")
-    db = PostgresDatabase(
-        connection_string="postgresql://user:pass@localhost:5432/testdb"
-    )
+async def test_backup_db_failure():
+    """Backup errors are raised."""
+    db = MemgraphDatabase(host="localhost", port=7687)
 
-    with patch("subprocess.run") as mock_run:
-        mock_run.side_effect = subprocess.CalledProcessError(
-            1, "pg_dump", stderr="Connection failed"
-        )
+    mock_session = AsyncMock()
+    mock_session.run.side_effect = Exception("Backup failed")
 
-        # Should not raise exception, but log error
+    mock_driver = AsyncMock()
+    mock_driver.session.return_value.__aenter__.return_value = mock_session
+
+    db._driver = mock_driver
+
+    with pytest.raises(Exception, match="Backup failed"):
         await db.backup_db()
-
-        mock_run.assert_called_once()

@@ -10,7 +10,29 @@ Implement all actionable review comments, validate CI, post structured replies.
 
 ## Execution Sequence
 
-### 1 — Setup
+### 1 — SOP Validation Gate
+
+```bash
+python3 .agent/scripts/orchestrator.py handle-pr-code
+ENFORCE_EXIT=$?
+[ $ENFORCE_EXIT -ne 0 ] && echo "❌ SOP validation failed" && exit 1
+
+WORKFLOW_NAME="handle-pr-code"
+cleanup_workflow() {
+  EXIT_CODE=$?
+  if [ $EXIT_CODE -ne 0 ]; then
+    python3 .agent/scripts/friction_logger.py \
+      --task "$WORKFLOW_NAME" \
+      --type "Workflow" \
+      --friction "Workflow exited with code $EXIT_CODE" \
+      --resolution "Inspect workflow output and rerun after fix" || true
+  fi
+  make clean-tmp >/dev/null 2>&1 || true
+}
+trap cleanup_workflow EXIT
+```
+
+### 2 — Setup
 
 ```bash
 mkdir -p .agent/tmp
@@ -18,27 +40,24 @@ grep -qxF '.agent/tmp/' .gitignore \
   || echo '.agent/tmp/' >> .gitignore
 ```
 
-### 2 — Load Skill
+> **sequential-thinking**: Read review comments → group by theme → assess change scope → plan implementation order → identify test coverage needs.
+
+### 3 — Load Skill
 
 ```
 pr-code-orchestrator
 ```
 
-### 3 — Checkout & Baseline
+### 4 — Checkout & Baseline
 
 ```bash
 gh pr checkout <PR_NUMBER>
-
-# Validate NOT on protected branch
-BRANCH=$(git branch --show-current)
-[[ "$BRANCH" == "main" || "$BRANCH" == "master" || "$BRANCH" == "production" ]] \
-  && echo "ABORT: protected branch" && exit 1
 
 # Run baseline validation before ANY changes
 # Store in tmp/runtime-summary.json
 ```
 
-### 4 — Discovery
+### 5 — Discovery
 
 ```bash
 gh pr view <PR_NUMBER> --json number,title,headRefName,baseRefName \
@@ -52,7 +71,7 @@ gh pr diff <PR_NUMBER> --name-only \
   > .agent/tmp/changed-files.txt
 ```
 
-### 5 — Build & Execute Matrix
+### 6 — Build & Execute Matrix
 
 - Classify every comment
 - Build `tmp/pr-code-matrix.json`
@@ -60,19 +79,19 @@ gh pr diff <PR_NUMBER> --name-only \
 - Group into task batches → `tmp/task-plan.json`
 - Execute: `/handle-code <task>` for each batch
 
-### 6 — Post Replies
+### 7 — Post Replies
 
 ```bash
 make pr-reply PR=<PR_NUMBER>
 ```
 
-### 7 — CI Check
+### 8 — CI Check
 
 ```bash
 gh pr checks <PR_NUMBER> --watch
 ```
 
-### 8 — Final Checks
+### 9 — Final Checks
 
 ```bash
 gh pr diff <PR_NUMBER> --name-only   # Only expected files changed
@@ -80,7 +99,7 @@ git log --oneline -5                  # Clean history
 git status                            # Clean tree
 ```
 
-### 9 — Cleanup
+### 10 — Cleanup
 
 ```bash
 make clean-tmp

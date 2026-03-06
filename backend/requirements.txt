@@ -1,11 +1,12 @@
 # OmniTrader MVP Dependencies
-ccxt>=4.0.0
+# Note: CCXT 4.4.0+ added Lighter.AI exchange (lighter-client not on PyPI)
+# GitHub installation has setuptools issues. Using stable PyPI version 4.3.x
+ccxt>=4.0.0,<4.4.0
 pandas>=2.0.0
 # TODO(T25): pandas-ta is unmaintained (last release 2022). Consider ta-lib or manual indicators.
 pandas-ta>=0.3.14b
 pyyaml>=6.0
-aiosqlite>=0.19.0
-asyncpg>=0.29.0
+neo4j>=5.18
 redis>=5.0.0
 httpx>=0.25.0
 python-dotenv>=1.0.0
@@ -13,7 +14,6 @@ structlog>=23.0.0
 
 # Database migrations
 sqlalchemy>=2.0.0
-alembic>=1.13.0
 
 # Celery worker offloading (broker + result backend = existing Redis)
 celery[redis]>=5.3.0

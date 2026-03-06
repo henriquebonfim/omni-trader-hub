@@ -82,7 +82,7 @@ class RiskManager:
     - Daily loss limits (circuit breaker)
     """
 
-    def __init__(self):
+    def __init__(self, database=None):
         config = get_config()
         self.position_size_pct = config.trading.position_size_pct
         self.stop_loss_pct = config.risk.stop_loss_pct
@@ -123,16 +123,16 @@ class RiskManager:
         # Persistence
         from .database.factory import DatabaseFactory
 
-        self.redis = DatabaseFactory.get_redis_store(config)
-        self._redis_key_prefix = "omnitrader:risk:"
+        self.database = database or DatabaseFactory.get_database(config)
+        self._state_key_prefix = "omnitrader:risk:"
 
     async def load_state(self):
-        """Restore state from Redis."""
+        """Restore state from persistent database."""
         logger.info("risk_manager_restoring_state")
         try:
             # Restore Daily Stats
-            daily_stats_data = await self.redis.get(
-                f"{self._redis_key_prefix}daily_stats", critical=True
+            daily_stats_data = await self.database.get_state(
+                f"{self._state_key_prefix}daily_stats"
             )
             is_same_day = False
             if daily_stats_data:
@@ -148,38 +148,40 @@ class RiskManager:
                     )
 
             # Restore Consecutive Losses (streak carries over days unless reset by win)
-            losses = await self.redis.get(
-                f"{self._redis_key_prefix}consecutive_losses", critical=True
+            losses = await self.database.get_state(
+                f"{self._state_key_prefix}consecutive_losses"
             )
             if losses is not None:
-                self.consecutive_losses = int(losses)
+                self.consecutive_losses = int(losses.get("value", 0))
                 logger.info(
                     "restored_consecutive_losses", count=self.consecutive_losses
                 )
 
             # Restore Peak Equity
-            peak_eq = await self.redis.get(
-                f"{self._redis_key_prefix}peak_equity", critical=True
+            peak_eq = await self.database.get_state(
+                f"{self._state_key_prefix}peak_equity"
             )
             if peak_eq is not None:
-                self.peak_equity = float(peak_eq)
+                self.peak_equity = float(peak_eq.get("value", 0.0))
                 logger.info("restored_peak_equity", peak_equity=self.peak_equity)
 
             # Restore Circuit Breakers
             if is_same_day:
-                cb_active = await self.redis.get(
-                    f"{self._redis_key_prefix}circuit_breaker", critical=True
+                cb_active = await self.database.get_state(
+                    f"{self._state_key_prefix}circuit_breaker"
                 )
                 if cb_active is not None:
-                    self._circuit_breaker_active = bool(cb_active)
+                    self._circuit_breaker_active = bool(cb_active.get("value", False))
             else:
                 self._circuit_breaker_active = False
 
-            wcb_active = await self.redis.get(
-                f"{self._redis_key_prefix}weekly_circuit_breaker", critical=True
+            wcb_active = await self.database.get_state(
+                f"{self._state_key_prefix}weekly_circuit_breaker"
             )
             if wcb_active is not None:
-                self._weekly_circuit_breaker_active = bool(wcb_active)
+                self._weekly_circuit_breaker_active = bool(
+                    wcb_active.get("value", False)
+                )
 
             logger.info("risk_state_restored")
 
@@ -188,34 +190,30 @@ class RiskManager:
             raise  # Fail-fast on startup if we cannot retrieve critical risk state
 
     async def save_state(self):
-        """Persist state to Redis."""
+        """Persist state to database."""
         try:
             # Save Daily Stats (expire in 24h just in case, though we check date on load)
-            await self.redis.set(
-                f"{self._redis_key_prefix}daily_stats",
+            await self.database.set_state(
+                f"{self._state_key_prefix}daily_stats",
                 self.daily_stats.to_dict(),
-                expire=86400,
-                critical=True,
+                expires_in=86400,
             )
 
             # Save other fields
-            await self.redis.set(
-                f"{self._redis_key_prefix}consecutive_losses",
-                self.consecutive_losses,
-                critical=True,
+            await self.database.set_state(
+                f"{self._state_key_prefix}consecutive_losses",
+                {"value": self.consecutive_losses},
             )
-            await self.redis.set(
-                f"{self._redis_key_prefix}peak_equity", self.peak_equity, critical=True
+            await self.database.set_state(
+                f"{self._state_key_prefix}peak_equity", {"value": self.peak_equity}
             )
-            await self.redis.set(
-                f"{self._redis_key_prefix}circuit_breaker",
-                self._circuit_breaker_active,
-                critical=True,
+            await self.database.set_state(
+                f"{self._state_key_prefix}circuit_breaker",
+                {"value": self._circuit_breaker_active},
             )
-            await self.redis.set(
-                f"{self._redis_key_prefix}weekly_circuit_breaker",
-                self._weekly_circuit_breaker_active,
-                critical=True,
+            await self.database.set_state(
+                f"{self._state_key_prefix}weekly_circuit_breaker",
+                {"value": self._weekly_circuit_breaker_active},
             )
         except Exception as e:
             logger.error("risk_state_save_failed_critical", error=str(e))

@@ -8,31 +8,55 @@ Full-cycle: PO review → triage → implement → PR → review → merge → r
 
 ---
 
-## Step 0 — PO Gate
-
-> **sequential-thinking**: Assess TASKS.md freshness, Docker health, test status. Decide: proceed or run `/handle-po-review` first.
+## Step 0 — SOP Validation Gate
 
 ```bash
-TASKS_AGE=$(( ($(date +%s) - $(stat -c %Y TASKS.md 2>/dev/null || echo 0)) / 3600 ))
-echo "TASKS.md age: ${TASKS_AGE}h"
-[ $TASKS_AGE -gt 24 ] && echo "⚠️  Stale — run /handle-po-review" || echo "✅ Current"
-```
+python3 .agent/scripts/orchestrator.py start-workflow
+ENFORCE_EXIT=$?
+[ $ENFORCE_EXIT -ne 0 ] && echo "❌ SOP validation failed" && exit 1
 
-If stale → `/handle-po-review` first. If current → Step 1.
+WORKFLOW_NAME="start-workflow"
+cleanup_workflow() {
+  EXIT_CODE=$?
+  if [ $EXIT_CODE -ne 0 ]; then
+    python3 .agent/scripts/friction_logger.py \
+      --task "$WORKFLOW_NAME" \
+      --type "Workflow" \
+      --friction "Workflow exited with code $EXIT_CODE" \
+      --resolution "Inspect workflow output and rerun after fix" || true
+  fi
+  make clean-tmp >/dev/null 2>&1 || true
+}
+trap cleanup_workflow EXIT
+```
 
 ---
 
-## Step 1 — Context Scan
+## Step 1 — PO Gate
+
+> **sequential-thinking**: Assess tasks/TASKS.md freshness, Docker health, test status. Decide: proceed or run `/handle-po-review` first.
 
 ```bash
-[ -f TODO.md ] && head -40 TODO.md
+TASKS_AGE=$(( ($(date +%s) - $(stat -c %Y tasks/TASKS.md 2>/dev/null || echo 0)) / 3600 ))
+echo "tasks/TASKS.md age: ${TASKS_AGE}h"
+[ $TASKS_AGE -gt 24 ] && echo "⚠️  Stale — run /handle-po-review" || echo "✅ Current"
+```
+
+If stale → `/handle-po-review` first. If current → Step 2.
+
+---
+
+## Step 2 — Context Scan
+
+```bash
+[ -f tasks/TODO.md ] && head -40 tasks/TODO.md
 gh pr list --state open --json number,title,headRefName --jq '.[] | "#\(.number) \(.title)"'
 gh pr list --state merged --limit 10 --json number,title,mergedAt --jq '.[] | "\(.mergedAt[:10]) #\(.number) \(.title)"'
 ```
 
 ---
 
-## Step 2 — New Issues Check
+## Step 3 — New Issues Check
 
 ```bash
 gh issue list --state open --json number,createdAt \
@@ -43,17 +67,17 @@ New issues → `/handle-backlog-triage`. Otherwise → Step 3.
 
 ---
 
-## Step 3 — Pick Top Task
+## Step 4 — Pick Top Task
 
-> **sequential-thinking**: Read TASKS.md. Validate top item is not already an open PR or Jules session. Confirm prerequisites (Docker + tests green via `make build && make test`).
+> **sequential-thinking**: Read tasks/TASKS.md. Validate top item is not already an open PR or Jules session. Confirm prerequisites (Docker + tests green via `make build && make test`).
 
 ```bash
-cat TASKS.md | head -50
+cat tasks/TASKS.md | head -50
 ```
 
 ---
 
-## Step 4 — Jules Dispatch & Poll
+## Step 5 — Jules Dispatch & Poll
 
 > **sequential-thinking**: Think → Dispatch → Poll → Pull → Verify. Polling is async to avoid blocking.
 
@@ -81,7 +105,7 @@ make test && make lint
 
 ---
 
-## Step 5 — Code Review
+## Step 6 — Code Review
 
 ```
 /handle-pr-review <PR_NUMBER>
@@ -91,7 +115,7 @@ If changes needed → `/handle-pr-code <PR_NUMBER>`
 
 ---
 
-## Step 6 — Merge
+## Step 7 — Merge
 
 ```
 /handle-close-pr <PR_NUMBER>
@@ -99,7 +123,7 @@ If changes needed → `/handle-pr-code <PR_NUMBER>`
 
 ---
 
-## Step 7 — Release (when milestone complete)
+## Step 8 — Release (when milestone complete)
 
 ```bash
 LAST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "none")
@@ -110,9 +134,9 @@ If 5+ commits or milestone complete → `/handle-release`
 
 ---
 
-## Step 8 — Loop
+## Step 9 — Loop
 
-Remove completed item from TASKS.md. Pick next. Return to Step 3.
+Remove completed item from tasks/TASKS.md. Pick next. Return to Step 4.
 
 ---
 
