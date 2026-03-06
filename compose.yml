@@ -15,7 +15,7 @@ services:
       - .env
     depends_on:
       memgraph:
-        condition: service_healthy
+        condition: service_started
       redis:
         condition: service_healthy
       ollama:
@@ -103,17 +103,6 @@ services:
       - memgraph_data:/var/lib/memgraph
     environment:
       - MEMGRAPH_DATA_DIR=/var/lib/memgraph
-    healthcheck:
-      test:
-        [
-          "CMD",
-          "python3",
-          "-c",
-          "import socket; s=socket.socket(); s.settimeout(2); s.connect(('localhost',7687)); s.close()",
-        ]
-      interval: 10s
-      timeout: 5s
-      retries: 5
     restart: unless-stopped
 
   memgraph-lab:
@@ -123,7 +112,7 @@ services:
       - "3001:3000"
     depends_on:
       memgraph:
-        condition: service_healthy
+        condition: service_started
     environment:
       - NEXTAUTH_URL=http://localhost:3001
     restart: unless-stopped
