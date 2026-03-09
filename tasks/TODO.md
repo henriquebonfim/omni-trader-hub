@@ -1,13 +1,15 @@
 # TODO
 
-Confirmed work for the current sprint. All items validated, scoped, and ready to implement.
-Unified Memgraph Architecture: Single persistent database replaces PostgreSQL + Neo4j + QuestDB.
+Confirmed work for the current and next sprints. All items validated, scoped, and ready to implement.
+Unified Memgraph Architecture → Multi-Asset Autonomous Trading Platform.
 
-> Last updated: 2026-03-05 | Sprint: Unified Memgraph Architecture (T32-T35)
+> Last updated: 2026-03-09 | Sprint: Unified Memgraph Architecture (T32-T36) + Multi-Asset Platform (T37-T42)
 
 ---
 
-> **⚠️ STRATEGIC PIVOT (2026-03-05)**: Starting immediate implementation of Knowledge Graph Intelligence system using Memgraph as single source of truth. PostgreSQL + Redis + Alembic → Memgraph + Redis (Celery-only). Data reset OK. Timeline: ~10 days for T32-T34 core, T35 backtesting after stabilization.
+> **⚠️ STRATEGIC PIVOT (2026-03-05)**: Memgraph as single source of truth. PostgreSQL + Redis + Alembic → Memgraph + Redis (Celery-only). Data reset OK.
+
+> **🚀 PLATFORM EXPANSION (2026-03-09)**: Evolving from single-pair BTC/USDT bot to **multi-asset autonomous trading platform**. Bots run per-asset, auto-select strategies via regime + backtest performance, and support custom user-created strategies built from 158 TA-Lib indicators. Frontend design spec (PROMPT.md) drives these new backend requirements (T37-T42).
 
 ## Sprint: Unified Memgraph Architecture — Graph Intelligence Foundation
 
@@ -318,6 +320,169 @@ Unified Memgraph Architecture: Single persistent database replaces PostgreSQL + 
     - Binance Direct handles all error codes gracefully
     - Fallback works: simulated outage → automatic CCXT switch
     - Performance: Direct adapter 20-30% faster RTT than CCXT
+
+---
+
+## Sprint: Multi-Asset Autonomous Platform (T37-T42)
+
+**Goal**: Transform single-pair BTC/USDT bot into a multi-asset platform where each bot instance manages one asset pair, autonomously selects strategies, and supports user-created custom strategies. Expose environment variable management via API. These backend features are required by the frontend design (see PROMPT.md).
+
+**Phase breakdown:**
+- **T37 (3 days)**: Multi-asset bot management — CRUD API, per-bot lifecycle, isolated positions
+- **T38 (2 days)**: Autonomous strategy selection — regime-based ranking, auto-rotation
+- **T39 (2 days)**: TA-Lib migration — replace pandas-ta, expose indicator catalog API
+- **T40 (3 days)**: Custom strategy system — user-created strategies with TA-Lib conditions
+- **T41 (1 day)**: Environment variable management API — read/write .env from dashboard
+- **T42 (1 day)**: Markets discovery API — fetch tradeable pairs from exchange
+
+**Depends on**: T32 (Memgraph), T35 (Backtesting for strategy scoring), T36 (Exchange adapter for multi-pair)
+
+### T37. Multi-Asset Bot Management API 🔴 CRITICAL
+- [ ] **Phase 7a: Bot entity model in Memgraph**
+    - New node label: `:Bot {id, symbol, status, mode, active_strategy, regime, leverage, balance_allocated, timeframe, created_at, updated_at}`
+    - Relationships: `(:Bot)-[:HAS_POSITION]->(:Position)`, `(:Bot)-[:EXECUTED]->(:Trade)`, `(:Bot)-[:USES]->(:Strategy)`
+    - Indexes: `:Bot(id)`, `:Bot(symbol)`, `:Bot(status)`
+    - Each bot runs independently — isolated position, risk state, and strategy context
+- [ ] **Phase 7b: Bot CRUD API endpoints** ([backend/src/api/routes/bots.py](backend/src/api/routes/bots.py))
+    - `GET /api/bots` — list all bots with current state
+    - `POST /api/bots` — create new bot `{symbol, mode, strategy?, leverage, allocation, timeframe}`
+    - `GET /api/bots/{id}` — single bot detail with position, recent trades, risk metrics
+    - `PUT /api/bots/{id}` — update bot configuration
+    - `DELETE /api/bots/{id}` — remove bot (with safety: must be stopped, no open position)
+    - `POST /api/bots/{id}/start` — start bot trading loop
+    - `POST /api/bots/{id}/stop` — stop bot, optionally close position
+    - `POST /api/bots/{id}/trade/open` — manual trade on specific bot
+    - `POST /api/bots/{id}/trade/close` — manual close on specific bot
+    - All mutation endpoints require `verify_api_key` auth
+- [ ] **Phase 7c: Bot lifecycle manager** ([backend/src/bot_manager.py](backend/src/bot_manager.py))
+    - `BotManager` class: manages multiple bot instances concurrently
+    - Each bot is an `OmniTrader` instance with its own symbol, strategy, and risk state
+    - Start/stop individual bots without affecting others
+    - Shared exchange connection (rate limiter is global) but isolated positions
+    - WebSocket feed: subscribe to multiple symbols via CCXT Pro
+    - Aggregate status: total portfolio value, combined PnL, open positions count
+- [ ] **Phase 7d: Per-bot risk isolation**
+    - Each bot gets its own risk state in Memgraph: `:State {key: "risk:{bot_id}:daily_stats"}`
+    - Independent circuit breakers per bot
+    - Global portfolio-level circuit breaker: if combined drawdown > threshold, pause all bots
+    - Per-bot allocation: sum of all allocations must not exceed 100%
+- **Effort**: ~3 days | **Consolidates**: BACKLOG B6 (Multi-Asset)
+- **Acceptance**: Create 3 bots (BTC, ETH, SOL), start all, each trades independently, stop one without affecting others
+
+### T38. Autonomous Strategy Selection Engine 🔴 CRITICAL
+- [ ] **Phase 8a: Strategy scoring model** ([backend/src/strategies/selector.py](backend/src/strategies/selector.py))
+    - For each registered strategy, maintain performance metrics per regime:
+        ```python
+        StrategyScore {
+            strategy_name: str
+            regime: str           # 'trending' | 'ranging' | 'volatile'
+            sharpe_ratio: float
+            win_rate: float
+            profit_factor: float
+            sample_size: int      # number of trades in this regime
+            last_updated: int
+        }
+        ```
+    - Store as `:StrategyScore` nodes in Memgraph, linked to `:Strategy` nodes
+    - Populate from backtesting results (T35) or live trading history
+    - Minimum sample size (20 trades) before strategy is eligible for auto-selection
+- [ ] **Phase 8b: Selection algorithm**
+    - When bot is in `mode: 'auto'`:
+        1. Detect current regime via `analyze_regime` (existing)
+        2. Query all strategy scores for that regime
+        3. Rank by composite score: `0.4 * sharpe + 0.3 * profit_factor + 0.3 * win_rate`
+        4. Select top strategy; if tie, prefer strategy with larger sample size
+        5. If regime changes → re-evaluate and rotate strategy
+    - Cooldown: don't rotate strategy more than once per 4 hours (avoid churn)
+    - Log rotation events: `:Signal {type: 'strategy_rotation', from: X, to: Y, reason: 'regime_change'}`
+- [ ] **Phase 8c: Manual override**
+    - When bot `mode: 'manual'` → lock to user-specified strategy, ignore regime changes
+    - API: `PUT /api/bots/{id}` with `{mode: 'manual', active_strategy: 'bollinger_bands'}`
+    - Dashboard shows "Auto" or "Manual" badge per bot
+- **Effort**: ~2 days | **Depends on**: T35 (backtest data for scoring), T37 (bot model)
+- **Acceptance**: Bot in auto mode switches from ADX Trend → Bollinger Bands when regime flips from TRENDING → RANGING
+
+### T39. TA-Lib Migration & Indicator Service 🟠 HIGH
+- [ ] **Phase 9a: Replace pandas-ta with TA-Lib**
+    - TA-Lib already installed in Docker image
+    - Update all 5 built-in strategies to use `talib.*` instead of `pandas_ta.*`:
+        - `adx_trend.py`: `talib.ADX()`, `talib.EMA()`
+        - `bollinger_bands.py`: `talib.BBANDS()`, `talib.RSI()`
+        - `breakout.py`: replace pandas-ta Donchian with manual or TA-Lib `talib.MAX()`/`talib.MIN()`
+        - `ema_volume.py`: `talib.EMA()`, `talib.SMA()`
+        - `z_score.py`: `talib.STDDEV()`, `talib.SMA()`
+    - Remove `pandas-ta` from requirements.txt
+    - Verify all existing tests pass after migration
+- [ ] **Phase 9b: Indicator catalog API**
+    - `GET /api/indicators` — returns all 158 TA-Lib functions grouped by category
+    - Response includes: function name, group, input params with defaults, output names
+    - Use `talib.get_function_groups()` and `talib.abstract.Function()` for introspection
+    - Categories: Overlap Studies (17), Momentum (30), Volume (3), Volatility (3), Price Transform (4), Cycle (5), Pattern Recognition (61), Math Operators (11), Statistic Functions (9)
+- [ ] **Phase 9c: Indicator computation endpoint**
+    - `POST /api/indicators/compute` — compute any indicator on given OHLCV data
+    - Used by Strategy Editor for preview charts
+    - Input: `{function: "RSI", params: {timeperiod: 14}, symbol: "BTC/USDT", timeframe: "1h"}`
+    - Output: array of values aligned with candle timestamps
+- **Effort**: ~2 days | **Note**: TA-Lib is already installed per user confirmation
+- **Acceptance**: All 5 strategies produce identical signals before/after migration; indicator catalog API returns all 158 functions
+
+### T40. Custom Strategy System (CRUD + Execution) 🟠 HIGH
+- [ ] **Phase 10a: Custom strategy data model**
+    - New node: `:CustomStrategy {name, description, regime_affinity, entry_long, entry_short, exit_long, exit_short, indicators, risk_overrides, created_at, updated_at, created_by}`
+    - `entry_long` / `entry_short` / `exit_long` / `exit_short`: JSON arrays of conditions
+    - Each condition: `{indicator: "RSI", operator: "<", value: 30}`
+    - `indicators`: JSON array of `{function: "RSI", params: {timeperiod: 14}, output_name: "rsi_14"}`
+- [ ] **Phase 10b: Custom strategy CRUD API**
+    - `GET /api/strategies` — list all strategies (built-in read-only + custom editable)
+    - `GET /api/strategies/{name}` — strategy detail with parameters
+    - `POST /api/strategies` — save new custom strategy (auth required)
+    - `PUT /api/strategies/{name}` — update custom strategy (auth, only user-created)
+    - `DELETE /api/strategies/{name}` — delete custom strategy (auth, only user-created)
+    - Built-in strategies (ADX Trend, Bollinger, etc.) cannot be modified or deleted
+- [ ] **Phase 10c: Custom strategy executor** ([backend/src/strategies/custom_executor.py](backend/src/strategies/custom_executor.py))
+    - `CustomStrategyExecutor(BaseStrategy)` — dynamically evaluates conditions
+    - Computes all required TA-Lib indicators from OHLCV data
+    - Evaluates entry/exit conditions: supports `>`, `<`, `>=`, `<=`, `crosses_above`, `crosses_below`
+    - `crosses_above`: previous bar indicator < value AND current bar indicator >= value
+    - Register in strategy registry dynamically at bot startup
+- [ ] **Phase 10d: Integration with Strategy Lab**
+    - Custom strategies appear alongside built-in in all dropdowns
+    - Backtesting (T35) works with custom strategies
+    - Autonomous selector (T38) can include custom strategies if they have enough backtest data
+- **Effort**: ~3 days | **Depends on**: T39 (TA-Lib indicators)
+- **Acceptance**: Create custom strategy "RSI Bounce" (RSI<30 entry, RSI>70 exit), backtest it, deploy on a bot
+
+### T41. Environment Variable Management API 🟠 HIGH
+- [ ] **Phase 11a: Env reader/writer** ([backend/src/api/routes/env.py](backend/src/api/routes/env.py))
+    - `GET /api/env` — read `.env` file, return variables grouped by category
+    - Mask secrets: BINANCE_API_KEY, BINANCE_SECRET, MEMGRAPH_PASSWORD, OMNITRADER_API_KEY → show `•••••`
+    - Categories: Binance API, Database, Redis, Notifications, Security
+    - Include metadata: `{key, value, masked, category, description, requires_restart}`
+- [ ] **Phase 11b: Env updater**
+    - `PUT /api/env` — update `.env` file (auth required)
+    - Validate: non-empty required fields, valid port numbers, valid URLs
+    - Write atomically: write to `.env.tmp`, then rename to `.env`
+    - Return `{requires_restart: boolean}` — true if any changed var needs service restart
+    - Log all env changes to `:Signal {type: 'config_change', ...}` for audit trail
+- [ ] **Phase 11c: Service restart endpoint**
+    - `POST /api/system/restart` — trigger Docker Compose restart (auth required)
+    - Uses `subprocess` to run `docker compose restart` (or reload specific services)
+    - Must confirm via request body: `{confirm: true}`
+- **Effort**: ~1 day
+- **Acceptance**: Change DISCORD_WEBHOOK_URL from Settings page, verify .env updated; change REDIS_PORT, see restart warning
+
+### T42. Markets Discovery API 🟠 HIGH
+- [ ] **Phase 12a: Markets endpoint** ([backend/src/api/routes/markets.py](backend/src/api/routes/markets.py))
+    - `GET /api/markets` — fetch all tradeable futures pairs from Binance
+    - Use exchange adapter: `exchange.fetch_markets()` or Binance REST `/fapi/v1/exchangeInfo`
+    - Return: `[{symbol, base, quote, min_size, tick_size, volume_24h, last_price, status}]`
+    - Filter: only active pairs, optionally filter by quote currency (USDT)
+    - Cache: Redis with 5-minute TTL (market info doesn't change frequently)
+- [ ] **Phase 12b: Market search**
+    - Query param: `GET /api/markets?search=ETH&quote=USDT`
+    - Used by frontend "Add Bot" symbol picker — searchable with volume + price display
+- **Effort**: ~1 day | **Depends on**: T36 (exchange adapter)
+- **Acceptance**: Frontend symbol picker shows all Binance Futures USDT pairs with volume and price
 
 ---
 

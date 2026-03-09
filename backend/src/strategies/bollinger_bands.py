@@ -10,9 +10,9 @@ Logic:
 from typing import Any, Dict, List
 
 import pandas as pd
-import pandas_ta as ta
 import structlog
 
+from src import indicators
 from src.analysis.regime import MarketRegime
 from src.config import Config
 
@@ -82,7 +82,9 @@ class BollingerBandsStrategy(BaseStrategy):
 
         try:
             # Calculate Bollinger Bands
-            bb = ta.bbands(ohlcv["close"], length=self.bb_length, std=self.bb_std)
+            bb = indicators.bbands(
+                ohlcv["close"], length=self.bb_length, std=self.bb_std
+            )
             # pandas-ta returns column names like BBL_20_2.0, BBM_20_2.0, BBU_20_2.0
             # Need to find them dynamically or construct the string
             if bb is not None and not bb.empty:
@@ -110,7 +112,7 @@ class BollingerBandsStrategy(BaseStrategy):
                             self.upper_band = bb[col].iloc[-1]
 
             # Calculate RSI
-            rsi_series = ta.rsi(ohlcv["close"], length=self.rsi_length)
+            rsi_series = indicators.rsi(ohlcv["close"], length=self.rsi_length)
             if rsi_series is not None and not rsi_series.empty:
                 self.rsi = rsi_series.iloc[-1]
 

@@ -10,9 +10,9 @@ Logic:
 from typing import Any, Dict, List
 
 import pandas as pd
-import pandas_ta as ta
 import structlog
 
+from src import indicators
 from src.analysis.regime import MarketRegime
 from src.config import Config
 
@@ -72,7 +72,7 @@ class BreakoutStrategy(BaseStrategy):
 
         try:
             # Calculate Donchian Channels
-            donchian = ta.donchian(
+            donchian = indicators.donchian(
                 ohlcv["high"],
                 ohlcv["low"],
                 lower_length=self.donchian_period,

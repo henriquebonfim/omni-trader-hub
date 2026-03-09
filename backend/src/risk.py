@@ -14,8 +14,9 @@ from datetime import date
 from typing import Optional
 
 import pandas as pd
-import pandas_ta as ta
 import structlog
+
+from src import indicators
 
 from .config import get_config
 
@@ -406,7 +407,7 @@ class RiskManager:
             )
 
         try:
-            atr = ta.atr(
+            atr = indicators.atr(
                 ohlcv["high"], ohlcv["low"], ohlcv["close"], length=self.atr_period
             )
             if atr is None or atr.empty:

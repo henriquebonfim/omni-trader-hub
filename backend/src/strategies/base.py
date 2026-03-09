@@ -10,9 +10,9 @@ from enum import Enum
 from typing import Any, Dict, List
 
 import pandas as pd
-import pandas_ta as ta
 import structlog
 
+from src import indicators
 from src.analysis.regime import MarketRegime
 from src.config import Config
 
@@ -293,7 +293,7 @@ class BaseStrategy(ABC):
             return "neutral"
 
         try:
-            ema = ta.ema(ohlcv["close"], length=period)
+            ema = indicators.ema(ohlcv["close"], length=period)
             if ema is None or pd.isna(ema.iloc[-1]):
                 return "neutral"
 

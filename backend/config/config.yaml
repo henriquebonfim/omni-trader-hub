@@ -1,9 +1,3 @@
-exchange:
-  leverage: 3
-  margin_type: isolated
-  name: binance
-  paper_mode: true
-  testnet: false
 database:
   encrypted: false
   host: ${MEMGRAPH_HOST}
@@ -11,13 +5,19 @@ database:
   port: ${MEMGRAPH_PORT}
   type: memgraph
   username: ${MEMGRAPH_USERNAME}
+exchange:
+  leverage: 3
+  margin_type: isolated
+  name: binance
+  paper_mode: true
+  testnet: false
+notifications:
+  discord_webhook: ${DISCORD_WEBHOOK_URL}
+  enabled: true
 redis:
   db: 1
   host: ${REDIS_HOST}
   port: ${REDIS_PORT}
-notifications:
-  discord_webhook: ${DISCORD_WEBHOOK_URL}
-  enabled: true
 risk:
   atr_multiplier_sl: 1.5
   atr_multiplier_tp: 2.0

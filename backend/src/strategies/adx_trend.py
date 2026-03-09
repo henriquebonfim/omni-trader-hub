@@ -10,9 +10,9 @@ Logic:
 from typing import Any, Dict, List
 
 import pandas as pd
-import pandas_ta as ta
 import structlog
 
+from src import indicators
 from src.analysis.regime import MarketRegime
 from src.config import Config
 
@@ -71,7 +71,7 @@ class ADXTrendStrategy(BaseStrategy):
 
         try:
             # Calculate ADX
-            adx_df = ta.adx(
+            adx_df = indicators.adx(
                 ohlcv["high"], ohlcv["low"], ohlcv["close"], length=self.adx_period
             )
 

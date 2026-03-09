@@ -2,7 +2,8 @@
 
 Items requiring design decisions, external dependencies, or are lower-priority long-term investments. Reviewed each sprint — promote to TODO when scoped and ready.
 
-> Last updated: 2026-03-05 | **MAJOR CONSOLIDATION (2026-03-05)**: Memgraph replaces PostgreSQL + Neo4j + QuestDB. B1→T35, B4→T34, B11/B12→Memgraph, B13→T33, B14→absorbed into T34. Completed: B8, B9
+> Last updated: 2026-03-09 | **MULTI-ASSET PLATFORM EXPANSION (2026-03-09)**: B6→T37 (Bot Management), new T38-T42 added. Added B16-B20 for frontend nice-to-haves.
+> Previous: 2026-03-05 — Memgraph consolidation: B1→T35, B4→T34, B11/B12→Memgraph, B13→T33, B14→absorbed. Completed: B8, B9
 
 ---
 
@@ -42,13 +43,12 @@ Items requiring design decisions, external dependencies, or are lower-priority l
 - **Depends on**: Multi-timeframe data pipeline (currently only primary TF analyzed)
 
 ### B6. Portfolio Construction / Multi-Asset
-- **Priority**: MEDIUM
-- **Design needed**:
-    - Asset selection criteria (liquidity minimums, correlation caps)
-    - Correlation management: max pairwise correlation exposure (BTC/ETH ~0.85 — don't long both)
-    - Capital allocation: equal-risk vs. volatility-parity vs. Kelly criterion
+- **Status**: ✅ **PROMOTED to T37** (2026-03-09) — Multi-Asset Bot Management API
+- **Change**: Bot-per-asset model implemented in T37 with per-bot risk isolation and global portfolio risk
+- **Remaining advanced features** (deferred to post-T37):
+    - Correlation management: max pairwise correlation exposure (B6 concern → T37 Phase 7d warns but doesn't block)
+    - Capital allocation modes: equal-risk vs. volatility-parity vs. Kelly criterion
     - Sector exposure caps (L1s, DeFi, memes)
-    - Risk: `min_size` is currently hardcoded for BTC (T27)
 
 ### B7. Execution Optimization
 - **Priority**: MEDIUM
@@ -101,9 +101,47 @@ ELIMINATED** (2026-03-05) — Memgraph is schemaless; no migrations needed
 - Implement MAGE GPU algorithms: Louvain community detection, Betweenness centrality
 - GNN model training via PyTorch Geometric
 - Timeline: When multi-pair scaling or GPU hardware justified
-### B13. Ollama Intelligence Sidecar
-- Local LLM for trade post-mortems, market narrative summaries, sentiment filtering. Phase 4 vision item.
 
-### B14. Semi-Automatic Mode
-- **Status**: ✅ **PROMOTED to TASKS.md T31** (2026-03-05)
-- **Next**: Design approval UI and timeout logic
+---
+
+## 🔵 New Items (2026-03-09 — Frontend-Driven)
+
+> These items are features visible in PROMPT.md (frontend spec) that are nice-to-have and not yet scoped for a sprint.
+
+### B16. Drag-and-Drop Strategy Builder (Visual)
+- **Priority**: LOW (nice-to-have)
+- **Design needed**: Visual node-based editor for strategy conditions (entry/exit)
+- Currently the Strategy Lab uses form-based condition entry (T40). A visual drag-and-drop builder would be a UX upgrade.
+- **Depends on**: T40 (Custom Strategy System must work first)
+- **Frontend**: Would replace `StrategyConditionBuilder` component with a canvas-based node editor
+- **Backend**: No new backend work — same Custom Strategy JSON format
+
+### B17. Correlation Matrix Dashboard
+- **Priority**: LOW (nice-to-have)
+- **Design needed**: Real-time correlation heatmap across all active bot pairs
+- Compute: rolling N-bar Pearson correlation between all pairs of bot symbols
+- Data source: `:Candle` nodes from Memgraph, compute via numpy
+- **Backend**: `GET /api/analytics/correlations` — returns NxN matrix
+- **Depends on**: T37 (must have multiple bots to correlate)
+- **Frontend**: Heatmap component in Risk Monitor page
+
+### B18. Trade Journal / Post-Mortem Annotations
+- **Priority**: LOW
+- **Design needed**: Allow user to annotate completed trades with notes, tags, and lessons learned
+- Store as properties on `:Trade` nodes or separate `:Annotation` nodes
+- Frontend: expandable row in Trade History table with text editor
+- Ollama integration (T33): auto-generate trade post-mortem summary
+
+### B19. Alert / Notification Center
+- **Priority**: MEDIUM
+- **Design needed**: In-app notification bell + configurable alert rules
+- Alert types: circuit breaker triggered, strategy rotation, regime change, daily PnL threshold, position opened/closed
+- Delivery: WebSocket push → frontend notification queue + optional Discord webhook
+- **Backend**: Alert rule engine with user-defined thresholds
+- **Depends on**: T37 (per-bot events), existing Discord webhook (T10)
+
+### B20. Dark/Light Theme Toggle
+- **Priority**: LOW
+- **Design needed**: CSS variable-based theme system
+- Currently all PROMPT.md designs assume dark theme (zinc-950 background)
+- Frontend-only change — no backend work needed

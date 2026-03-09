@@ -1,8 +1,38 @@
-# OmniTrader Backend
-FROM python:3.13-slim
+# Build stage
+FROM python:3.12-slim AS builder
 
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
+ARG TALIB_VERSION=0.6.4
+ARG TALIB_SHA256=aa04066d17d69c73b1baaef0883414d3d56ab3775872d82916d1cdb376a3ae86
+
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN curl -fSL "https://github.com/TA-Lib/ta-lib/releases/download/v${TALIB_VERSION}/ta-lib-${TALIB_VERSION}-src.tar.gz" -o /tmp/ta-lib.tar.gz && \
+    echo "${TALIB_SHA256}  /tmp/ta-lib.tar.gz" | sha256sum -c - && \
+    tar -xzf /tmp/ta-lib.tar.gz -C /tmp && \
+    cd /tmp/ta-lib-${TALIB_VERSION} && \
+    ./configure --prefix=/usr && \
+    make -j$(nproc) && \
+    make install && \
+    rm -rf /tmp/ta-lib*
+
+RUN pip install --no-cache-dir --upgrade pip setuptools wheel
+
+COPY requirements.txt .
+RUN pip install --no-cache-dir --prefix=/install -r requirements.txt
+RUN pip install --no-cache-dir --prefix=/install --ignore-installed packaging==26.0
+
+
+# Runtime image
+FROM python:3.12-slim
+
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
+ENV LD_LIBRARY_PATH=/usr/lib
 
 WORKDIR /app
 
@@ -11,23 +41,16 @@ RUN apt-get update && apt-get install -y \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Python dependencies
-COPY requirements.txt .
-ARG DEV=false
-RUN pip install --no-cache-dir -r requirements.txt
-# If DEV=true, we would copy and install requirements-dev.txt here,
-# but it's excluded by .dockerignore by default.
-# For a full dev build, you would need to adjust .dockerignore.
+COPY --from=builder /usr/lib/libta-lib* /usr/lib/
+COPY --from=builder /install /usr/local
 
-# Copy source
+RUN mkdir -p data && \
+    useradd -m appuser && \
+    chown -R appuser /app
+
 COPY src/ ./src/
 COPY config/ ./config/
 
-# Data directory (will be volume-mounted in compose)
-RUN mkdir -p data
-
-# Non-root user
-RUN useradd -m appuser && chown -R appuser /app
 USER appuser
 
 EXPOSE 8000

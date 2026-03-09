@@ -1,17 +1,19 @@
 # OmniTrader — Roadmap
 
-**Version**: 1.1
-**Date**: 2026-03-03
+**Version**: 2.0
+**Date**: 2026-03-09
 **Author**: AI Product Owner & Finance Strategist
-**Status**: Post-Audit — Critical fixes required before live trading
+**Status**: Multi-Asset Autonomous Platform — Backend expansion in progress
 
 ---
 
 ## 🔹 Executive Summary
 
-OmniTrader is a **self-hosted, automated BTC/USDT Futures trading bot** targeting sustainable risk-adjusted returns through a portfolio of quantitative strategies on Binance. The system is currently an MVP with paper trading, a single-pair focus (BTC/USDT), 5 pluggable strategies, and a React dashboard for monitoring.
+OmniTrader is a **self-hosted, multi-asset autonomous crypto futures trading platform** targeting sustainable risk-adjusted returns through a portfolio of quantitative strategies on Binance. The system supports multiple independent bots (one per trading pair), autonomous strategy selection based on regime classification, and a full-featured React dashboard for management, analytics, and strategy design.
 
-**Current state**: Working MVP with EMA, ADX, Bollinger Bands, Breakout, and Z-Score strategies — all paper-traded with simulated capital. Infrastructure includes: risk management layer (position sizing, SL/TP, circuit breakers, trailing stops, black swan detection, auto-deleverage), FastAPI backend, **Celery worker offloading**, **WebSocket live feed** (CCXT Pro), **PostgreSQL** + SQLite dual database support, **Redis state persistence**, external **watchdog** process, and Docker Compose deployment (7 services).
+**Current state**: Working MVP with EMA, ADX, Bollinger Bands, Breakout, and Z-Score strategies — paper-traded with simulated capital. Infrastructure includes: risk management layer (position sizing, SL/TP, circuit breakers, trailing stops, black swan detection, auto-deleverage), FastAPI backend, **Celery worker offloading**, **WebSocket live feed** (CCXT Pro), **Memgraph** graph database (replaced PostgreSQL + Neo4j + QuestDB), **Redis state persistence**, **Ollama** NLP sidecar, external **watchdog** process, and Docker Compose deployment (9 services). **TA-Lib** installed for 158+ indicator functions.
+
+**Platform evolution (2026-03-09)**: Expanding from single BTC/USDT pair to multi-asset bot management. Each bot trades a specific pair with its own strategy, risk parameters, and lifecycle. An autonomous strategy selection engine picks the optimal strategy per regime. Users can create custom strategies via TA-Lib indicator combinations. Frontend dashboard (PROMPT.md) designed with 9 pages covering bot management, intelligence, charting, backtesting, risk monitoring, trade history, strategy lab, and settings.
 
 **Product thesis**: Generate consistent, positive expectancy returns by combining trend-following and mean-reversion strategies with strict risk management, regime awareness, and disciplined position sizing — **not** by promising outsized returns.
 
@@ -168,19 +170,34 @@ The current codebase implements 5 strategies. Below is a financially rigorous as
 
 ### Strategy Composition Recommendation
 
+> **Updated 2026-03-09**: With autonomous strategy selection (T38), bots auto-pick the best strategy per regime based on backtest/live scoring. Manual override still available.
+
 ```
-Priority 1: ADX Trend (primary signal)
-  + Regime Classifier ✅ implemented — BUT needs hysteresis fix (TASKS T13)
-  + ATR-based stops — configured but NOT wired to exchange orders (TASKS T9)
+Auto Mode (T38 — Autonomous Strategy Selection):
+  Per bot, per regime, the selector picks the highest-scoring strategy:
+  - TRENDING regime  → likely ADX Trend or EMA Volume (trend-following)
+  - RANGING regime   → likely Bollinger Bands or Z-Score (mean-reversion)
+  - VOLATILE regime  → reduced sizing, possibly ADX Trend with tighter stops
+  Scoring: 0.4×Sharpe + 0.3×ProfitFactor + 0.3×WinRate (min 20 trades)
+  Cooldown: min 4h between strategy rotations
 
-Priority 2: Bollinger/Z-Score (ONLY in classified ranging regime)
-  + Must be DISABLED during trending regime ✅ (regime gating works)
-  + ⚠️ Both use level-based signals — add cooldown to prevent re-entry grinding (TASKS T15)
-  + ⚠️ Z-Score assumes normality — crypto fat tails make 2σ less extreme than modeled
+Manual Mode (user locks strategy):
+  Bot uses the specified strategy regardless of regime.
+  Dashboard shows "Manual 🔒" badge.
 
-Priority 3: Breakout — CURRENTLY NON-FUNCTIONAL
-  + Donchian current-bar inclusion bug makes signals nearly impossible (TASKS T14)
-  + Must fix before any deployment, even in paper mode
+Custom Strategies (T40):
+  Users build strategies from TA-Lib indicator conditions.
+  Custom strategies participate in auto-selection once backtested (≥20 trades).
+
+Legacy Recommendation (still valid for initial deploy):
+  Priority 1: ADX Trend (primary signal)
+    + Regime Classifier ✅ implemented — needs hysteresis fix (T13)
+    + ATR-based stops — configured but NOT wired to exchange orders (T9)
+
+  Priority 2: Bollinger/Z-Score (ONLY in classified ranging regime)
+    + Must be DISABLED during trending regime ✅ (regime gating works)
+
+  Priority 3: Breakout — fix Donchian bug (T14) before any deployment
 
 DO NOT: Run all strategies simultaneously without regime awareness.
          This is the #1 failure mode of retail bots.
@@ -212,8 +229,8 @@ Priority 5: Growth                 → Only after 1–4 are satisfied
 |-----------|--------------|-------------|-----------|
 | **Model** | Fixed % (2%) | Volatility-adjusted (ATR-based) | Fixed % ignores market conditions; 2% in low-vol ≠ 2% in high-vol |
 | **Position size** | 2% of wallet per trade | 0.5–3% scaled by 14-day ATR | Reduces size in volatile markets, increases in calm |
-| **Max concurrent positions** | 1 | 1 (scale to 3 at P3) | Single-pair limits diversification; OK for MVP |
-| **Max portfolio exposure** | 6% (2% × 3x leverage) | ≤20% notional at 3x | Current is conservative. Good. |
+| **Max concurrent positions** | 1 | 1–5 per bot (T37), configurable global max | Multi-asset bot model supports multiple pairs simultaneously |
+| **Max portfolio exposure** | 6% (2% × 3x leverage) | ≤20% notional at 3x, split across bots | Portfolio-level risk managed by BotManager (T37) |
 
 ### Stop Loss / Take Profit
 
@@ -248,11 +265,18 @@ Priority 5: Growth                 → Only after 1–4 are satisfied
 
 ### Correlation & Diversification
 
-For single-pair (BTC/USDT) — not applicable yet. When multi-pair is added (P2 #69):
+Multi-asset bot management (T37) introduces portfolio-level concerns:
 
-- Max correlation exposure: 0.7 (BTC/ETH corr is ~0.85 — don't long both)
-- Max sector exposure: 60% in any single sector (L1s, DeFi, memes)
-- BTC dominance as correlation proxy: >60% BTC.D = only trade BTC
+- **Per-bot risk isolation**: Each bot has independent daily loss tracker, circuit breakers, position limits
+- **Global portfolio risk**:
+    - Max total allocation: sum of all bot allocations ≤ 100% of capital
+    - Global drawdown circuit breaker: combined portfolio drops >10% from HWM → pause all bots
+    - Max concurrent positions: configurable (default 5)
+- **Correlation management** (T37 Phase 7d):
+    - Max correlation exposure: 0.7 (BTC/ETH corr ~0.85 — warn when adding both)
+    - Alert on high-correlation pair addition (warn but don't block)
+    - Future: correlation matrix dashboard (BACKLOG B17)
+- **BTC dominance as correlation proxy**: >60% BTC.D = consider reducing alt exposure
 
 ---
 
@@ -316,21 +340,27 @@ The current crisis exposes gaps in the data pipeline. The following are now high
 ```mermaid
 graph TB
     subgraph "Backend (Python 3.12)"
-        ML["Main Loop (30s cycle)"]
-        ST["Strategy Engine (5 strategies)"]
+        BM["Bot Manager (multi-bot orchestrator)"]
+        BOT1["Bot: BTC/USDT"]
+        BOT2["Bot: ETH/USDT"]
+        BOT3["Bot: SOL/USDT"]
+        ST["Strategy Engine (5 built-in + custom)"]
+        SEL["Strategy Selector (autonomous)"]
         RG["Regime Classifier (ADX/ATR)"]
-        RM["Risk Manager"]
-        EX["Exchange (CCXT + CCXT Pro)"]
-        DB["Database (Postgres / SQLite)"]
-        RD["Redis (state + broker)"]
+        RM["Risk Manager (per-bot + global portfolio)"]
+        EX["Exchange (CCXT + CCXT Pro, multi-symbol)"]
+        DB["Memgraph (graph DB)"]
+        RD["Redis (state + broker + cache)"]
         NT["Notifier (Discord)"]
         API["FastAPI Server"]
-        WS["WebSocket Feed (CCXT Pro)"]
-        RL["Rate Limiter (leaky bucket)"]
+        WS["WebSocket Feed (CCXT Pro, multi-pair)"]
+        RL["Rate Limiter (leaky bucket, shared)"]
+        TALIB["TA-Lib (158+ indicators)"]
+        OLL["Ollama (NLP/sentiment)"]
     end
 
     subgraph "Workers"
-        CW["Celery Worker (analysis)"]
+        CW["Celery Worker (analysis, backtest)"]
     end
 
     subgraph "Monitoring"
@@ -338,19 +368,31 @@ graph TB
     end
 
     subgraph "Frontend (Vite + React)"
-        DASH["Dashboard"]
+        DASH["Dashboard (portfolio overview)"]
+        BOTS["Bots & Assets (CRUD, lifecycle)"]
+        INTEL["Intelligence (NLP, graph)"]
+        CHART["Candlestick Charts"]
+        BT["Backtesting Engine"]
+        RISK["Risk Monitor"]
         TRADES["Trade History"]
-        CONF["Config Editor"]
-        CTRL["Bot Controls"]
+        SLAB["Strategy Lab (custom strategies)"]
+        SETT["Settings (env, config)"]
     end
 
     subgraph "Binance"
         BIN_API["Futures API"]
-        BIN_WS["WebSocket Feed"]
+        BIN_WS["WebSocket Feed (multi-pair)"]
     end
 
-    ML --> ST
-    ML --> RG
+    BM --> BOT1
+    BM --> BOT2
+    BM --> BOT3
+    BOT1 --> ST
+    BOT2 --> ST
+    BOT3 --> ST
+    ST --> TALIB
+    SEL --> RG
+    SEL --> ST
     ST --> CW
     RG --> CW
     ST --> RM
@@ -358,12 +400,17 @@ graph TB
     EX --> RL
     RL --> BIN_API
     WS --> BIN_WS
-    ML --> DB
-    ML --> RD
-    ML --> NT
+    BM --> DB
+    BM --> RD
+    BM --> NT
+    OLL --> CW
     API --> DB
+    API --> BM
     WS --> DASH
     DASH --> API
+    BOTS --> API
+    SLAB --> API
+    SETT --> API
     WD --> API
 ```
 
@@ -462,13 +509,18 @@ graph TB
 
 | Data | Source | Frequency | Purpose | Current |
 |------|--------|-----------|---------|---------|
-| OHLCV (15m) | Binance REST | Every 60s | Strategy signals | ✅ |
+| OHLCV (15m) | Binance REST/WS | Every 60s | Strategy signals | ✅ |
 | OHLCV (1h, 4h, 1d) | Binance REST | Every cycle | Multi-TF analysis | ❌ Needed for P2 |
+| OHLCV (multi-pair) | Binance WS | Real-time | Per-bot strategy signals (T37) | 🔄 Planned |
 | Account balance | Binance REST | Every cycle | Position sizing | ✅ |
-| Open positions | Binance REST | Every cycle | State management | ✅ |
+| Open positions (multi) | Binance REST | Every cycle | Per-bot state management (T37) | 🔄 Planned |
+| Markets / tradeable pairs | Binance REST | Every 5min | Bot creation: symbol picker (T42) | 🔄 Planned |
+| TA-Lib indicators (158+) | Computed locally | Per cycle | Strategy signals + custom strategies (T39, T40) | ✅ Installed |
+| Strategy scores | Memgraph | Per trade | Autonomous strategy selection (T38) | 🔄 Planned |
+| Custom strategy configs | Memgraph | On demand | Strategy Lab CRUD (T40) | 🔄 Planned |
 | Funding rate | Binance REST | Every 8h | Cost tracking | ❌ Needed for P1 |
 | Order book (L2) | Binance WS | Real-time | Liquidity analysis | ❌ Needed for P2 |
-| Historical trades (backtest) | Binance/Kaggle | Once | Backtesting | ❌ Needed for P3 |
+| Historical trades (backtest) | Binance/Kaggle | Once | Backtesting (T35) | 🔄 Planned |
 | BTC dominance | CoinGecko | Daily | Regime analysis | ❌ Needed for P4 |
 | DXY index | FRED/Yahoo | Daily | Macro correlation | ❌ Needed for P4 |
 | Fear & Greed Index | Alternative.me | Daily | Sentiment filter | ❌ Needed for P4 |

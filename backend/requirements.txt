@@ -1,28 +1,74 @@
-# OmniTrader MVP Dependencies
-# Note: CCXT 4.4.0+ added Lighter.AI exchange (lighter-client not on PyPI)
-# GitHub installation has setuptools issues. Using stable PyPI version 4.3.x
-ccxt>=4.0.0,<4.4.0
-pandas>=2.0.0
-# TODO(T25): pandas-ta is unmaintained (last release 2022). Consider ta-lib or manual indicators.
-pandas-ta>=0.3.14b
-pyyaml>=6.0
-neo4j>=5.18
-redis>=5.0.0
-httpx>=0.25.0
-python-dotenv>=1.0.0
-structlog>=23.0.0
+# ============================================================================
+# OmniTrader Production Dependencies
+# ============================================================================
+# This file contains ONLY runtime dependencies for production deployment.
+# Development tools (linters, tests) are in requirements-dev.txt
+# ============================================================================
 
-# Database migrations
-sqlalchemy>=2.0.0
+# Core Trading Infrastructure
+# ----------------------------------------------------------------------------
+# CCXT: Cryptocurrency exchange integration
+ccxt==4.5.42
 
-# Celery worker offloading (broker + result backend = existing Redis)
-celery[redis]>=5.3.0
+# aiohttp: Required for ccxt.pro WebSocket support
+aiohttp==3.13.3
 
-# API / Dashboard
-fastapi>=0.111.0
-uvicorn[standard]>=0.29.0
-websockets>=12.0
-python-multipart>=0.0.9
+# Data Analysis
+# ----------------------------------------------------------------------------
+# Explicit numpy pin for reproducibility and numeric stack stability.
+numpy==2.4.2
 
-# NOTE: For production deployments, use requirements.lock for reproducible builds.
-# Generate with: pip freeze > requirements.lock
+# Pandas pin aligned to the latest stable release.
+pandas==3.0.1
+
+# TA-Lib: Technical analysis library (requires C library installed)
+TA-Lib==0.6.8
+
+# Configuration & Environment
+# ----------------------------------------------------------------------------
+pyyaml==6.0.3
+python-dotenv==1.2.2
+packaging==26.0
+
+# Logging
+# ----------------------------------------------------------------------------
+structlog==25.5.0
+
+# Database
+# ----------------------------------------------------------------------------
+# neo4j: Memgraph uses neo4j driver protocol
+neo4j==6.1.0
+
+# Redis: Cache & message broker
+# Pinned to latest stable compatible with celery/kombu redis extra (<6.5)
+redis==6.4.0
+
+# Async Task Queue
+# ----------------------------------------------------------------------------
+# Celery with Redis backend for regime/strategy analysis offloading
+celery[redis]==5.6.2
+
+# HTTP Client
+# ----------------------------------------------------------------------------
+# httpx: Async HTTP for Discord webhooks and external APIs
+httpx==0.28.1
+
+# Web API
+# ----------------------------------------------------------------------------
+fastapi==0.135.1
+
+# uvicorn with standard extras (websockets, httptools, uvloop)
+uvicorn[standard]==0.41.0
+
+# ============================================================================
+# Production Deployment Notes
+# ============================================================================
+# For reproducible builds, generate a lock file:
+#   pip freeze > requirements.lock
+#
+# Security audits:
+#   pip-audit requirements.txt
+#
+# Update check:
+#   pip list --outdated
+# ============================================================================

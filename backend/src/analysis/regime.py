@@ -1,8 +1,9 @@
 from enum import Enum
 
 import pandas as pd
-import pandas_ta as ta
 import structlog
+
+from src import indicators
 
 logger = structlog.get_logger()
 
@@ -54,7 +55,7 @@ class RegimeClassifier:
 
         try:
             # Calculate ADX for Trend Strength
-            adx_df = ta.adx(
+            adx_df = indicators.adx(
                 ohlcv["high"], ohlcv["low"], ohlcv["close"], length=self.adx_period
             )
             if adx_df is None or adx_df.empty:
@@ -68,7 +69,7 @@ class RegimeClassifier:
             current_adx = adx_df[adx_col].iloc[-1]
 
             # Calculate ATR for Volatility
-            atr = ta.atr(
+            atr = indicators.atr(
                 ohlcv["high"], ohlcv["low"], ohlcv["close"], length=self.atr_period
             )
             if atr is None or atr.empty:
@@ -78,7 +79,7 @@ class RegimeClassifier:
 
             # Calculate SMA of ATR for baseline volatility (use 2x period for smoothing)
             # We need to fillna or handle early NaN values if dataframe is short
-            atr_sma = ta.sma(atr, length=self.atr_period * 2)
+            atr_sma = indicators.sma(atr, length=self.atr_period * 2)
 
             if atr_sma is None or atr_sma.empty or pd.isna(atr_sma.iloc[-1]):
                 # Fallback: if not enough data for SMA, compare to recent average manually or skip volatility check

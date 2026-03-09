@@ -10,9 +10,9 @@ Logic:
 from typing import Any, Dict, List
 
 import pandas as pd
-import pandas_ta as ta
 import structlog
 
+from src import indicators
 from src.analysis.regime import MarketRegime
 from src.config import Config
 
@@ -83,9 +83,11 @@ class EMAVolumeStrategy(BaseStrategy):
             return
 
         # Calculate indicators
-        ema_fast_series = ta.ema(ohlcv["close"], length=self.ema_fast_period)
-        ema_slow_series = ta.ema(ohlcv["close"], length=self.ema_slow_period)
-        volume_sma_series = ta.sma(ohlcv["volume"], length=self.volume_sma_period)
+        ema_fast_series = indicators.ema(ohlcv["close"], length=self.ema_fast_period)
+        ema_slow_series = indicators.ema(ohlcv["close"], length=self.ema_slow_period)
+        volume_sma_series = indicators.sma(
+            ohlcv["volume"], length=self.volume_sma_period
+        )
 
         # Store current values
         self.ema_fast = ema_fast_series.iloc[-1]
