@@ -57,6 +57,25 @@ export default {
           border: "hsl(var(--sidebar-border))",
           ring: "hsl(var(--sidebar-ring))",
         },
+        trading: {
+          green: "hsl(var(--green))",
+          red: "hsl(var(--red))",
+          yellow: "hsl(var(--yellow))",
+          orange: "hsl(var(--orange))",
+          purple: "hsl(var(--purple))",
+        },
+        panel: "hsl(var(--bg-panel))",
+        "panel-hover": "hsl(var(--bg-hover))",
+        sentiment: {
+          positive: "hsl(var(--sentiment-positive))",
+          neutral: "hsl(var(--sentiment-neutral))",
+          negative: "hsl(var(--sentiment-negative))",
+        },
+        impact: {
+          high: "hsl(var(--impact-high))",
+          medium: "hsl(var(--impact-medium))",
+          low: "hsl(var(--impact-low))",
+        },
       },
       borderRadius: {
         lg: "var(--radius)",
@@ -65,25 +84,27 @@ export default {
       },
       keyframes: {
         "accordion-down": {
-          from: {
-            height: "0",
-          },
-          to: {
-            height: "var(--radix-accordion-content-height)",
-          },
+          from: { height: "0" },
+          to: { height: "var(--radix-accordion-content-height)" },
         },
         "accordion-up": {
-          from: {
-            height: "var(--radix-accordion-content-height)",
-          },
-          to: {
-            height: "0",
-          },
+          from: { height: "var(--radix-accordion-content-height)" },
+          to: { height: "0" },
+        },
+        pulse: {
+          "0%, 100%": { opacity: "1" },
+          "50%": { opacity: "0.5" },
+        },
+        "slide-in": {
+          from: { opacity: "0", transform: "translateY(-10px)" },
+          to: { opacity: "1", transform: "translateY(0)" },
         },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
         "accordion-up": "accordion-up 0.2s ease-out",
+        "pulse-slow": "pulse 2s ease-in-out infinite",
+        "slide-in": "slide-in 0.3s ease-out",
       },
     },
   },
