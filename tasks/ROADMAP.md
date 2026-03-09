@@ -3,7 +3,7 @@
 **Version**: 2.0
 **Date**: 2026-03-09
 **Author**: AI Product Owner & Finance Strategist
-**Status**: Multi-Asset Autonomous Platform — Backend expansion in progress
+**Status**: Multi-Asset Autonomous Platform — Backend expansion + frontend integration in progress
 
 ---
 
@@ -13,7 +13,7 @@ OmniTrader is a **self-hosted, multi-asset autonomous crypto futures trading pla
 
 **Current state**: Working MVP with EMA, ADX, Bollinger Bands, Breakout, and Z-Score strategies — paper-traded with simulated capital. Infrastructure includes: risk management layer (position sizing, SL/TP, circuit breakers, trailing stops, black swan detection, auto-deleverage), FastAPI backend, **Celery worker offloading**, **WebSocket live feed** (CCXT Pro), **Memgraph** graph database (replaced PostgreSQL + Neo4j + QuestDB), **Redis state persistence**, **Ollama** NLP sidecar, external **watchdog** process, and Docker Compose deployment (9 services). **TA-Lib** installed for 158+ indicator functions.
 
-**Platform evolution (2026-03-09)**: Expanding from single BTC/USDT pair to multi-asset bot management. Each bot trades a specific pair with its own strategy, risk parameters, and lifecycle. An autonomous strategy selection engine picks the optimal strategy per regime. Users can create custom strategies via TA-Lib indicator combinations. Frontend dashboard (PROMPT.md) designed with 9 pages covering bot management, intelligence, charting, backtesting, risk monitoring, trade history, strategy lab, and settings.
+**Platform evolution (2026-03-09)**: Expanding from single BTC/USDT pair to multi-asset bot management. Each bot trades a specific pair with its own strategy, risk parameters, and lifecycle. An autonomous strategy selection engine picks the optimal strategy per regime. Users can create custom strategies via TA-Lib indicator combinations. Frontend dashboard (PROMPT.md) designed with 9 pages covering bot management, intelligence, charting, backtesting, risk monitoring, trade history, strategy lab, and settings. **Frontend integration bridge (T43)** connects the new React frontend to the existing backend using adapter + stub layers — real data where backend routes exist, typed stubs for features still in development (T33-T42).
 
 **Product thesis**: Generate consistent, positive expectancy returns by combining trend-following and mean-reversion strategies with strict risk management, regime awareness, and disciplined position sizing — **not** by promising outsized returns.
 

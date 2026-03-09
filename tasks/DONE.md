@@ -202,3 +202,79 @@
 </details>
 
 ---
+
+### T32. Memgraph Infrastructure & Database Layer Rewrite ✅ **COMPLETED 2026-03-09**
+- [x] **Phase 1a: Docker infrastructure**
+    - Removed PostgreSQL service from compose.yml
+    - Added Memgraph: `memgraph/memgraph-mage:3.8.0-relwithdebinfo`
+    - Added Memgraph Lab: `memgraph/lab:latest` (port 3001 for visualization)
+    - Enabled Ollama service (GPU enabled)
+    - Updated healthchecks: Bolt ping for Memgraph via mgconsole
+    - 8 services total (down from 9, postgres removed)
+    - **Completed**: 2026-03-09 | PR #66
+
+- [x] **Phase 1b: MemgraphDatabase implementation**
+    - Created `backend/src/database/memgraph.py` implementing all 18+ `BaseDatabase` abstract methods
+    - Uses `neo4j` async Python driver (Bolt protocol, Memgraph-compatible)
+    - Node labels: `:Trade`, `:DailySummary`, `:EquitySnapshot`, `:Signal`, `:FundingPayment`, `:State`
+    - Properties match PostgreSQL schema exactly
+    - Comprehensive indexes: Trade(timestamp/symbol), Signal(timestamp), EquitySnapshot(timestamp), DailySummary(date), State(key)
+    - ID generation: Memgraph internal `id(node)` for auto-increment behavior
+    - Timestamp storage: epoch milliseconds for efficient filtering
+    - MERGE upsert pattern for daily summaries
+    - Cypher aggregation queries for weekly PnL
+    - ~690 lines of production code
+    - **Completed**: 2026-03-09 | PR #66
+
+- [x] **Phase 1c: Risk state migration**
+    - Migrated 5 Redis keys to Memgraph `:State` nodes:
+        - `omnitrader:risk:daily_stats` → `:State {key: "omnitrader:risk:daily_stats"}`
+        - `omnitrader:risk:consecutive_losses` → `:State {key: "omnitrader:risk:consecutive_losses"}`
+        - `omnitrader:risk:peak_equity` → `:State {key: "omnitrader:risk:peak_equity"}`
+        - `omnitrader:risk:circuit_breaker` → `:State {key: "omnitrader:risk:circuit_breaker"}`
+        - `omnitrader:risk:weekly_circuit_breaker` → `:State {key: "omnitrader:risk:weekly_circuit_breaker"}`
+    - Updated `RiskManager` to use `database.get_state()` / `database.set_state()`
+    - Removed `RedisStore` dependency from RiskManager
+    - TTL support via `expires_in` parameter (converted to `expires_at` timestamp)
+    - **Completed**: 2026-03-09 | PR #66
+
+- [x] **Phase 1d: Config, cleanup, dependencies**
+    - Updated `backend/config/config.yaml`: replaced PostgreSQL config with Memgraph connection params
+    - Deleted legacy database implementations: `postgres.py`, `sqlite.py`, `redis_store.py`
+    - Removed entire `alembic/` directory (schema versioning no longer needed)
+    - Updated `requirements.txt`: removed `asyncpg`, `aiosqlite`, `alembic`; added `neo4j==6.1.0`
+    - Updated `DatabaseFactory` to return `MemgraphDatabase` by default
+    - Added safe port parsing with fallback to 7687
+    - **Completed**: 2026-03-09 | PR #66
+
+- **Consolidates**: BACKLOG.md B1 (Backtesting data storage), B11 (QuestDB replacement), B12 (Neo4j graph database)
+- **Risk Level**: 🔴 Critical (infrastructure replacement)
+- **Testing**: 134 tests passing including Memgraph integration tests with cleanup
+- **CI**: All checks passing (Backend Tests & Lint, Frontend, GitGuardian)
+- **Deliverables**:
+    - Production-ready Memgraph database layer
+    - Risk state persistence moved from Redis to Memgraph
+    - Clean separation of dev/prod Docker configs (compose.yml + compose.dev.yml)
+    - CI-compatible test skipping for integration tests
+
+---
+
+### T39. TA-Lib Migration (Phase 9a) ✅ **COMPLETED 2026-03-09**
+- [x] **Phase 9a: Replace pandas-ta with TA-Lib in all strategies**
+    - Migrated all 5 strategies to TA-Lib:
+        - `adx_trend.py`: Uses `talib.ADX()`, `talib.EMA()`
+        - `bollinger_bands.py`: Uses `talib.BBANDS()`, `talib.RSI()`
+        - `breakout.py`: Uses `talib.MAX()`, `talib.MIN()` for Donchian channels
+        - `ema_volume.py`: Uses `talib.EMA()`, `talib.SMA()`
+        - `z_score.py`: Uses `talib.SMA()`, `talib.STDDEV()`
+    - Created `backend/src/indicators.py` adapter layer:
+        - `_as_float64()` helper for type safety (TA-Lib requires double precision)
+        - Maintains pandas-ta API compatibility (accepts/returns pandas Series)
+        - All TA-Lib calls wrapped with float64 conversion
+    - Removed `pandas-ta` from `requirements.txt`
+    - TA-Lib version: `TA-Lib==0.6.8` (compiled from source in Docker)
+    - All 134 tests passing with identical signal behavior
+    - **Completed**: 2026-03-09 | PR #66
+    - **Note**: Phases 9b (Indicator catalog API) and 9c (Compute endpoint) remain pending
+
+---

@@ -11,6 +11,15 @@ exchange:
   name: binance
   paper_mode: true
   testnet: false
+graph:
+  cryptopanic_api_key: ${CRYPTOPANIC_API_KEY}
+  fear_greed_polling_interval: 300
+  news_polling_interval: 60
+  news_ttl_days: 7
+  ollama_model: llama3:8b
+  ollama_timeout: 30
+  rss_polling_interval: 300
+  sentiment_aggregation_days: 30
 notifications:
   discord_webhook: ${DISCORD_WEBHOOK_URL}
   enabled: true

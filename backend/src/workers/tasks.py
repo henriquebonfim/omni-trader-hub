@@ -141,3 +141,101 @@ def analyze_regime(self, ohlcv_json: str) -> str:
     except Exception as exc:
         logger.error("analyze_regime_task_failed", error=str(exc))
         raise self.retry(exc=exc, countdown=1) from exc
+
+
+@celery_app.task(bind=True, name="omnitrader.ingest_news_cycle", max_retries=2)
+def ingest_news_cycle(self) -> dict:
+    """
+    Run the news ingestion pipeline:
+    1. Fetch CryptoPanic, Fear & Greed Index, and RSS feeds
+    2. Enhance new news events with Ollama NLP.
+    3. Prune old news events.
+
+    Returns
+    -------
+    dict
+        Summary of operations.
+    """
+    import asyncio
+    from src.config import get_config
+    from src.database import MemgraphDatabase
+    from src.graph.ingestor import NewsIngestor
+    from src.graph.nlp import OllamaNLP
+
+    config = get_config()
+
+    async def _run_pipeline():
+        db = MemgraphDatabase(
+            host=getattr(config.database, "host", "memgraph"),
+            port=int(getattr(config.database, "port", 7687)),
+            username=getattr(config.database, "username", ""),
+            password=getattr(config.database, "password", ""),
+            encrypted=getattr(config.database, "encrypted", False),
+        )
+        await db.connect()
+
+        graph_config = getattr(config, "graph", None)
+        api_key = getattr(graph_config, "cryptopanic_api_key", None) if graph_config else None
+        
+        ingestor = NewsIngestor(db=db, cryptopanic_api_key=api_key)
+        
+        # Parallel ingest operations
+        results = await asyncio.gather(
+            ingestor.fetch_cryptopanic(),
+            ingestor.fetch_rss_feeds(),
+            ingestor.fetch_fear_greed(),
+            return_exceptions=True
+        )
+
+        cryptopanic_events = results[0] if isinstance(results[0], list) else []
+        rss_events = results[1] if isinstance(results[1], list) else []
+        
+        all_new_events = cryptopanic_events + rss_events
+
+        model = getattr(graph_config, "ollama_model", "llama3:8b") if graph_config else "llama3:8b"
+        timeout = int(getattr(graph_config, "ollama_timeout", 30)) if graph_config else 30
+        
+        nlp = OllamaNLP(model=model, timeout=timeout)
+        
+        enriched_count = 0
+        semaphore = asyncio.Semaphore(5)
+
+        async def _enrich_with_semaphore(event_id: str):
+            async with semaphore:
+                try:
+                    await nlp.enrich_news_event(event_id, db)
+                    return True
+                except Exception as e:
+                    logger.error(f"Failed to enrich event {event_id}: {e}")
+                    return False
+
+        enrichment_tasks = [_enrich_with_semaphore(event_id) for event_id in all_new_events]
+        results = await asyncio.gather(*enrichment_tasks)
+        enriched_count = sum(1 for r in results if r)
+        
+        await nlp.close()
+        
+        days_to_keep = int(getattr(graph_config, "news_ttl_days", 7)) if graph_config else 7
+        await ingestor.prune_old_news(days=days_to_keep)
+
+        await db.close()
+
+        return {
+            "cryptopanic_events": len(cryptopanic_events),
+            "rss_events": len(rss_events),
+            "enriched_events": enriched_count
+        }
+
+    try:
+        loop = asyncio.get_event_loop()
+    except RuntimeError:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        
+    try:
+        result = loop.run_until_complete(_run_pipeline())
+        logger.info("ingest_news_cycle_completed", result=result)
+        return result
+    except Exception as exc:
+        logger.error("ingest_news_cycle_failed", error=str(exc))
+        raise self.retry(exc=exc, countdown=5) from exc

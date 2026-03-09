@@ -3,8 +3,9 @@
 Single source of truth for all technical work: architecture items, audit-discovered bugs, and risk gaps.
 Institutional-grade audit completed **2026-03-03** — findings integrated below.
 Multi-asset autonomous platform expansion added **2026-03-09** — T37-T42 driven by frontend spec (PROMPT.md).
+Frontend-backend integration migration added **2026-03-09** — T43 bridges new frontend to existing backend.
 
-> Last updated: 2026-03-09 | Sprint promotion: T37-T42 added (Multi-Asset Platform)
+> Last updated: 2026-03-09 | Sprint promotion: T37-T42 added (Multi-Asset Platform), T43 added (Frontend Integration)
 
 ---
 
@@ -12,43 +13,7 @@ Multi-asset autonomous platform expansion added **2026-03-09** — T37-T42 drive
 
 **Strategic Shift (2026-03-05)**: Replace PostgreSQL + planned Neo4j + QuestDB with unified **Memgraph** database. Single persistent store for trades, signals, equity, knowledge graph (news/assets/sectors), and candles. Redis drops to Celery-only. Data can be reset — clean slate.
 
-### T32. Memgraph Infrastructure & Database Layer Rewrite
-- [ ] **Phase 1a: Docker infrastructure**
-    - Remove PostgreSQL service from compose.yml
-    - Add Memgraph: `memgraph/memgraph-mage:3.8.0-relwithdebinfo`
-    - Add Memgraph Lab: `memgraph/lab:latest` (port 3001 for visualization)
-    - Uncomment Ollama service (GPU enabled)
-    - Update healthchecks: Bolt ping for Memgraph, remove Postgres dependency
-    - 8 services total (down from 9, no postgres)
-- [ ] **Phase 1b: MemgraphDatabase implementation (~500 lines)**
-    - Create `backend/src/database/memgraph.py` implementing all 18 `BaseDatabase` abstract methods
-    - Use `neo4j` async Python driver (Bolt protocol, Memgraph-compatible)
-    - Node labels: `:Trade`, `:DailySummary`, `:EquitySnapshot`, `:Signal`, `:FundingPayment`, `:Position`, `:State`
-    - Properties mimic PostgreSQL columns exactly
-    - Indexes: `:Trade(timestamp)`, `:Trade(symbol)`, `:Signal(timestamp)`, `:EquitySnapshot(timestamp)`, `:DailySummary(date)`, `:State(key)`, `:Position(symbol)`
-    - ID generation: use Memgraph internal `id(node)` for RETURNING id behavior
-    - Timestamp storage: epoch milliseconds for easy filtering
-    - `save_daily_summary()`: use `MERGE (d:DailySummary {date: $date}) SET d += $props` for upsert
-    - `get_weekly_pnl()`: `MATCH (t:Trade) WHERE t.action='CLOSE' AND t.timestamp >= $start RETURN sum(t.pnl)`
-    - `backup_db()`: execute `DUMP DATABASE` via mgclient or Memgraph snapshot
-- [ ] **Phase 1c: Risk state migration**
-    - Move 5 Redis keys to Memgraph `:State` nodes:
-        - `omnitrader:risk:daily_stats` → `:State {key: "risk:daily_stats", value: {...}}`
-        - `omnitrader:risk:consecutive_losses` → `:State {key: "risk:consecutive_losses"}`
-        - `omnitrader:risk:peak_equity` → `:State {key: "risk:peak_equity"}`
-        - `omnitrader:risk:circuit_breaker` → `:State {key: "risk:circuit_breaker"}`
-        - `omnitrader:risk:weekly_circuit_breaker` → `:State {key: "risk:weekly_circuit_breaker"}`
-    - Update `RiskManager` ([risk.py](backend/src/risk.py)) to use `db.get_state()` / `db.set_state()`
-    - Remove `RedisStore` dependency from `RiskManager.__init__`
-    - TTL handling: `:State {expires_at: <timestamp>}` property + periodic cleanup query (`MATCH (s:State) WHERE s.expires_at < now() DELETE s`)
-- [ ] **Phase 1d: Config, cleanup, dependencies**
-    - Update [backend/config/config.yaml](backend/config/config.yaml): replace `database:` section with Memgraph connection
-    - Remove from .env template: `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB`
-    - Delete: [postgres.py](backend/src/database/postgres.py), [sqlite.py](backend/src/database/sqlite.py), [redis_store.py](backend/src/database/redis_store.py), entire [alembic/](backend/alembic/) directory
-    - Update [requirements.txt](backend/requirements.txt): remove `asyncpg`, `aiosqlite`, `alembic`; add `neo4j`
-    - Update `DatabaseFactory` in [factory.py](backend/src/database/factory.py): default to `memgraph` type
-- **Consolidates**: BACKLOG.md B1 (Backtesting data), B11 (QuestDB), B12 (Neo4j) | **Priority**: 🔴 CRITICAL
-- **Effort**: ~2 days (code + testing)
+> **T32 COMPLETED**: ✅ All Phase 1 tasks complete (2026-03-09). See DONE.md for details. Memgraph infrastructure fully operational.
 
 ### T33. News Ingestion & NLP Pipeline
 - [ ] **Phase 2a: Extended graph schema**
@@ -352,15 +317,8 @@ Multi-asset autonomous platform expansion added **2026-03-09** — T37-T42 drive
     - Rotation events logged with reason
 
 ### T39. TA-Lib Migration & Indicator Service
-- [ ] **Phase 9a: Replace pandas-ta with TA-Lib in all strategies**
-    - `adx_trend.py`: `pandas_ta.adx()` → `talib.ADX(high, low, close, timeperiod=14)`, `talib.EMA(close, timeperiod=N)`
-    - `bollinger_bands.py`: `pandas_ta.bbands()` → `talib.BBANDS(close, timeperiod=20, nbdevup=2, nbdevdn=2)`, `talib.RSI(close, timeperiod=14)`
-    - `breakout.py`: manual Donchian → `talib.MAX(high, timeperiod=20)`, `talib.MIN(low, timeperiod=20)`
-    - `ema_volume.py`: `pandas_ta.ema()` → `talib.EMA(close, timeperiod=N)`, `talib.SMA(volume, timeperiod=20)`
-    - `z_score.py`: manual z-score → `talib.SMA(close, timeperiod=20)` + `talib.STDDEV(close, timeperiod=20)`
-    - Conversion pattern: pandas Series → numpy array (`df['close'].values`) before passing to TA-Lib
-    - Remove `pandas-ta` from `requirements.txt`; TA-Lib (`TA-Lib>=0.4.28`) already installed
-    - Run full test suite: all strategy tests must pass with identical signal behavior
+> **Phase 9a COMPLETED**: ✅ All strategies migrated to TA-Lib (2026-03-09). See DONE.md for details.
+
 - [ ] **Phase 9b: Indicator catalog API** ([backend/src/api/routes/indicators.py](backend/src/api/routes/indicators.py))
     - `GET /api/indicators` — returns all TA-Lib functions grouped by category:
         ```json
@@ -507,7 +465,103 @@ Multi-asset autonomous platform expansion added **2026-03-09** — T37-T42 drive
     - Cached: second call completes in <10ms
 
 ---
+## 🔵 Frontend Integration Bridge
 
+> **Context (2026-03-09)**: The new React frontend (10 pages, full API client, WebSocket client) has zero actual backend integration — every page uses mock data. T43 connects the frontend to the existing backend now, using adapter + stub layers so unimplemented features (T33-T42) degrade gracefully instead of crashing. As each backend task completes, its corresponding frontend stub is replaced with real data.
+
+### T43. Frontend-Backend Integration Migration
+- [ ] **Phase 13a: Infrastructure — Vite proxy + Nginx upstream + auth**
+    - Add dev proxy to [frontend/vite.config.ts](frontend/vite.config.ts): `/api/*` → `http://localhost:8000`, `/ws` → `ws://localhost:8000/ws/live`
+    - Update [frontend/nginx.conf](frontend/nginx.conf): add `upstream backend` block and `proxy_pass` for `/api/` and `/ws` (production)
+    - Add auth token injection to [frontend/src/lib/api.ts](frontend/src/lib/api.ts): `Authorization: Bearer <token>` header in `request()`, sourced from `VITE_API_KEY` env var
+- [ ] **Phase 13b: Adapter layer — backend shapes → frontend types**
+    - Create [frontend/src/lib/adapters.ts](frontend/src/lib/adapters.ts) (~200 lines)
+    - `adaptBotState(backendStatus, backendPosition, backendBalance) → Bot` — maps single-bot `/api/bot/state` + `/api/position` + `/api/balance` responses to frontend `Bot` type
+    - `adaptTrade(backendTrade) → Trade` — field renames (`id` string→number, `timestamp` ISO→epoch, add missing `bot_id`, `notional`, `fee`)
+    - `adaptEquitySnapshot(backendSnapshot) → EquitySnapshot` — `{timestamp, balance}` → `{timestamp, equity}`
+    - `adaptStrategy(backendStrategy) → Strategy` — map `{name, active, metadata}` → full `Strategy` type with defaults for missing fields
+    - `adaptConfig(backendConfig) → AppConfig` — flatten nested backend config (`exchange.leverage`, `risk.stop_loss_pct`, `notifications.discord_webhook`) into flat frontend `AppConfig`
+    - `reverseAdaptConfig(appConfig) → ConfigUpdate` — reverse: flat frontend → nested backend `ConfigUpdate` schema
+    - `adaptWsMessage(backendMsg) → CycleMessage` — map `current_price`→`price`, `market_regime`→`regime`, `circuit_breaker_active`→`circuit_breaker`, inject `bot_id` for first bot
+- [ ] **Phase 13c: Stub layer — typed fallbacks for unimplemented endpoints**
+    - Create [frontend/src/lib/stubs.ts](frontend/src/lib/stubs.ts) (~150 lines)
+    - Each stub annotated with future task ID: `// STUB: replaced by T{N}`
+    - `stubBots() → Bot[]` — returns mock bots from `mock-data.ts`, first bot enriched with real data at call site
+    - `stubSentiment() → SentimentData` — `{score: 0, label: "Neutral", article_count: 0, max_impact: 0}` (→ T33/T34)
+    - `stubCrisis() → CrisisStatus` — `{active: false, source: "auto"}` (→ T34)
+    - `stubNews() → NewsItem[]` — empty array (→ T33)
+    - `stubBacktestResults() → BacktestResults` — mock results from `mock-data.ts` (→ T35)
+    - `stubMarkets() → MarketPair[]` — hardcoded top-20 pairs with approximate volumes (→ T42)
+    - `stubEnvVars() → EnvVariable[]` — mock env vars from `mock-data.ts` (→ T41)
+- [ ] **Phase 13d: API client rewiring — try/real → catch/stub**
+    - Rewire all functions in [frontend/src/lib/api.ts](frontend/src/lib/api.ts):
+    - **Real endpoints** (backend exists now):
+        - `fetchBots()` → call `GET /api/bot/state` + `/api/position` + `/api/balance`, adapt to `Bot[]` (single bot as first item, rest from stubs)
+        - `startBot(id)` / `stopBot(id)` → proxy first bot to `POST /api/bot/start|stop`, others no-op
+        - `fetchStrategies()` → `GET /api/strategies` + `adaptStrategy()`
+        - `fetchTradeHistory()` → `GET /api/trades?limit=50` + `adaptTrade()`
+        - `fetchEquitySnapshots()` → `GET /api/equity?limit=200` + `adaptEquitySnapshot()`
+        - `fetchConfig()` / `updateConfig()` → `GET|PUT /api/config` + bidirectional adapter
+    - **Stubbed endpoints** (backend not yet built):
+        - `createBot()` / `updateBot()` / `deleteBot()` → stub no-op, return mock (→ T37)
+        - `createStrategy()` / `updateStrategy()` / `deleteStrategy()` → stub (→ T40)
+        - `fetchSentiment()` / `fetchCrisis()` / `updateCrisis()` / `fetchNews()` → stub (→ T33/T34)
+        - `runBacktest()` / `fetchBacktestResults()` → stub (→ T35)
+        - `fetchMarkets()` → stub (→ T42)
+        - `fetchEnvVars()` / `updateEnvVars()` → stub (→ T41)
+- [ ] **Phase 13e: WebSocket integration**
+    - Update [frontend/src/lib/ws.ts](frontend/src/lib/ws.ts): connect via proxy `ws://${location.host}/ws`
+    - Adapt incoming messages using `adaptWsMessage()`: backend sends flat cycle JSON → frontend `CycleMessage`
+    - Field mapping: `current_price`→`price`, `market_regime`→`regime`, `circuit_breaker_active`→`circuit_breaker`, `balance`→`balance_allocated`
+    - Only handle cycle messages (backend has no `alert` or `trade` WS types yet)
+    - Keep existing auto-reconnect with exponential backoff
+- [ ] **Phase 13f: Page-by-page wiring (all pages)**
+    - **Dashboard.tsx**: TanStack Query hooks for `fetchBots()`, `fetchTradeHistory()`, `fetchEquitySnapshots()`. Live data from WS store. Alerts: mock fallback
+    - **BotsAssets.tsx**: wire start/stop buttons to `startBot()`/`stopBot()`. CRUD drawers use stub mutations
+    - **Charts.tsx**: replace procedurally-generated candles with `GET /api/candles/?timeframe=X`. Symbol selector from real bot symbols
+    - **TradeHistory.tsx**: replace `mockTrades` with `fetchTradeHistory()`. Client-side sort/pagination unchanged
+    - **Settings.tsx**: two-way config binding via `fetchConfig()`/`updateConfig()` adapters (General/Risk/Notifications tabs). Env + System tabs: stub
+    - **StrategyLab.tsx**: real strategy list via `fetchStrategies()`. Custom CRUD: stub
+    - **RiskMonitor.tsx**: derive from `fetchBots()` (which calls `/api/bot/state` + `/api/position`). Circuit breakers: derive from bot state. Rest: stub
+    - **Intelligence.tsx**: all stub — sentiment gauge, crisis toggle, news feed, macro indicators
+    - **Backtesting.tsx**: all stub — config form, metrics display, equity chart, monthly returns
+    - **Topbar.tsx + AppSidebar.tsx**: already wired to Zustand store; live once WS connects (Phase 13e). Alerts: mock fallback
+- [ ] **Phase 13g: Backend stub routes (recommended)**
+    - Create [backend/src/api/routes/stubs.py](backend/src/api/routes/stubs.py) — placeholder endpoints returning `501 Not Implemented` with JSON bodies:
+        - `GET /api/bots` → `[{single bot from current /api/bot/state}]`
+        - `POST/PUT/DELETE /api/bots/*` → 501 `{"error": "Not implemented", "task": "T37"}`
+        - `GET /api/graph/*` → neutral/empty stubs with task references
+        - `POST /api/backtest/*` → 501 `{"error": "Not implemented", "task": "T35"}`
+        - `GET /api/markets` → hardcoded top-20 USDT perps
+        - `GET/PUT /api/env` → 501 `{"error": "Not implemented", "task": "T41"}`
+    - Register in [backend/src/api/__init__.py](backend/src/api/__init__.py)
+    - This gives frontend clean 501s instead of ambiguous 404s — stubs annotated with which task replaces them
+- **Files created**: `frontend/src/lib/adapters.ts`, `frontend/src/lib/stubs.ts`, `backend/src/api/routes/stubs.py`
+- **Files modified**: `frontend/vite.config.ts`, `frontend/nginx.conf`, `frontend/src/lib/api.ts`, `frontend/src/lib/ws.ts`, all 9 pages, `frontend/src/components/layout/Topbar.tsx`, `frontend/src/components/layout/AppSidebar.tsx`, `backend/src/api/__init__.py`
+- **Stub replacement map**:
+    | Stub | Replaced by | Backend Task |
+    |------|-------------|-------------|
+    | `stubBots()` | Real multi-bot API | T37 |
+    | `stubSentiment()` / `stubCrisis()` / `stubNews()` | Graph analytics API | T33/T34 |
+    | `stubBacktestResults()` | Backtesting engine API | T35 |
+    | `stubMarkets()` | Markets discovery API | T42 |
+    | `stubEnvVars()` | Env management API | T41 |
+    | Strategy CRUD stubs | Custom strategy API | T40 |
+- **Priority**: 🔴 CRITICAL (unblocks frontend usability) | **Effort**: ~2 days
+- **Depends on**: T32 (Memgraph — ✅ done)
+- **Enables**: All future backend tasks (T33-T42) to be visible in frontend as stubs are progressively replaced
+- **Acceptance criteria**:
+    - Dashboard shows real balance/position/PnL from backend (not mock)
+    - Topbar WS status shows "connected" when backend is running
+    - Charts render real Binance candles for selected timeframe
+    - Trade history shows actual trades from backend
+    - Settings round-trip: change leverage → persists across reload
+    - Bot start/stop buttons control the real backend bot
+    - Stubbed pages (Intelligence, Backtesting, Env) render with placeholder data, no console errors
+    - `Authorization: Bearer` header sent on protected endpoints
+    - `make test` frontend profile: no regressions
+
+---
 ## �🟠 High Priority (Correctness & Reliability)
 
 ---

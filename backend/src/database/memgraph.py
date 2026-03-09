@@ -9,11 +9,20 @@ Node Labels:
   :Signal - Strategy signals (timestamp: ms epoch)
   :FundingPayment - Funding rate payments
   :State - Persistent key-value state (key: unique identifier)
+  :Asset - Cryptocurrency asset (symbol, name, sector, exchange, market_cap_tier)
+  :NewsEvent - News event (id, title, source, published_at, sentiment_score, impact_level, raw_text)
+  :Sector - Industry sector (name)
+  :MacroIndicator - Macroeconomic indicator (name, value, timestamp)
+  :Candle - Price candle (symbol, timeframe, timestamp, open, high, low, close, volume)
 
 Relationships:
   Not currently used for main data flow (denormalized for query performance)
   (:Trade)-[:TRIGGERED_BY]->(:Signal) - Added in Phase 2
   (:Signal)-[:GENERATED_BY]->(strategy) - Added in Phase 2
+  (:NewsEvent)-[:IMPACTS {magnitude}]->(:Asset) - Added in Phase 2
+  (:NewsEvent)-[:MENTIONS]->(:Sector) - Added in Phase 2
+  (:Asset)-[:BELONGS_TO]->(:Sector) - Added in Phase 2
+  (:Asset)-[:CORRELATES_WITH {coefficient}]->(:Asset) - Added in Phase 2
 """
 
 import json
@@ -113,6 +122,9 @@ class MemgraphDatabase(BaseDatabase):
             "CREATE INDEX ON :DailySummary(date);",
             "CREATE INDEX ON :State(key);",
             "CREATE INDEX ON :FundingPayment(timestamp);",
+            "CREATE INDEX ON :NewsEvent(published_at);",
+            "CREATE INDEX ON :Candle(symbol, timeframe, timestamp);",
+            "CREATE INDEX ON :MacroIndicator(name);",
         ]
 
         async with self._driver.session() as session:
