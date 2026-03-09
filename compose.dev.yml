@@ -1,0 +1,33 @@
+services:
+  omnitrader:
+    volumes:
+      - ./backend/config:/app/config
+      - ./backend/data:/app/data
+      - ./backend/src:/app/src
+      - ./backend/tests:/app/tests
+
+  watchdog:
+    volumes:
+      - ./backend/config:/app/config
+
+  celery-worker:
+    volumes:
+      - ./backend/config:/app/config
+      - ./backend/src:/app/src
+
+  frontend:
+    volumes:
+      - ./frontend/src:/app/src
+      - ./frontend/package.json:/app/package.json
+      - ./frontend/bun.lockb:/app/bun.lockb
+
+  frontend-test:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      target: builder
+    volumes:
+      - ./frontend:/app
+    working_dir: /app
+    profiles:
+      - test

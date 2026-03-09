@@ -8,38 +8,51 @@ import pytest_asyncio
 from src.database import Database
 
 
+def is_memgraph_available() -> bool:
+    """Check if Memgraph is available for integration tests."""
+    try:
+        from neo4j import GraphDatabase
+        driver = GraphDatabase.driver("bolt://memgraph:7687", auth=None)
+        with driver.session() as session:
+            session.run("RETURN 1").single()
+        driver.close()
+        return True
+    except Exception:
+        return False
+
+
+pytestmark = pytest.mark.skipif(
+    not is_memgraph_available(),
+    reason="Memgraph not available (integration test)"
+)
+
+
 @pytest_asyncio.fixture
 async def db():
-    # Use :memory: for testing
-    db = Database(":memory:")
+    db = Database(host="memgraph", port=7687)
     await db.connect()
+
+    # Keep tests isolated in shared integration Memgraph.
+    async with db._driver.session() as session:
+        await session.run("MATCH (n) DETACH DELETE n")
+
     yield db
+
+    async with db._driver.session() as session:
+        await session.run("MATCH (n) DETACH DELETE n")
     await db.close()
 
 
 @pytest.mark.asyncio
 async def test_connect_and_tables(db):
-    # db fixture already calls connect() which calls _create_tables and _migrate_tables
-    # We can verify tables exist by querying sqlite_master
-    async with db._connection.execute(
-        "SELECT name FROM sqlite_master WHERE type='table'"
-    ) as cursor:
-        tables = [row[0] for row in await cursor.fetchall()]
+    assert db._driver is not None
 
-    assert "trades" in tables
-    assert "daily_summary" in tables
-    assert "equity_snapshots" in tables
-    assert "signals_log" in tables
+    async with db._driver.session() as session:
+        result = await session.run("RETURN 1 as connected")
+        record = await result.single()
 
-    async with db._connection.execute(
-        "SELECT name FROM sqlite_master WHERE type='index'"
-    ) as cursor:
-        indexes = [row[0] for row in await cursor.fetchall()]
-
-    assert "idx_trades_timestamp" in indexes
-    assert "idx_trades_symbol" in indexes
-    assert "idx_equity_timestamp" in indexes
-    assert "idx_signals_timestamp" in indexes
+    assert record is not None
+    assert record["connected"] == 1
 
 
 @pytest.mark.asyncio
@@ -56,7 +69,8 @@ async def test_log_trade_open_and_get_recent(db):
         expected_price=49950.0,
         slippage=50.0,
     )
-    assert trade_id == 1
+    assert isinstance(trade_id, int)
+    assert trade_id >= 0
 
     trades = await db.get_recent_trades(limit=1)
     assert len(trades) == 1
@@ -86,9 +100,10 @@ async def test_log_trade_close(db):
         pnl_pct=2.0,
         reason="take_profit",
         expected_price=50950.0,
-        slippage=-50.0,  # Favorable
+        slippage=-50.0,
     )
-    assert trade_id == 1
+    assert isinstance(trade_id, int)
+    assert trade_id >= 0
 
     trades = await db.get_recent_trades(limit=1)
     assert len(trades) == 1
@@ -105,7 +120,7 @@ async def test_log_trade_close(db):
 @pytest.mark.asyncio
 async def test_get_last_trade(db):
     await db.log_trade_open("BTC/USDT", "LONG", 50000.0, 0.1, 5000.0, None, None)
-    await asyncio.sleep(0.01)  # Ensure timestamp difference
+    await asyncio.sleep(0.01)
     await db.log_trade_open("ETH/USDT", "SHORT", 3000.0, 1.0, 3000.0, None, None)
 
     last_btc = await db.get_last_trade("BTC/USDT")
@@ -114,7 +129,6 @@ async def test_get_last_trade(db):
     last_eth = await db.get_last_trade("ETH/USDT")
     assert last_eth["symbol"] == "ETH/USDT"
 
-    # Test None case
     last_none = await db.get_last_trade("SOL/USDT")
     assert last_none is None
 
@@ -139,7 +153,6 @@ async def test_daily_summary(db):
     assert summary["pnl"] == 500.0
     assert summary["trades_count"] == 5
 
-    # Test update (INSERT OR REPLACE)
     await db.save_daily_summary(
         date=today,
         starting_balance=10000.0,
@@ -155,7 +168,6 @@ async def test_daily_summary(db):
     assert summary["ending_balance"] == 10600.0
     assert summary["trades_count"] == 6
 
-    # Test None case for a non-existent date
     summary_none = await db.get_daily_summary("1970-01-01")
     assert summary_none is None
 
@@ -163,11 +175,11 @@ async def test_daily_summary(db):
 @pytest.mark.asyncio
 async def test_equity_snapshots(db):
     await db.log_equity_snapshot(10000.0)
+    await asyncio.sleep(0.01)
     await db.log_equity_snapshot(10100.0)
 
     snapshots = await db.get_equity_snapshots(limit=10)
     assert len(snapshots) == 2
-    # Ordered by timestamp DESC
     assert snapshots[0]["balance"] == 10100.0
     assert snapshots[1]["balance"] == 10000.0
 
@@ -184,12 +196,19 @@ async def test_log_signal(db):
         indicators=indicators,
     )
 
-    async with db._connection.execute("SELECT * FROM signals_log") as cursor:
-        row = await cursor.fetchone()
-        columns = [description[0] for description in cursor.description]
-        signal = dict(zip(columns, row, strict=False))
+    async with db._driver.session() as session:
+        result = await session.run(
+            """
+            MATCH (s:Signal)
+            RETURN s.symbol as symbol, s.price as price, s.signal as signal, s.indicators as indicators
+            ORDER BY s.timestamp DESC
+            LIMIT 1
+            """
+        )
+        record = await result.single()
 
-    assert signal["symbol"] == "BTC/USDT"
-    assert signal["price"] == 52000.0
-    assert signal["signal"] == "SELL"
-    assert json.loads(signal["indicators"]) == indicators
+    assert record is not None
+    assert record["symbol"] == "BTC/USDT"
+    assert record["price"] == 52000.0
+    assert record["signal"] == "SELL"
+    assert json.loads(record["indicators"]) == indicators
