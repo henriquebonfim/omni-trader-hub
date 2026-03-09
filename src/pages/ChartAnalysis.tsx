@@ -68,7 +68,7 @@ export default function ChartAnalysis() {
     });
     candleSeries.setData(candleData);
 
-    const volumeSeries = chart.addSeries(VolumeSeries, {
+    const volumeSeries = chart.addSeries(HistogramSeries, {
       priceFormat: { type: 'volume' },
       priceScaleId: '',
     });
