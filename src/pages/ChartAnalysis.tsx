@@ -1,7 +1,7 @@
 import { Panel } from '@/components/shared/Panel';
 import { StatusBadge } from '@/components/shared/StatusBadge';
 import { useEffect, useRef, useState } from 'react';
-import { createChart, CandlestickSeries, VolumeSeries, type IChartApi } from 'lightweight-charts';
+import { createChart, CandlestickSeries, HistogramSeries, type IChartApi } from 'lightweight-charts';
 
 function generateCandleData(count: number) {
   const data = [];
