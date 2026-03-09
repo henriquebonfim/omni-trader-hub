@@ -3,7 +3,7 @@
 Confirmed work for the current and next sprints. All items validated, scoped, and ready to implement.
 Unified Memgraph Architecture → Multi-Asset Autonomous Trading Platform.
 
-> Last updated: 2026-03-09 | Sprint: Unified Memgraph Architecture (T32-T36) + Multi-Asset Platform (T37-T42)
+> Last updated: 2026-03-09 | Sprint: Unified Memgraph Architecture (T32-T36) + Frontend Integration (T43) + Multi-Asset Platform (T37-T42)
 
 ---
 
@@ -483,6 +483,43 @@ Unified Memgraph Architecture → Multi-Asset Autonomous Trading Platform.
     - Used by frontend "Add Bot" symbol picker — searchable with volume + price display
 - **Effort**: ~1 day | **Depends on**: T36 (exchange adapter)
 - **Acceptance**: Frontend symbol picker shows all Binance Futures USDT pairs with volume and price
+
+---
+
+## Sprint: Frontend-Backend Integration Bridge (T43)
+
+**Goal**: Connect the new React frontend to the existing backend. The frontend has 10 pages with a full API client + WebSocket client but zero actual backend integration (100% mock data). This sprint creates an adapter layer (backend shapes → frontend types) and a stub layer (typed fallbacks for unimplemented features) so the frontend works with real data where available and degrades gracefully elsewhere. As T33-T42 complete, each stub is replaced with the real endpoint.
+
+**Depends on**: T32 (Memgraph — ✅ done)
+**Enables**: All T33-T42 backend work to surface in the frontend progressively
+**Plan file**: `plan-frontendBackendIntegrationMigration.prompt.md`
+
+**Phase breakdown:**
+- **Phase 13a**: Infrastructure — Vite dev proxy, Nginx production proxy, auth token injection
+- **Phase 13b**: Adapter layer — `adapters.ts` converting backend response shapes to frontend TypeScript types
+- **Phase 13c**: Stub layer — `stubs.ts` providing typed fallbacks annotated with future task IDs (T33-T42)
+- **Phase 13d**: API client rewiring — each `api.ts` function calls real backend or falls back to stub
+- **Phase 13e**: WebSocket integration — connect to real WS, adapt message format
+- **Phase 13f**: Page-by-page wiring — replace mock imports with TanStack Query hooks in all 9 pages + layout
+- **Phase 13g**: Backend stub routes — `stubs.py` returning 501 with task references for unbuilt endpoints
+
+**Real endpoints (backend exists):** `/api/bot/state`, `/api/position`, `/api/balance`, `/api/strategies`, `/api/trades`, `/api/equity`, `/api/config`, `/api/candles`, `/api/bot/start|stop`, `/api/notifications/discord`
+
+**Stubbed endpoints (→ replaced by future tasks):**
+| Frontend Feature | Stub | Replaced by |
+|---|---|---|
+| Multi-bot management | `stubBots()` | T37 |
+| Sentiment/Crisis/News | `stubSentiment()`, `stubCrisis()`, `stubNews()` | T33/T34 |
+| Backtesting | `stubBacktestResults()` | T35 |
+| Markets discovery | `stubMarkets()` | T42 |
+| Env variable management | `stubEnvVars()` | T41 |
+| Custom strategy CRUD | Strategy mutation stubs | T40 |
+
+**Files created**: `frontend/src/lib/adapters.ts`, `frontend/src/lib/stubs.ts`, `backend/src/api/routes/stubs.py`
+**Files modified**: `frontend/vite.config.ts`, `frontend/nginx.conf`, `frontend/src/lib/api.ts`, `frontend/src/lib/ws.ts`, all 9 pages, Topbar, AppSidebar, `backend/src/api/__init__.py`
+
+**Effort**: ~2 days
+**Acceptance**: Dashboard shows real data, WS connected, Charts show real candles, Settings persist, stubbed pages render without errors
 
 ---
 

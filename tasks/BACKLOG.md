@@ -2,7 +2,7 @@
 
 Items requiring design decisions, external dependencies, or are lower-priority long-term investments. Reviewed each sprint — promote to TODO when scoped and ready.
 
-> Last updated: 2026-03-09 | **MULTI-ASSET PLATFORM EXPANSION (2026-03-09)**: B6→T37 (Bot Management), new T38-T42 added. Added B16-B20 for frontend nice-to-haves.
+> Last updated: 2026-03-09 | **MULTI-ASSET PLATFORM EXPANSION (2026-03-09)**: B6→T37 (Bot Management), new T38-T42 added. T43 (Frontend Integration Bridge) added. Added B16-B20 for frontend nice-to-haves.
 > Previous: 2026-03-05 — Memgraph consolidation: B1→T35, B4→T34, B11/B12→Memgraph, B13→T33, B14→absorbed. Completed: B8, B9
 
 ---
@@ -138,7 +138,7 @@ ELIMINATED** (2026-03-05) — Memgraph is schemaless; no migrations needed
 - Alert types: circuit breaker triggered, strategy rotation, regime change, daily PnL threshold, position opened/closed
 - Delivery: WebSocket push → frontend notification queue + optional Discord webhook
 - **Backend**: Alert rule engine with user-defined thresholds
-- **Depends on**: T37 (per-bot events), existing Discord webhook (T10)
+- **Depends on**: T37 (per-bot events), T43 (frontend WS integration), existing Discord webhook (T10)
 
 ### B20. Dark/Light Theme Toggle
 - **Priority**: LOW

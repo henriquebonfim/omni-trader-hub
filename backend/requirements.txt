@@ -72,3 +72,4 @@ uvicorn[standard]==0.41.0
 # Update check:
 #   pip list --outdated
 # ============================================================================
+feedparser>=6.0.0
