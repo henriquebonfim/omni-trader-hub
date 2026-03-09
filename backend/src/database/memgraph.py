@@ -137,7 +137,7 @@ class MemgraphDatabase(BaseDatabase):
             async with self._driver.session() as session:
                 # Memgraph snapshot command
                 result = await session.run("CREATE SNAPSHOT;")
-                record = await result.single()
+                await result.single()
                 timestamp = datetime.now(timezone.utc).isoformat()
                 logger.info("database_backup_created", timestamp=timestamp)
                 return timestamp
@@ -381,12 +381,16 @@ class MemgraphDatabase(BaseDatabase):
             t.side as side,
             t.action as action,
             t.price as price,
+            t.expected_price as expected_price,
+            t.slippage as slippage,
             t.size as size,
             t.notional as notional,
             t.pnl as pnl,
             t.pnl_pct as pnl_pct,
             t.reason as reason,
-            t.fee as fee
+            t.fee as fee,
+            t.stop_loss as stop_loss,
+            t.take_profit as take_profit
         ORDER BY t.timestamp DESC
         LIMIT $limit
         """
@@ -404,12 +408,16 @@ class MemgraphDatabase(BaseDatabase):
                     "side": record["side"],
                     "action": record["action"],
                     "price": record["price"],
+                    "expected_price": record["expected_price"],
+                    "slippage": record["slippage"],
                     "size": record["size"],
                     "notional": record["notional"],
                     "pnl": record["pnl"],
                     "pnl_pct": record["pnl_pct"],
                     "reason": record["reason"],
                     "fee": record["fee"],
+                    "stop_loss": record["stop_loss"],
+                    "take_profit": record["take_profit"],
                 }
                 trades.append(trade)
 

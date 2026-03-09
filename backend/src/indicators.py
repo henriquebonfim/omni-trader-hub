@@ -12,6 +12,11 @@ import pandas as pd
 import talib
 
 
+def _as_float64(values: pd.Series):
+    """TA-Lib requires double precision arrays; normalize all numeric inputs."""
+    return values.astype("float64").to_numpy()
+
+
 def ema(close: pd.Series, length: int = 14) -> pd.Series:
     """
     Exponential Moving Average
@@ -23,7 +28,7 @@ def ema(close: pd.Series, length: int = 14) -> pd.Series:
     Returns:
         Series with EMA values, indexed like input
     """
-    result = talib.EMA(close.values, timeperiod=length)
+    result = talib.EMA(_as_float64(close), timeperiod=length)
     return pd.Series(result, index=close.index, name=f"EMA_{length}")
 
 
@@ -38,7 +43,7 @@ def sma(close: pd.Series, length: int = 14) -> pd.Series:
     Returns:
         Series with SMA values, indexed like input
     """
-    result = talib.SMA(close.values, timeperiod=length)
+    result = talib.SMA(_as_float64(close), timeperiod=length)
     return pd.Series(result, index=close.index, name=f"SMA_{length}")
 
 
@@ -57,7 +62,9 @@ def atr(
     Returns:
         Series with ATR values, indexed like close
     """
-    result = talib.ATR(high.values, low.values, close.values, timeperiod=length)
+    result = talib.ATR(
+        _as_float64(high), _as_float64(low), _as_float64(close), timeperiod=length
+    )
     return pd.Series(result, index=close.index, name=f"ATR_{length}")
 
 
@@ -72,7 +79,7 @@ def rsi(close: pd.Series, length: int = 14) -> pd.Series:
     Returns:
         Series with RSI values (0-100), indexed like input
     """
-    result = talib.RSI(close.values, timeperiod=length)
+    result = talib.RSI(_as_float64(close), timeperiod=length)
     return pd.Series(result, index=close.index, name=f"RSI_{length}")
 
 
@@ -92,9 +99,13 @@ def adx(
         DataFrame with columns: ADX_{length}, DMP_{length}, DMN_{length}
         Matches pandas-ta column naming convention
     """
-    adx_values = talib.ADX(high.values, low.values, close.values, timeperiod=length)
-    plus_di = talib.PLUS_DI(high.values, low.values, close.values, timeperiod=length)
-    minus_di = talib.MINUS_DI(high.values, low.values, close.values, timeperiod=length)
+    high_values = _as_float64(high)
+    low_values = _as_float64(low)
+    close_values = _as_float64(close)
+
+    adx_values = talib.ADX(high_values, low_values, close_values, timeperiod=length)
+    plus_di = talib.PLUS_DI(high_values, low_values, close_values, timeperiod=length)
+    minus_di = talib.MINUS_DI(high_values, low_values, close_values, timeperiod=length)
 
     return pd.DataFrame(
         {
@@ -120,7 +131,7 @@ def bbands(close: pd.Series, length: int = 20, std: float = 2.0) -> pd.DataFrame
         Matches pandas-ta column naming convention with float formatting
     """
     upper, middle, lower = talib.BBANDS(
-        close.values,
+        _as_float64(close),
         timeperiod=length,
         nbdevup=std,
         nbdevdn=std,

@@ -1,6 +1,6 @@
 """Tests for Memgraph backup functionality."""
 
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
@@ -18,8 +18,10 @@ async def test_backup_db_success():
     mock_session = AsyncMock()
     mock_session.run.return_value = mock_result
 
-    mock_driver = AsyncMock()
-    mock_driver.session.return_value.__aenter__.return_value = mock_session
+    mock_driver = MagicMock()
+    session_cm = AsyncMock()
+    session_cm.__aenter__.return_value = mock_session
+    mock_driver.session.return_value = session_cm
 
     db._driver = mock_driver
 
@@ -37,8 +39,10 @@ async def test_backup_db_failure():
     mock_session = AsyncMock()
     mock_session.run.side_effect = Exception("Backup failed")
 
-    mock_driver = AsyncMock()
-    mock_driver.session.return_value.__aenter__.return_value = mock_session
+    mock_driver = MagicMock()
+    session_cm = AsyncMock()
+    session_cm.__aenter__.return_value = mock_session
+    mock_driver.session.return_value = session_cm
 
     db._driver = mock_driver
 

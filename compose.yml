@@ -15,7 +15,7 @@ services:
       - .env
     depends_on:
       memgraph:
-        condition: service_started
+        condition: service_healthy
       redis:
         condition: service_healthy
       ollama:
@@ -96,6 +96,16 @@ services:
       - memgraph_data:/var/lib/memgraph
     environment:
       - MEMGRAPH_DATA_DIR=/var/lib/memgraph
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "echo 'RETURN 1;' | timeout 5 mgconsole >/dev/null || exit 1",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
     restart: unless-stopped
 
   memgraph-lab:
@@ -105,7 +115,7 @@ services:
       - "3001:3000"
     depends_on:
       memgraph:
-        condition: service_started
+        condition: service_healthy
     environment:
       - NEXTAUTH_URL=http://localhost:3001
     restart: unless-stopped

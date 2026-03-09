@@ -5,6 +5,9 @@ import structlog
 
 from src import indicators
 
+# Backward-compatible alias for tests and older modules that still patch/use `ta.*`.
+ta = indicators
+
 logger = structlog.get_logger()
 
 

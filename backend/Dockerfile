@@ -22,8 +22,8 @@ RUN curl -fSL "https://github.com/TA-Lib/ta-lib/releases/download/v${TALIB_VERSI
 
 RUN pip install --no-cache-dir --upgrade pip setuptools wheel
 
-COPY requirements.txt .
-RUN pip install --no-cache-dir --prefix=/install -r requirements.txt
+COPY requirements.txt requirements-dev.txt ./
+RUN pip install --no-cache-dir --prefix=/install -r requirements-dev.txt
 RUN pip install --no-cache-dir --prefix=/install --ignore-installed packaging==26.0
 
 
