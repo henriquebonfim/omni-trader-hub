@@ -5,7 +5,7 @@ Institutional-grade audit completed **2026-03-03** — findings integrated below
 Multi-asset autonomous platform expansion added **2026-03-09** — T37-T42 driven by frontend spec (PROMPT.md).
 Frontend-backend integration migration added **2026-03-09** — T43 bridges new frontend to existing backend.
 
-> Last updated: 2026-03-09 | Sprint promotion: T37-T42 added (Multi-Asset Platform), T43 added (Frontend Integration)
+> Last updated: 2026-03-09 | Sprint status: T32-T34 completed and merged to master. Next: T35 (Backtesting), T36 (Exchange Adapter), T37-T42 (Multi-Asset Platform)
 
 ---
 
@@ -14,14 +14,15 @@ Frontend-backend integration migration added **2026-03-09** — T43 bridges new 
 **Strategic Shift (2026-03-05)**: Replace PostgreSQL + planned Neo4j + QuestDB with unified **Memgraph** database. Single persistent store for trades, signals, equity, knowledge graph (news/assets/sectors), and candles. Redis drops to Celery-only. Data can be reset — clean slate.
 
 > **T32 COMPLETED**: ✅ All Phase 1 tasks complete (2026-03-09). See DONE.md for details. Memgraph infrastructure fully operational.
+> **T33 COMPLETED**: ✅ News ingestion pipeline with CryptoPanic, RSS, Fear & Greed Index, and Ollama NLP integration complete (2026-03-09).
 
 ### T33. News Ingestion & NLP Pipeline
-- [ ] **Phase 2a: Extended graph schema**
+- [x] **Phase 2a: Extended graph schema**
     - Add node labels: `:Asset {symbol, name, sector, exchange, market_cap_tier}`, `:NewsEvent {id, title, source, published_at, sentiment_score, impact_level, raw_text}`, `:Sector {name}`, `:MacroIndicator {name, value, timestamp}`, `:Candle {symbol, timeframe, timestamp, open, high, low, close, volume}`
     - Relationships: `(:NewsEvent)-[:IMPACTS {magnitude}]->(:Asset)`, `(:NewsEvent)-[:MENTIONS]->(:Sector)`, `(:Asset)-[:BELONGS_TO]->(:Sector)`, `(:Asset)-[:CORRELATES_WITH {coefficient}]->(:Asset)`, `(:Trade)-[:TRIGGERED_BY]->(:Signal)` (new!)
     - Indexes: `:NewsEvent(published_at)`, `:Candle(symbol, timeframe, timestamp)`, `:MacroIndicator(name)`
     - Create indices in startup: `CREATE INDEX ON :NewsEvent(published_at)`, etc.
-- [ ] **Phase 2b: News ingestor service** ([backend/src/graph/ingestor.py](backend/src/graph/ingestor.py))
+- [x] **Phase 2b: News ingestor service** ([backend/src/graph/ingestor.py](backend/src/graph/ingestor.py))
     - CryptoPanic API polling (60s interval): `GET api/v1/posts/` → returns crypto news with `vote_count` (sentiment proxy)
     - Fear & Greed Index (300s interval): Alternative.me `/api/fear-and-greed` → store as `:MacroIndicator`
     - RSS feed parsing (300s interval): feedparser library for CoinDesk, CoinTelegraph, The Block
@@ -31,7 +32,7 @@ Frontend-backend integration migration added **2026-03-09** — T43 bridges new 
     - Create `MENTIONS` relationships to Sector nodes
     - Use existing [rate_limiter.py](backend/src/rate_limiter.py) pattern for all API calls
     - TTL: prune old news nodes (7 days for individual `:NewsEvent`, 30 days for aggregated sentiment)
-- [ ] **Phase 2c: Ollama NLP entity extraction** ([backend/src/graph/nlp.py](backend/src/graph/nlp.py))
+- [x] **Phase 2c: Ollama NLP entity extraction** ([backend/src/graph/nlp.py](backend/src/graph/nlp.py))
     - POST news text to Ollama at `http://ollama:11434/api/generate` with structured extraction prompt
     - Prompt extracts: mentioned asset tickers, sectors, sentiment polarity (-1 to +1), impact magnitude (0 to 1)
     - Structured JSON schema: `{assets: ["BTC", "ETH"], sectors: ["L1", "DeFi"], sentiment: 0.7, impact: 0.85}`
@@ -41,37 +42,39 @@ Frontend-backend integration migration added **2026-03-09** — T43 bridges new 
 - **Consolidates**: BACKLOG.md B4 (Macro Risk module), B13 (Ollama sidecar) | **Priority**: 🟠 HIGH
 - **Effort**: ~2 days
 
+> **T34 COMPLETED**: ✅ Graph analytics engine, crisis mode, and pipeline integration complete (2026-03-09).
+
 ### T34. Graph Analytics, Crisis Mode & Pipeline Integration
-- [ ] **Phase 3a: Graph analytics queries** ([backend/src/graph/analytics.py](backend/src/graph/analytics.py))
+- [x] **Phase 3a: Graph analytics queries** ([backend/src/graph/analytics.py](backend/src/graph/analytics.py))
     - Sentiment aggregation: `MATCH (n:NewsEvent)-[:IMPACTS]->(a:Asset {symbol: $sym}) WHERE n.published_at > $since RETURN avg(n.sentiment_score) as sentiment, count(n) as volume, max(n.impact_level) as max_impact`
     - Crisis detection: `MATCH (n:NewsEvent)-[:IMPACTS]->(a) WHERE n.published_at >= now() - duration('1h') AND n.impact_level > 0.7 AND n.sentiment_score < -0.5 RETURN count(n) as negative_impact_count` → flag if > 3
     - Sentiment-reality divergence: compare Fear & Greed index > 75 (Extreme Greed) + rolling news sentiment < -0.3 (Extreme Negative) → return `divergence_flag: true` with warning
     - Sector contagion: if news impacts Asset A, query for `:Asset`-[:`CORRELATES_WITH`]->() → Alert correlated assets
     - All queries return JSON-serializable results (strings, numbers, lists, dicts only — no objects)
-- [ ] **Phase 3b: Celery task + concurrent dispatch**
+- [x] **Phase 3b: Celery task + concurrent dispatch**
     - New Celery task: `analyze_knowledge_graph(symbol: str, config_dict: dict) → Dict[str, Any]` in [backend/src/workers/tasks.py](backend/src/workers/tasks.py)
     - Returns: `{sentiment: float, impact: float, crisis_flag: bool, divergence_flag: bool, correlated_alerts: List[str]}`
     - Modify [backend/src/main.py](backend/src/main.py) `run_cycle()`: concat `dispatch()` to include 3rd task: `analyze_knowledge_graph`
     - After all 3 tasks return: apply graph-derived overrides before execution
-- [ ] **Phase 3c: Crisis mode protocol** ([backend/src/graph/crisis.py](backend/src/graph/crisis.py))
+- [x] **Phase 3c: Crisis mode protocol** ([backend/src/graph/crisis.py](backend/src/graph/crisis.py))
     - Automatic activation: when `crisis_flag=True` from graph analytics
     - Manual toggle: `config.graph.crisis_mode` field + API endpoint `PUT /api/graph/crisis`
     - **Overrides when active**: leverage → 1.0× (from 3×), position_size_pct → 0.5% (from 2%), restrict strategy to `adx_trend` only, max_daily_loss_pct → 2% (from 5%)
     - State persisted in Memgraph `:State {key: "crisis_mode", value: {active: bool, triggered_by: str, activated_at: timestamp}}`
     - Survives restarts
     - Log activation/deactivation to `signals_log` table
-- [ ] **Phase 3d: Signal gating using graph context**
+- [x] **Phase 3d: Signal gating using graph context**
     - In `_open_position()` before risk validation:
         - If `divergence_flag=True`: reduce confidence in signal by 50% (widen SL or higher entry threshold)
         - If `sentiment < -0.5` and signal is LONG: block entry
         - If `sentiment > 0.5` and signal is SHORT: block entry
         - Pass graph context dict to strategy result for logging
-- [ ] **Phase 3e: API endpoints** ([backend/src/api/routes/graph.py](backend/src/api/routes/graph.py))
+- [x] **Phase 3e: API endpoints** ([backend/src/api/routes/graph.py](backend/src/api/routes/graph.py))
     - `GET /api/graph/sentiment/{symbol}`: return `{sentiment: float, volume: int, max_impact: float, recent_news: [...]}`
     - `GET /api/graph/crisis`: return `{active: bool, triggered_by: str, macro_indicators: {dxy, oil, fear_greed, btc_dominance}, latest_alert: str}`
     - `PUT /api/graph/crisis`: toggle manual crisis mode (require `verify_api_key`)
     - `GET /api/graph/news`: latest 20 news events with sentiment/impact scores
-- [ ] **Phase 3f: Frontend components & WebSocket**
+- [ ] **Phase 3f: Frontend components & WebSocket** (deferred to T43)
     - New components: `SentimentGauge.tsx` (emoji gauge -1 to +1), `NewsFeed.tsx` (scrollable with impact colors), `MacroPanel.tsx` (DXY, Oil, Fear & Greed cards, red/green arrows)
     - Update [frontend/src/lib/api.ts](frontend/src/lib/api.ts) with new endpoint types
     - Extend `CycleMessage` type: add `sentiment?: number`, `crisis_mode?: boolean`, `macro_indicators?: {...}`
