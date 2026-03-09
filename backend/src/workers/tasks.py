@@ -239,3 +239,44 @@ def ingest_news_cycle(self) -> dict:
     except Exception as exc:
         logger.error("ingest_news_cycle_failed", error=str(exc))
         raise self.retry(exc=exc, countdown=5) from exc
+
+
+@celery_app.task(bind=True, name="omnitrader.analyze_knowledge_graph", max_retries=1)
+def analyze_knowledge_graph(self, symbol: str, current_price: float, config_dict: dict) -> dict:
+    """
+    Compute graph analytics metrics (sentiment, contagion, divergence) in Celery.
+    Returns JSON-serializable dict with crisis signals.
+    """
+    import asyncio
+    
+    try:
+        from src.database import DatabaseFactory
+        from src.graph.analytics import GraphAnalytics
+        
+        # Helper inner async func
+        async def _run_analytics():
+            config = _build_config(config_dict)
+            db = DatabaseFactory.get_database(config)
+            await db.connect()
+            
+            try:
+                ga = GraphAnalytics(db)
+                
+                sentiment = await ga.get_asset_sentiment(symbol, hours_lookback=24)
+                contagion = await ga.detect_sector_contagion(symbol, hours_lookback=24)
+                divergence = await ga.detect_sentiment_divergence(symbol, current_price, hours_lookback=24)
+                
+                return {
+                    "sentiment": sentiment,
+                    "contagion": contagion,
+                    "divergence": divergence
+                }
+            finally:
+                await db.close()
+
+        # Run async logic synchronously for Celery
+        return asyncio.run(_run_analytics())
+        
+    except Exception as exc:
+        logger.error("analyze_knowledge_graph_task_failed", error=str(exc), symbol=symbol)
+        raise self.retry(exc=exc, countdown=1) from exc
