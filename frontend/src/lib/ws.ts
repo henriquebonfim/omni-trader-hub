@@ -1,63 +1,69 @@
-import { useEffect, useRef, useState } from 'react'
-import type { CycleMessage } from './api'
+import { useEffect, useRef, useCallback } from 'react';
+import { useAppStore } from '@/stores/app-store';
+import type { CycleMessage, AlertMessage, TradeMessage } from '@/types';
 
-type WsStatus = 'connecting' | 'open' | 'closed' | 'error'
+const WS_URL = import.meta.env.VITE_WS_URL || 'ws://localhost:8000/ws';
 
 export function useLiveFeed() {
-  const [message, setMessage] = useState<CycleMessage | null>(null)
-  const [status, setStatus] = useState<WsStatus>('connecting')
-  const wsRef = useRef<WebSocket | null>(null)
-  const reconnectTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const wsRef = useRef<WebSocket | null>(null);
+  const reconnectTimeout = useRef<ReturnType<typeof setTimeout>>();
+  const retryCount = useRef(0);
+  const {
+    wsStatus, setWsStatus,
+    updateBotFromCycle, addAlert, addTradeEvent
+  } = useAppStore();
 
-  useEffect(() => {
-    let cancelled = false
-
-    const connect = () => {
-      if (cancelled) return
-
-      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
-      const host = window.location.host
-      const ws = new WebSocket(`${protocol}//${host}/ws/live`)
-      wsRef.current = ws
+  const connect = useCallback(() => {
+    try {
+      const ws = new WebSocket(WS_URL);
+      wsRef.current = ws;
 
       ws.onopen = () => {
-        if (!cancelled) setStatus('open')
-      }
+        setWsStatus('connected');
+        retryCount.current = 0;
+      };
 
-      ws.onmessage = (evt) => {
-        if (!cancelled) {
-          try {
-            const data = JSON.parse(evt.data) as CycleMessage
-            setMessage(data)
-          } catch {
-            // ignore malformed messages
+      ws.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          switch (data.type) {
+            case 'cycle_update':
+              updateBotFromCycle(data as CycleMessage);
+              break;
+            case 'alert':
+              addAlert(data as AlertMessage);
+              break;
+            case 'trade':
+              addTradeEvent(data as TradeMessage);
+              break;
           }
+        } catch (e) {
+          console.error('WS parse error:', e);
         }
-      }
+      };
 
       ws.onclose = () => {
-        if (!cancelled) {
-          setStatus('closed')
-          reconnectTimer.current = setTimeout(() => {
-            if (!cancelled) connect()
-          }, 3000)
-        }
-      }
+        setWsStatus('disconnected');
+        const delay = Math.min(1000 * Math.pow(2, retryCount.current), 30000);
+        retryCount.current++;
+        reconnectTimeout.current = setTimeout(connect, delay);
+      };
 
       ws.onerror = () => {
-        if (!cancelled) setStatus('error')
-        ws.close()
-      }
+        ws.close();
+      };
+    } catch {
+      setWsStatus('disconnected');
     }
+  }, [setWsStatus, updateBotFromCycle, addAlert, addTradeEvent]);
 
-    connect()
-
+  useEffect(() => {
+    connect();
     return () => {
-      cancelled = true
-      if (reconnectTimer.current) clearTimeout(reconnectTimer.current)
-      wsRef.current?.close()
-    }
-  }, [])
+      wsRef.current?.close();
+      if (reconnectTimeout.current) clearTimeout(reconnectTimeout.current);
+    };
+  }, [connect]);
 
-  return { message, status }
+  return { status: wsStatus };
 }

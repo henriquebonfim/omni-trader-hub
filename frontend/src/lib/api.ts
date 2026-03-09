@@ -1,142 +1,77 @@
-const BASE = '/api'
+import type {
+  Bot, Trade, Strategy, BacktestConfig, BacktestResults,
+  SentimentData, CrisisStatus, NewsItem, AppConfig,
+  EnvVariable, MarketPair, EquitySnapshot
+} from '@/types';
 
-class ApiClient {
-  private baseUrl: string
+const BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
-  constructor(baseUrl: string) {
-    this.baseUrl = baseUrl
-  }
-
-  private async request(endpoint: string, options: RequestInit = {}) {
-    const url = `${this.baseUrl}${endpoint}`
-    const apiKey = localStorage.getItem('omnitrader_api_key')
-    const headers = new Headers(options.headers || {})
-    if (!headers.has('Content-Type')) {
-      headers.set('Content-Type', 'application/json')
-    }
-
-    if (apiKey) {
-      headers.set('Authorization', `Bearer ${apiKey}`)
-    }
-
-    const response = await fetch(url, { ...options, headers })
-
-    if (!response.ok) {
-      throw new Error(`API Error: ${response.statusText}`)
-    }
-
-    const contentType = response.headers.get('content-type')
-    if (contentType && contentType.includes('application/json')) {
-      return response.json()
-    }
-    return response.text()
-  }
-
-  get(endpoint: string, params?: Record<string, any>) {
-    let query = ''
-    if (params) {
-      const searchParams = new URLSearchParams()
-      Object.entries(params).forEach(([key, value]) => {
-        if (value !== undefined) {
-          searchParams.append(key, String(value))
-        }
-      })
-      query = `?${searchParams.toString()}`
-    }
-    return this.request(`${endpoint}${query}`)
-  }
-
-  post(endpoint: string, body?: any) {
-    return this.request(endpoint, {
-      method: 'POST',
-      body: body ? JSON.stringify(body) : undefined,
-    })
-  }
-
-  put(endpoint: string, body?: any) {
-    return this.request(endpoint, {
-      method: 'PUT',
-      body: body ? JSON.stringify(body) : undefined,
-    })
-  }
+async function request<T>(path: string, options?: RequestInit): Promise<T> {
+  const res = await fetch(`${BASE}${path}`, {
+    headers: { 'Content-Type': 'application/json' },
+    ...options,
+  });
+  if (!res.ok) throw new Error(`API Error: ${res.status} ${res.statusText}`);
+  return res.json();
 }
 
-export const api = new ApiClient(BASE)
-
-// Status
-export const fetchStatus = () => api.get('/status')
-export const fetchBalance = () => api.get('/balance')
-export const fetchPosition = () => api.get('/position')
-
-// Trades
-export const fetchTrades = (limit = 50) => api.get('/trades', { limit })
-export const fetchDailySummary = (date: string) => api.get(`/daily-summary/${date}`)
-export const fetchEquity = (limit = 200) => api.get('/equity', { limit })
+// Bots
+export const fetchBots = () => request<Bot[]>('/api/bots');
+export const createBot = (config: Partial<Bot>) =>
+  request<Bot>('/api/bots', { method: 'POST', body: JSON.stringify(config) });
+export const updateBot = (id: string, config: Partial<Bot>) =>
+  request<Bot>(`/api/bots/${id}`, { method: 'PUT', body: JSON.stringify(config) });
+export const deleteBot = (id: string) =>
+  request<void>(`/api/bots/${id}`, { method: 'DELETE' });
+export const startBot = (id: string) =>
+  request<void>(`/api/bots/${id}/start`, { method: 'POST' });
+export const stopBot = (id: string) =>
+  request<void>(`/api/bots/${id}/stop`, { method: 'POST' });
 
 // Strategies
-export const fetchStrategies = () => api.get('/strategies')
+export const fetchStrategies = () => request<Strategy[]>('/api/strategies');
+export const saveStrategy = (strategy: Partial<Strategy>) =>
+  request<Strategy>('/api/strategies', { method: 'POST', body: JSON.stringify(strategy) });
+export const updateStrategy = (name: string, strategy: Partial<Strategy>) =>
+  request<Strategy>(`/api/strategies/${name}`, { method: 'PUT', body: JSON.stringify(strategy) });
+export const deleteStrategy = (name: string) =>
+  request<void>(`/api/strategies/${name}`, { method: 'DELETE' });
+
+// Analytics
+export const fetchTradeHistory = (filters?: Record<string, string>) => {
+  const params = new URLSearchParams(filters);
+  return request<{ trades: Trade[]; total: number }>(`/api/trades/history?${params}`);
+};
+export const fetchEquitySnapshots = (symbol?: string, days?: number) => {
+  const params = new URLSearchParams();
+  if (symbol) params.set('symbol', symbol);
+  if (days) params.set('days', String(days));
+  return request<EquitySnapshot[]>(`/api/equity/snapshots?${params}`);
+};
+
+// Intelligence
+export const fetchSentiment = (symbol: string) =>
+  request<SentimentData>(`/api/graph/sentiment/${symbol}`);
+export const fetchCrisisStatus = () => request<CrisisStatus>('/api/graph/crisis');
+export const toggleCrisisMode = (active: boolean) =>
+  request<void>('/api/graph/crisis', { method: 'PUT', body: JSON.stringify({ active }) });
+export const fetchNews = () => request<NewsItem[]>('/api/graph/news');
+
+// Backtest
+export const runBacktest = (config: BacktestConfig) =>
+  request<{ id: string }>('/api/backtest/run', { method: 'POST', body: JSON.stringify(config) });
+export const fetchBacktestResults = (id: string) =>
+  request<BacktestResults>(`/api/backtest/results/${id}`);
 
 // Config
-export const fetchConfig = () => api.get('/config')
-export const updateConfig = (updates: object) => api.put('/config', updates)
+export const fetchConfig = () => request<AppConfig>('/api/config');
+export const updateConfig = (config: Partial<AppConfig>) =>
+  request<AppConfig>('/api/config', { method: 'PUT', body: JSON.stringify(config) });
 
-// Bot control
-export const botStart = () => api.post('/bot/start')
-export const botStop = () => api.post('/bot/stop')
-export const botRestart = () => api.post('/bot/restart')
-export const fetchBotState = () => api.get('/bot/state')
+// Env
+export const fetchEnvVars = () => request<EnvVariable[]>('/api/env');
+export const updateEnvVars = (vars: EnvVariable[]) =>
+  request<{ requires_restart: boolean }>('/api/env', { method: 'PUT', body: JSON.stringify(vars) });
 
-// Manual Trading
-export const manualTradeOpen = (side: 'long' | 'short') => api.post('/bot/trade/open', { side })
-export const manualTradeClose = () => api.post('/bot/trade/close')
-
-// Notifications
-export const fetchDiscordConfig = () => api.get('/notifications/discord')
-export const updateDiscordConfig = (payload: { webhook_url: string; enabled: boolean }) =>
-  api.put('/notifications/discord', payload)
-export const testDiscord = () => api.post('/notifications/discord/test')
-
-// Types
-export interface Trade {
-  id: number
-  timestamp: string
-  symbol: string
-  side: string
-  action: string
-  price: number
-  size: number
-  notional: number
-  pnl: number | null
-  pnl_pct: number | null
-  reason: string | null
-  stop_loss: number | null
-  take_profit: number | null
-  expected_price: number | null
-  slippage: number | null
-  fee: number | null
-  fee_currency: string | null
-}
-
-export interface EquitySnapshot {
-  id: number
-  timestamp: string
-  balance: number
-}
-
-export interface CycleMessage {
-  type: 'cycle'
-  timestamp: string
-  symbol: string
-  price: number
-  signal: string
-  reason: string
-  indicators: Record<string, number>
-  position: string | null
-  balance: number
-  daily_pnl: number
-  daily_pnl_pct: number
-  circuit_breaker: boolean
-  market_trend?: string
-  time_in_trade?: number
-}
-
+// Markets
+export const fetchMarkets = () => request<MarketPair[]>('/api/markets');

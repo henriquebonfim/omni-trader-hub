@@ -27,14 +27,14 @@ class DatabaseFactory:
           password: null
         """
         db_config = getattr(config, "database", None)
-        
+
         # Handle port: extract and convert safely, default to 7687
         port_raw = getattr(db_config, "port", 7687) if db_config else 7687
         try:
             port = int(port_raw) if port_raw else 7687
         except (ValueError, TypeError):
             port = 7687
-        
+
         return MemgraphDatabase(
             host=getattr(db_config, "host", "memgraph") if db_config else "memgraph",
             port=port,

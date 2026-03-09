@@ -12,6 +12,7 @@ def is_memgraph_available() -> bool:
     """Check if Memgraph is available for integration tests."""
     try:
         from neo4j import GraphDatabase
+
         driver = GraphDatabase.driver("bolt://memgraph:7687", auth=None)
         with driver.session() as session:
             session.run("RETURN 1").single()
@@ -22,8 +23,7 @@ def is_memgraph_available() -> bool:
 
 
 pytestmark = pytest.mark.skipif(
-    not is_memgraph_available(),
-    reason="Memgraph not available (integration test)"
+    not is_memgraph_available(), reason="Memgraph not available (integration test)"
 )
 
 
