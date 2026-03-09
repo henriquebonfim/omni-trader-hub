@@ -27,8 +27,9 @@ from .risk import RiskManager
 from .strategies.base import StrategyResult
 from .workers.dispatch import dispatch
 from .workers.serializers import df_to_json, market_data_to_json
-from .workers.tasks import analyze_regime, analyze_strategy
+from .workers.tasks import analyze_regime, analyze_strategy, analyze_knowledge_graph
 from .ws_feed import WsFeed
+from .graph.crisis import CrisisManager
 
 # Configure structured logging
 structlog.configure(
@@ -76,6 +77,7 @@ class OmniTrader:
         self.risk = RiskManager(database=self.database)
         self.notifier = Notifier()
         self.regime_classifier = RegimeClassifier()
+        self.crisis_manager = CrisisManager(database=self.database)
 
         # Load strategy dynamically
         strategy_name = getattr(self.config.strategy, "name", "ema_volume")
@@ -636,7 +638,7 @@ class OmniTrader:
             primary_ohlcv_json = df_to_json(primary_ohlcv)
 
             try:
-                strategy_result_dict, regime_value = await asyncio.gather(
+                strategy_result_dict, regime_value, graph_analytics_dict = await asyncio.gather(
                     dispatch(
                         analyze_strategy,
                         strategy_name,
@@ -651,13 +653,31 @@ class OmniTrader:
                         primary_ohlcv_json,
                         timeout=25.0,
                     ),
+                    dispatch(
+                        analyze_knowledge_graph,
+                        symbol,
+                        current_price,
+                        config_dict,
+                        timeout=25.0,
+                    ),
+                    return_exceptions=True
                 )
+                
+                # Check for exceptions
+                if isinstance(strategy_result_dict, Exception):
+                    raise strategy_result_dict
+                if isinstance(regime_value, Exception):
+                    raise regime_value
+                
                 result = StrategyResult(
                     signal=Signal(strategy_result_dict["signal"]),
                     reason=strategy_result_dict["reason"],
                     indicators=strategy_result_dict["indicators"],
                 )
                 current_regime = MarketRegime(regime_value)
+                
+                graph_analytics = graph_analytics_dict if not isinstance(graph_analytics_dict, Exception) else {}
+                
             except Exception as celery_exc:
                 # Celery worker unavailable or timed out — fall back to local execution.
                 logger.warning(
@@ -668,23 +688,43 @@ class OmniTrader:
                     market_data, current_side, market_trend=market_trend
                 )
                 current_regime = self.regime_classifier.analyze(primary_ohlcv)
+                graph_analytics = {}
 
-            # 5b. Regime Gating
-            # If current regime is not in strategy's valid regimes, force HOLD for entries.
-            # We allow exits to proceed even in wrong regime (to get out of trouble).
-            if current_regime not in self.strategy.valid_regimes:
-                if (
-                    result.signal in (Signal.LONG, Signal.SHORT)
-                    and not position.is_open
-                ):
+            # Evaluate auto-crisis
+            if graph_analytics:
+                contagion_risk = graph_analytics.get("contagion", {}).get("contagion_risk", False)
+                sentiment_level = graph_analytics.get("sentiment", {}).get("avg_sentiment", 0.0)
+                await self.crisis_manager.evaluate_automated_crisis(contagion_risk, sentiment_level)
+
+            # 5b. Gating Rules (Crisis & Regime)
+            # Crisis Mode Gating
+            is_crisis = await self.crisis_manager.is_crisis_active()
+            if is_crisis:
+                if result.signal in (Signal.LONG, Signal.SHORT) and not position.is_open:
                     logger.warning(
-                        "signal_rejected_regime_mismatch",
+                        "signal_rejected_crisis_mode",
                         signal=result.signal,
-                        regime=current_regime.value,
-                        valid_regimes=[r.value for r in self.strategy.valid_regimes],
+                        reason="Crisis Mode Active",
                     )
                     result.signal = Signal.HOLD
-                    result.reason = f"Regime Mismatch: {current_regime.value}"
+                    result.reason = "Crisis Mode Active"
+            else:
+                # Regime Gating
+                # If current regime is not in strategy's valid regimes, force HOLD for entries.
+                # We allow exits to proceed even in wrong regime (to get out of trouble).
+                if current_regime not in self.strategy.valid_regimes:
+                    if (
+                        result.signal in (Signal.LONG, Signal.SHORT)
+                        and not position.is_open
+                    ):
+                        logger.warning(
+                            "signal_rejected_regime_mismatch",
+                            signal=result.signal,
+                            regime=current_regime.value,
+                            valid_regimes=[r.value for r in self.strategy.valid_regimes],
+                        )
+                        result.signal = Signal.HOLD
+                        result.reason = f"Regime Mismatch: {current_regime.value}"
 
             # Sanitize indicators for JSON serialization (handle numpy types)
             def _sanitize(v):
@@ -751,6 +791,7 @@ class OmniTrader:
                         "daily_pnl": self.risk.daily_stats.realized_pnl,
                         "daily_pnl_pct": self.risk.daily_stats.pnl_pct,
                         "circuit_breaker": self.risk.check_circuit_breaker(),
+                        "graph_analytics": graph_analytics,
                     }
                 )
 
