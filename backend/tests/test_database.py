@@ -2,7 +2,6 @@ import asyncio
 import json
 from datetime import datetime, timezone
 
-import neo4j
 import pytest
 import pytest_asyncio
 
