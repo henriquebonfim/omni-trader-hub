@@ -6,11 +6,6 @@ services:
     container_name: omnitrader
     ports:
       - "8000:8000"
-    volumes:
-      - ./backend/config:/app/config
-      - ./backend/data:/app/data
-      - ./backend/src:/app/src
-      - ./backend/tests:/app/tests
     env_file:
       - .env
     depends_on:
@@ -27,8 +22,6 @@ services:
       dockerfile: Dockerfile
     container_name: omnitrader-watchdog
     command: python -m src.watchdog
-    volumes:
-      - ./backend/config:/app/config
     environment:
       - WATCHDOG_HEALTH_URL=http://omnitrader:8000/api/health
     env_file:
@@ -44,9 +37,6 @@ services:
       dockerfile: Dockerfile
     container_name: omnitrader-celery
     command: celery -A src.workers worker --loglevel=info --concurrency=2 --queues=celery
-    volumes:
-      - ./backend/config:/app/config
-      - ./backend/src:/app/src
     env_file:
       - .env
     depends_on:
@@ -67,25 +57,10 @@ services:
     container_name: omnitrader-frontend
     ports:
       - "3000:80"
-    volumes:
-      - ./frontend/src:/app/src
-      - ./frontend/package.json:/app/package.json
-      - ./frontend/bun.lockb:/app/bun.lockb
     depends_on:
       omnitrader:
         condition: service_started
     restart: unless-stopped
-
-  frontend-test:
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile
-      target: builder
-    volumes:
-      - ./frontend:/app
-    working_dir: /app
-    profiles:
-      - test
 
   memgraph:
     image: memgraph/memgraph-mage:3.8.0-relwithdebinfo
