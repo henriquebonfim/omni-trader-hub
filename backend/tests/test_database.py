@@ -23,7 +23,8 @@ def is_memgraph_available() -> bool:
 
 
 pytestmark = pytest.mark.skipif(
-    not is_memgraph_available(), reason="Memgraph not available (integration test)"
+    not is_memgraph_available(),
+    reason="Memgraph not available (integration test)"
 )
 
 
