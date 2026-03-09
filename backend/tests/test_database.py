@@ -2,10 +2,30 @@ import asyncio
 import json
 from datetime import datetime, timezone
 
+import neo4j
 import pytest
 import pytest_asyncio
 
 from src.database import Database
+
+
+def is_memgraph_available() -> bool:
+    """Check if Memgraph is available for integration tests."""
+    try:
+        from neo4j import GraphDatabase
+        driver = GraphDatabase.driver("bolt://memgraph:7687", auth=None)
+        with driver.session() as session:
+            session.run("RETURN 1").single()
+        driver.close()
+        return True
+    except Exception:
+        return False
+
+
+pytestmark = pytest.mark.skipif(
+    not is_memgraph_available(),
+    reason="Memgraph not available (integration test)"
+)
 
 
 @pytest_asyncio.fixture
