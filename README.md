@@ -8,6 +8,8 @@
 
 **Omni-Trader Hub** is a comprehensive, modern dashboard interface designed for quantitative traders and algorithmic trading bot managers. It features dark-mode aesthetics, rich interactive charts, and an array of components optimized for managing trading backtests, strategies, risk monitors, and live market intelligence.
 
+![Omni-Trader Hub](public/hero.png)
+
 This project was built to showcase a high-performance frontend implementation using **React, Vite, TypeScript, Tailwind CSS**, and **shadcn-ui**.
 
 > **Note**: This is a frontend-only showcase. The data displayed is mocked for demonstration purposes, ensuring no actual financial data, API keys, or live connections are required to run and interact with the application.
