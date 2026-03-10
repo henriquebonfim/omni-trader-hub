@@ -5,7 +5,7 @@ Institutional-grade audit completed **2026-03-03** — findings integrated below
 Multi-asset autonomous platform expansion added **2026-03-09** — T37-T42 driven by frontend spec (PROMPT.md).
 Frontend-backend integration migration added **2026-03-09** — T43 bridges new frontend to existing backend.
 
-> Last updated: 2026-03-09 | Sprint status: T32-T34 completed and merged to master. Next: T35 (Backtesting), T36 (Exchange Adapter), T37-T42 (Multi-Asset Platform)
+> Last updated: 2026-03-09 | Sprint status: T32-T35 completed and merged to master. Next: T36 (Exchange Adapter), T37-T42 (Multi-Asset Platform)
 
 ---
 
@@ -83,13 +83,15 @@ Frontend-backend integration migration added **2026-03-09** — T43 bridges new 
 - **Effort**: ~3 days
 
 ### T35. Backtesting Engine on Memgraph (absorbs T29)
-- [ ] **Phase 4a: Historical candle storage**
+> **T35 COMPLETED**: ✅ Backtesting engine, metrics suite, and Memgraph candle storage integration complete (2026-03-09).
+
+- [x] **Phase 4a: Historical candle storage**
     - Bulk download from Binance REST API `/api/v3/klines`: handle pagination (1000 bars/call max), rate limiting
     - Store as `:Candle {symbol, timeframe, timestamp, open, high, low, close, volume}` nodes
     - Composite key: (symbol, timeframe, timestamp) — use Memgraph index
     - Query pattern: `MATCH (c:Candle {symbol: $sym, timeframe: $tf}) WHERE c.timestamp >= $start AND c.timestamp <= $end RETURN c ORDER BY c.timestamp`
     - Deduplication: skip inserts if node already exists
-- [ ] **Phase 4b: Event-driven backtest simulator** ([backend/src/backtest/engine.py](backend/src/backtest/engine.py))
+- [x] **Phase 4b: Event-driven backtest simulator** ([backend/src/backtest/engine.py](backend/src/backtest/engine.py))
     - `BacktestEngine` class: iterates `:Candle` nodes chronologically
     - Reuse existing `BaseStrategy` interface — **zero changes to strategy code**
     - On each candle:
@@ -99,7 +101,7 @@ Frontend-backend integration migration added **2026-03-09** — T43 bridges new 
         4. Update position state, unrealized PnL
     - Cost model: 0.04% taker fee (assume all market orders), bid-ask spread (0.01% + ATR volatility adjustment), funding rate costs (8h intervals for perpetuals)
     - Store trades, signals, snapshots as Memgraph nodes during simulation
-- [ ] **Phase 4c: Walk-forward validation + performance metrics** ([backend/src/backtest/metrics.py](backend/src/backtest/metrics.py))
+- [x] **Phase 4c: Walk-forward validation + performance metrics** ([backend/src/backtest/metrics.py](backend/src/backtest/metrics.py))
     - Rolling train/test splits: train on 6 months, test on 1 month, roll forward
     - Separate in-sample vs out-of-sample tracking (detect overfitting)
     - Performance metrics: Sharpe ratio (annualized, assume 252 trading days), Sortino ratio, max drawdown, profit factor, win rate, avg win/loss, consecutive win/loss streaks
