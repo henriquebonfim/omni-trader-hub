@@ -21,10 +21,13 @@ def get_session_status(session_id):
         lines = result.stdout.strip().split("\n")
         for line in lines:
             if session_id in line:
-                # Basic parsing: ID is usually the first column, Status is the last
+                # Jules can truncate status columns; detect known multi-word states first.
+                if "Awaiting User" in line:
+                    return "AWAITING_USER"
+
+                # Basic fallback parsing: ID is usually first column, status often last token.
                 parts = line.split()
                 if len(parts) >= 2:
-                    # Status is likely the last part
                     status = parts[-1]
                     return status
 
@@ -40,7 +43,7 @@ def main():
     parser.add_argument(
         "--interval", type=int, default=30, help="Polling interval in seconds"
     )
-    parser.add_argument("--timeout", type=int, default=1800, help="Timeout in seconds")
+    parser.add_argument("--timeout", type=int, default=3600, help="Timeout in seconds")
 
     args = parser.parse_args()
 
@@ -52,6 +55,12 @@ def main():
 
         if status == "COMPLETED" or status == "DONE" or status == "FINISHED":
             print(f"Session {args.id} completed successfully.")
+            sys.exit(0)
+        elif status == "AWAITING_USER":
+            print(
+                f"Session {args.id} is awaiting user action/feedback. "
+                "Pull with: make j-pull ID=<session_id>"
+            )
             sys.exit(0)
         elif status == "FAILED" or status == "ERROR":
             print(f"Session {args.id} failed.")
