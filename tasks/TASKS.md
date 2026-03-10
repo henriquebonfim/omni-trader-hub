@@ -5,7 +5,7 @@ Institutional-grade audit completed **2026-03-03** — findings integrated below
 Multi-asset autonomous platform expansion added **2026-03-09** — T37-T42 driven by frontend spec (PROMPT.md).
 Frontend-backend integration migration added **2026-03-09** — T43 bridges new frontend to existing backend.
 
-> Last updated: 2026-03-09 | Sprint status: T32-T35 completed and merged to master. Next: T36 (Exchange Adapter), T37-T42 (Multi-Asset Platform)
+> Last updated: 2026-03-09 | Sprint status: T32-T36 completed and merged to master. Next: T37-T42 (Multi-Asset Platform)
 
 ---
 
@@ -118,7 +118,9 @@ Frontend-backend integration migration added **2026-03-09** — T43 bridges new 
     - Bootstrap CIs don't include zero expectancy
 
 ### T36. Exchange Adapter Architecture — Decouple from CCXT
-- [ ] **Phase 5a: Abstract exchange interface** ([backend/src/exchanges/base.py](backend/src/exchanges/base.py))
+> **T36 COMPLETED**: ✅ Exchange adapter architecture merged to master (2026-03-09).
+
+- [x] **Phase 5a: Abstract exchange interface** ([backend/src/exchanges/base.py](backend/src/exchanges/base.py))
     - Create `BaseExchangeAdapter` abstract class with 18 core methods (match current `Exchange` API surface):
         - Connection: `connect()`, `close()`, `health_check()`
         - Market data: `fetch_ohlcv()`, `get_ticker()`, `get_mark_price()`
@@ -128,14 +130,14 @@ Frontend-backend integration migration added **2026-03-09** — T43 bridges new 
     - All methods return standardized DTOs (dataclasses): `TickerData`, `PositionData`, `BalanceData`, `OrderResult`
     - Paper trading simulation: move from CCXT wrapper to base adapter (`_paper_mode` flag → shared logic across all adapters)
     - Rate limiting: shared `LeakyBucketRateLimiter` instance per adapter
-- [ ] **Phase 5b: CCXT adapter implementation** ([backend/src/exchanges/ccxt_adapter.py](backend/src/exchanges/ccxt_adapter.py))
+- [x] **Phase 5b: CCXT adapter implementation** ([backend/src/exchanges/ccxt_adapter.py](backend/src/exchanges/ccxt_adapter.py))
     - `CCXTAdapter(BaseExchangeAdapter)` — wraps existing `ccxt.binance()` client
     - Move all current `Exchange` class code into this adapter (minimal refactor)
     - Translate CCXT responses to DTOs: `ccxt_ticker → TickerData`, `ccxt_position → PositionData`, etc.
     - Handle CCXT-specific exceptions → standardized `ExchangeError`, `RateLimitError`, `OrderRejectedError`
     - Dependency pinning: `ccxt>=4.0.0,<4.4.0` (avoid lighter-client bug)
     - Version warnings: log when using CCXT 4.3.x (explain stability choice)
-- [ ] **Phase 5c: Binance Direct REST adapter** ([backend/src/exchanges/binance_direct.py](backend/src/exchanges/binance_direct.py))
+- [x] **Phase 5c: Binance Direct REST adapter** ([backend/src/exchanges/binance_direct.py](backend/src/exchanges/binance_direct.py))
     - `BinanceDirectAdapter(BaseExchangeAdapter)` — pure HTTP client using `httpx` or `aiohttp`
     - Binance Futures REST API v1: `POST /fapi/v1/order`, `GET /fapi/v2/balance`, `GET /fapi/v2/positionRisk`
     - Full control over:
@@ -147,7 +149,7 @@ Frontend-backend integration migration added **2026-03-09** — T43 bridges new 
     - Handle WebSocket keepalive (listenKey for user data stream)
     - Add response schema validation: `pydantic` models for type safety
     - Implement order recvWindow validation (avoid timestamp rejections)
-- [ ] **Phase 5d: Adapter factory + configuration** ([backend/src/exchanges/factory.py](backend/src/exchanges/factory.py))
+- [x] **Phase 5d: Adapter factory + configuration** ([backend/src/exchanges/factory.py](backend/src/exchanges/factory.py))
     - `ExchangeFactory.create_adapter(adapter_type: str) → BaseExchangeAdapter`
     - Config options in [config.yaml](backend/config/config.yaml):
         ```yaml
@@ -159,7 +161,7 @@ Frontend-backend integration migration added **2026-03-09** — T43 bridges new 
     - Fallback logic: if `binance_direct` fails 3× consecutively → switch to `ccxt_adapter` for session
     - Adapter health tracking: Redis metrics for success/error rates per adapter type
     - Startup validation: test adapter connection before OmniTrader initializes strategies
-- [ ] **Phase 5e: Integration + testing updates**
+- [x] **Phase 5e: Integration + testing updates**
     - Update `OmniTrader.__init__()` in [main.py](backend/src/main.py): replace `self.exchange = Exchange()` with `self.exchange = ExchangeFactory.create_adapter(config.exchange.adapter)`
     - Update all tests: replace `Exchange` mocks with `BaseExchangeAdapter` mocks
     - Create adapter-specific test suites:
