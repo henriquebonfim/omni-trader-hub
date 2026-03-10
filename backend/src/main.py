@@ -21,15 +21,15 @@ from src.strategies import Signal, get_strategy
 from .analysis.regime import MarketRegime, RegimeClassifier
 from .config import get_config, reload_config
 from .database import DatabaseFactory
-from .exchange import Exchange
+from .exchanges import ExchangeFactory
+from .graph.crisis import CrisisManager
 from .notifier import Notifier
 from .risk import RiskManager
 from .strategies.base import StrategyResult
 from .workers.dispatch import dispatch
 from .workers.serializers import df_to_json, market_data_to_json
-from .workers.tasks import analyze_regime, analyze_strategy, analyze_knowledge_graph
+from .workers.tasks import analyze_knowledge_graph, analyze_regime, analyze_strategy
 from .ws_feed import WsFeed
-from .graph.crisis import CrisisManager
 
 # Configure structured logging
 structlog.configure(
@@ -72,7 +72,7 @@ class OmniTrader:
 
     def __init__(self):
         self.config = get_config()
-        self.exchange = Exchange()
+        self.exchange = ExchangeFactory.create_exchange()
         self.database = DatabaseFactory.get_database(self.config)
         self.risk = RiskManager(database=self.database)
         self.notifier = Notifier()

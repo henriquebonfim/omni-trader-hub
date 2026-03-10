@@ -6,6 +6,7 @@ from pydantic import BaseModel, ConfigDict, Field, HttpUrl, model_validator
 class ExchangeConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
     name: Optional[Literal["binance"]] = None
+    adapter: Optional[Literal["ccxt", "binance_direct"]] = None
     testnet: Optional[bool] = None
     paper_mode: Optional[bool] = None
     leverage: Optional[int] = Field(None, ge=1, le=125)

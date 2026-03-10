@@ -13,51 +13,14 @@ import ccxt.async_support as ccxt
 import pandas as pd
 import structlog
 
-from .config import get_config
-from .rate_limiter import LeakyBucketRateLimiter
+from ..config import get_config
+from ..rate_limiter import LeakyBucketRateLimiter
+from .base import BaseExchange, Position
 
 logger = structlog.get_logger()
 
 
-class Position:
-    """Represents a futures position."""
-
-    def __init__(self, data: dict | None = None):
-        if data is None:
-            self.symbol = None
-            self.side = None
-            self.size = 0.0
-            self.entry_price = 0.0
-            self.notional = 0.0
-            self.unrealized_pnl = 0.0
-            self.leverage = 1
-            self.liquidation_price = 0.0
-        else:
-            self.symbol = data.get("symbol")
-            self.side = data.get("side")  # "long" or "short"
-            self.size = float(data.get("contracts", 0))
-            self.entry_price = float(data.get("entryPrice", 0))
-            self.notional = float(data.get("notional", 0))
-            self.unrealized_pnl = float(data.get("unrealizedPnl", 0))
-            self.leverage = int(data.get("leverage", 1))
-            self.liquidation_price = float(data.get("liquidationPrice", 0))
-
-    @property
-    def contracts(self) -> float:
-        """Alias for size to match standard naming."""
-        return self.size
-
-    @property
-    def is_open(self) -> bool:
-        return self.size > 0
-
-    def __repr__(self) -> str:
-        if not self.is_open:
-            return "Position(None)"
-        return f"Position({self.side} {self.size} @ {self.entry_price}, PnL: {self.unrealized_pnl:.2f})"
-
-
-class Exchange:
+class CCXTExchange(BaseExchange):
     """
     Binance Futures exchange wrapper.
 

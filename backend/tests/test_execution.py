@@ -3,7 +3,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from src.exchange import Position
+from src.exchanges.base import Position
 from src.main import OmniTrader
 
 
@@ -17,7 +17,7 @@ def bot():
 
         # Mock dependencies
         with (
-            patch("src.main.Exchange"),
+            patch("src.main.ExchangeFactory.create_exchange"),
             patch("src.main.DatabaseFactory") as mock_db_factory,
             patch("src.main.RiskManager"),
             patch("src.main.Notifier") as MockNotifier,
@@ -387,13 +387,14 @@ async def test_reconcile_positions_fallback(bot):
 
 @pytest.mark.asyncio
 async def test_paper_mode_long_pnl_calculation():
-    from src.exchange import Exchange
+    from src.exchanges import ExchangeFactory
+    from src.exchanges.ccxt_adapter import CCXTExchange
 
-    with patch("src.exchange.get_config") as mock_config:
+    with patch("src.exchanges.ccxt_adapter.get_config") as mock_config:
         mock_config.return_value.exchange.paper_mode = True
         mock_config.return_value.trading.symbol = "BTC/USDT"
 
-        exchange = Exchange()
+        exchange = ExchangeFactory.create_exchange()
         exchange.paper_mode = True
         exchange._paper_balance = 10000.0
 
@@ -422,13 +423,14 @@ async def test_paper_mode_long_pnl_calculation():
 
 @pytest.mark.asyncio
 async def test_paper_mode_short_pnl_calculation():
-    from src.exchange import Exchange
+    from src.exchanges import ExchangeFactory
+    from src.exchanges.ccxt_adapter import CCXTExchange
 
-    with patch("src.exchange.get_config") as mock_config:
+    with patch("src.exchanges.ccxt_adapter.get_config") as mock_config:
         mock_config.return_value.exchange.paper_mode = True
         mock_config.return_value.trading.symbol = "BTC/USDT"
 
-        exchange = Exchange()
+        exchange = ExchangeFactory.create_exchange()
         exchange.paper_mode = True
         exchange._paper_balance = 10000.0
 
@@ -456,11 +458,12 @@ async def test_paper_mode_short_pnl_calculation():
 
 
 def test_paper_mode_long_sl_trigger():
-    from src.exchange import Exchange
+    from src.exchanges import ExchangeFactory
+    from src.exchanges.ccxt_adapter import CCXTExchange
 
-    with patch("src.exchange.get_config") as mock_config:
+    with patch("src.exchanges.ccxt_adapter.get_config") as mock_config:
         mock_config.return_value.exchange.paper_mode = True
-        exchange = Exchange()
+        exchange = ExchangeFactory.create_exchange()
         exchange.paper_mode = True
         exchange._paper_balance = 10000.0
 
@@ -491,11 +494,12 @@ def test_paper_mode_long_sl_trigger():
 
 
 def test_paper_mode_long_tp_trigger():
-    from src.exchange import Exchange
+    from src.exchanges import ExchangeFactory
+    from src.exchanges.ccxt_adapter import CCXTExchange
 
-    with patch("src.exchange.get_config") as mock_config:
+    with patch("src.exchanges.ccxt_adapter.get_config") as mock_config:
         mock_config.return_value.exchange.paper_mode = True
-        exchange = Exchange()
+        exchange = ExchangeFactory.create_exchange()
         exchange.paper_mode = True
         exchange._paper_balance = 10000.0
 
@@ -526,11 +530,12 @@ def test_paper_mode_long_tp_trigger():
 
 
 def test_paper_mode_short_sl_trigger():
-    from src.exchange import Exchange
+    from src.exchanges import ExchangeFactory
+    from src.exchanges.ccxt_adapter import CCXTExchange
 
-    with patch("src.exchange.get_config") as mock_config:
+    with patch("src.exchanges.ccxt_adapter.get_config") as mock_config:
         mock_config.return_value.exchange.paper_mode = True
-        exchange = Exchange()
+        exchange = ExchangeFactory.create_exchange()
         exchange.paper_mode = True
         exchange._paper_balance = 10000.0
 
@@ -561,11 +566,12 @@ def test_paper_mode_short_sl_trigger():
 
 
 def test_paper_mode_short_tp_trigger():
-    from src.exchange import Exchange
+    from src.exchanges import ExchangeFactory
+    from src.exchanges.ccxt_adapter import CCXTExchange
 
-    with patch("src.exchange.get_config") as mock_config:
+    with patch("src.exchanges.ccxt_adapter.get_config") as mock_config:
         mock_config.return_value.exchange.paper_mode = True
-        exchange = Exchange()
+        exchange = ExchangeFactory.create_exchange()
         exchange.paper_mode = True
         exchange._paper_balance = 10000.0
 
@@ -596,11 +602,12 @@ def test_paper_mode_short_tp_trigger():
 
 
 def test_paper_mode_no_trigger_on_non_crossing_price():
-    from src.exchange import Exchange
+    from src.exchanges import ExchangeFactory
+    from src.exchanges.ccxt_adapter import CCXTExchange
 
-    with patch("src.exchange.get_config") as mock_config:
+    with patch("src.exchanges.ccxt_adapter.get_config") as mock_config:
         mock_config.return_value.exchange.paper_mode = True
-        exchange = Exchange()
+        exchange = ExchangeFactory.create_exchange()
         exchange.paper_mode = True
         exchange._paper_balance = 10000.0
 
@@ -764,12 +771,13 @@ async def test_open_position_atr_stops_calculation_failure(bot):
 
 @pytest.mark.asyncio
 async def test_market_long_invalid_amount():
-    from src.exchange import Exchange
+    from src.exchanges import ExchangeFactory
+    from src.exchanges.ccxt_adapter import CCXTExchange
 
-    with patch("src.exchange.get_config") as mock_config:
+    with patch("src.exchanges.ccxt_adapter.get_config") as mock_config:
         mock_config.return_value.exchange.paper_mode = True
         mock_config.return_value.trading.symbol = "BTC/USDT"
-        exchange = Exchange()
+        exchange = ExchangeFactory.create_exchange()
 
         with pytest.raises(
             ValueError, match="market_long requires amount > 0, got None"
@@ -787,12 +795,13 @@ async def test_market_long_invalid_amount():
 
 @pytest.mark.asyncio
 async def test_market_short_invalid_amount():
-    from src.exchange import Exchange
+    from src.exchanges import ExchangeFactory
+    from src.exchanges.ccxt_adapter import CCXTExchange
 
-    with patch("src.exchange.get_config") as mock_config:
+    with patch("src.exchanges.ccxt_adapter.get_config") as mock_config:
         mock_config.return_value.exchange.paper_mode = True
         mock_config.return_value.trading.symbol = "BTC/USDT"
-        exchange = Exchange()
+        exchange = ExchangeFactory.create_exchange()
 
         with pytest.raises(
             ValueError, match="market_short requires amount > 0, got None"

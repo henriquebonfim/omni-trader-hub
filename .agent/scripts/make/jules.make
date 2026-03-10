@@ -5,6 +5,7 @@ $(shell mkdir -p $(JULES_DIR)/sessions)
 
 # Default values
 PARALLEL ?= 1
+J_POLL_TIMEOUT ?= 3600
 
 j-help:
 	@echo "Event-Oriented Jules commands:"
@@ -51,7 +52,7 @@ j-status:
 
 j-poll:
 	@if [ -z "$(ID)" ]; then echo "Usage: make j-poll ID=<id>"; exit 1; fi
-	@python3 .agent/scripts/jules_poll.py --id $(ID) --interval 60 --timeout 1800
+	@python3 .agent/scripts/jules_poll.py --id $(ID) --interval 60 --timeout $(J_POLL_TIMEOUT)
 
 j-pull:
 	@if [ -z "$(ID)" ]; then echo "Usage: make j-pull ID=<id>"; exit 1; fi

@@ -6,6 +6,7 @@ database:
   type: memgraph
   username: ${MEMGRAPH_USERNAME}
 exchange:
+  adapter: ccxt
   leverage: 3
   margin_type: isolated
   name: binance
