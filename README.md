@@ -1,73 +1,91 @@
-# Welcome to your Lovable project
+# Alpha Trader Hub 🚀
 
-## Project info
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![TypeScript](https://img.shields.io/badge/TypeScript-007ACC?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
+[![React](https://img.shields.io/badge/React-20232A?logo=react&logoColor=61DAFB)](https://reactjs.org/)
+[![Vite](https://img.shields.io/badge/Vite-B73BFE?logo=vite&logoColor=FFD62E)](https://vitejs.dev/)
+[![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-38B2AC?logo=tailwind-css&logoColor=white)](https://tailwindcss.com/)
 
-**URL**: https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID
+**Alpha Trader Hub** is a comprehensive, modern dashboard interface designed for quantitative traders and algorithmic trading bot managers. It features dark-mode aesthetics, rich interactive charts, and an array of components optimized for managing trading backtests, strategies, risk monitors, and live market intelligence.
 
-## How can I edit this code?
+This project was built to showcase a high-performance frontend implementation using **React, Vite, TypeScript, Tailwind CSS**, and **shadcn-ui**.
 
-There are several ways of editing your application.
+> **Note**: This is a frontend-only showcase. The data displayed is mocked for demonstration purposes, ensuring no actual financial data, API keys, or live connections are required to run and interact with the application.
 
-**Use Lovable**
+## 🌟 Features
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and start prompting.
+- **Advanced Trading Dashboard**: Overview of portfolio performance, recent trades, and open positions.
+- **Interactive Chart Analysis**: Deep technical analysis capabilities using `lightweight-charts`.
+- **Strategy Backtesting Interface**: UI for configuring parameters, running simulated tests, and displaying walk-forward analysis metrics.
+- **Risk Monitor**: Visual circuit breakers, max drawdown limits, and portfolio health indicators.
+- **Market Intelligence**: Live sentiment emojis and news stream interfaces.
+- **Responsive & Modern UI**: Built with Radix UI primitives and styled via Tailwind CSS for a seamless dark-theme experience.
 
-Changes made via Lovable will be committed automatically to this repo.
+## 🛠️ Tech Stack
 
-**Use your preferred IDE**
+- **Framework**: [React](https://reactjs.org/) + [Vite](https://vitejs.dev/)
+- **Language**: [TypeScript](https://www.typescriptlang.org/)
+- **Styling**: [Tailwind CSS](https://tailwindcss.com/)
+- **Components**: [shadcn/ui](https://ui.shadcn.com/)
+- **Charts**: [Lightweight Charts](https://tradingview.github.io/lightweight-charts/), [Recharts](https://recharts.org/)
+- **Routing**: [React Router DOM](https://reactrouter.com/)
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+## 🚀 Getting Started
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+To get a local copy up and running, follow these simple steps:
 
-Follow these steps:
+### Prerequisites
 
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
+Ensure you have [Node.js](https://nodejs.org/) (v18 or higher recommended) and `npm` installed.
 
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
+### Installation
 
-# Step 3: Install the necessary dependencies.
-npm i
+1. **Clone the repository**
+   ```bash
+   git clone https://github.com/your-username/alpha-trader-hub.git
+   cd alpha-trader-hub
+   ```
 
-# Step 4: Start the development server with auto-reloading and an instant preview.
-npm run dev
-```
+2. **Install dependencies**
+   ```bash
+   npm install
+   ```
 
-**Edit a file directly in GitHub**
+3. **Start the development server**
+   ```bash
+   npm run dev
+   ```
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+4. **Open in browser**
+   Navigate to `http://localhost:8080` (or the port specified by Vite in your terminal).
 
-**Use GitHub Codespaces**
+## 🌍 Deployment
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+This application is optimized for static hosting platforms like **Firebase Hosting**, Vercel, or Netlify.
 
-## What technologies are used for this project?
+### Firebase Hosting
 
-This project is built with:
+1. Install the Firebase CLI:
+   ```bash
+   npm install -g firebase-tools
+   ```
+2. Login to Firebase:
+   ```bash
+   firebase login
+   ```
+3. Initialize the project (already configured via `firebase.json` in this repo, so you just need to link your project):
+   ```bash
+   firebase use --add
+   ```
+4. Build the project:
+   ```bash
+   npm run build
+   ```
+5. Deploy:
+   ```bash
+   firebase deploy --only hosting
+   ```
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+## 📝 License
 
-## How can I deploy this project?
-
-Simply open [Lovable](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and click on Share -> Publish.
-
-## Can I connect a custom domain to my Lovable project?
-
-Yes, you can!
-
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
-
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+Distributed under the MIT License. See `LICENSE` for more information.
