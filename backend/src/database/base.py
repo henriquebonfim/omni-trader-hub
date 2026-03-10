@@ -137,3 +137,28 @@ class BaseDatabase(ABC):
     ) -> None:
         """Log a funding payment."""
         pass
+
+    @abstractmethod
+    async def save_candles(
+        self, symbol: str, timeframe: str, candles: list[dict]
+    ) -> int:
+        """
+        Save a list of candles to the database.
+        Candle dict format: {"timestamp": int, "open": float, "high": float, "low": float, "close": float, "volume": float}
+        Returns the number of candles saved.
+        """
+        pass
+
+    @abstractmethod
+    async def get_candles(
+        self,
+        symbol: str,
+        timeframe: str,
+        start_time: Optional[int] = None,
+        end_time: Optional[int] = None,
+        limit: Optional[int] = None,
+    ) -> list[dict]:
+        """
+        Retrieve ordered candles from the database.
+        """
+        pass
