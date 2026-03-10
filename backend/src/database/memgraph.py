@@ -706,3 +706,94 @@ class MemgraphDatabase(BaseDatabase):
         async with self._driver.session() as session:
             await session.run(query, key=key)
             logger.debug("state_deleted", key=key)
+
+    # ==================== CANDLES ====================
+
+    async def save_candles(
+        self, symbol: str, timeframe: str, candles: list[dict]
+    ) -> int:
+        """
+        Save a list of candles to the database.
+        Candle dict format: {"timestamp": int, "open": float, "high": float, "low": float, "close": float, "volume": float}
+        Returns the number of candles saved.
+        """
+        if not candles:
+            return 0
+
+        # Optimization: use UNWIND to insert in bulk
+        query = """
+        UNWIND $candles AS candle
+        MERGE (c:Candle {symbol: $symbol, timeframe: $timeframe, timestamp: candle.timestamp})
+        SET c.open = candle.open,
+            c.high = candle.high,
+            c.low = candle.low,
+            c.close = candle.close,
+            c.volume = candle.volume
+        """
+
+        async with self._driver.session() as session:
+            await session.run(
+                query,
+                symbol=symbol,
+                timeframe=timeframe,
+                candles=candles,
+            )
+            # Memgraph driver does not return 'nodes created' summary via `result.consume().counters` reliably,
+            # so we just return the length of the list we provided.
+            return len(candles)
+
+    async def get_candles(
+        self,
+        symbol: str,
+        timeframe: str,
+        start_time: Optional[int] = None,
+        end_time: Optional[int] = None,
+        limit: Optional[int] = None,
+    ) -> list[dict]:
+        """
+        Retrieve ordered candles from the database.
+        """
+        conditions = ["c.symbol = $symbol", "c.timeframe = $timeframe"]
+        if start_time is not None:
+            conditions.append("c.timestamp >= $start_time")
+        if end_time is not None:
+            conditions.append("c.timestamp <= $end_time")
+
+        where_clause = " AND ".join(conditions)
+        limit_clause = f" LIMIT {limit}" if limit else ""
+
+        query = f"""
+        MATCH (c:Candle)
+        WHERE {where_clause}
+        RETURN c.timestamp as timestamp,
+               c.open as open,
+               c.high as high,
+               c.low as low,
+               c.close as close,
+               c.volume as volume
+        ORDER BY c.timestamp ASC
+        {limit_clause}
+        """
+
+        async with self._driver.session() as session:
+            result = await session.run(
+                query,
+                symbol=symbol,
+                timeframe=timeframe,
+                start_time=start_time,
+                end_time=end_time,
+            )
+            records = await result.fetch(1000000)  # arbitrary large number
+            
+            candles = []
+            for record in records:
+                candles.append({
+                    "timestamp": record["timestamp"],
+                    "open": record["open"],
+                    "high": record["high"],
+                    "low": record["low"],
+                    "close": record["close"],
+                    "volume": record["volume"],
+                })
+
+            return candles
