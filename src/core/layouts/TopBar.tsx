@@ -1,5 +1,5 @@
-import { Wifi, WifiOff, Circle } from 'lucide-react';
 import { StatusBadge } from '@/core/shared/StatusBadge';
+import { Circle, Wifi, WifiOff } from 'lucide-react';
 
 interface TopBarProps {
   wsStatus: 'connecting' | 'open' | 'closed';
@@ -11,7 +11,7 @@ export function TopBar({ wsStatus, botRunning = true }: TopBarProps) {
     <header className="h-12 flex items-center justify-between px-4 border-b border-border bg-card shrink-0">
       <div className="flex items-center gap-3">
         <Circle className={`h-3 w-3 fill-current ${botRunning ? 'text-trading-green' : 'text-trading-red'}`} />
-        <span className="font-bold text-foreground tracking-tight">Alpha Trader Hub</span>
+        <span className="font-bold text-foreground tracking-tight">Omni-Trader Hub</span>
       </div>
 
       <div className="hidden md:flex items-center gap-3">

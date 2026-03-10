@@ -1,4 +1,4 @@
-# Alpha Trader Hub 🚀
+# Omni-Trader Hub 🚀
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![TypeScript](https://img.shields.io/badge/TypeScript-007ACC?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
@@ -6,7 +6,7 @@
 [![Vite](https://img.shields.io/badge/Vite-B73BFE?logo=vite&logoColor=FFD62E)](https://vitejs.dev/)
 [![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-38B2AC?logo=tailwind-css&logoColor=white)](https://tailwindcss.com/)
 
-**Alpha Trader Hub** is a comprehensive, modern dashboard interface designed for quantitative traders and algorithmic trading bot managers. It features dark-mode aesthetics, rich interactive charts, and an array of components optimized for managing trading backtests, strategies, risk monitors, and live market intelligence.
+**Omni-Trader Hub** is a comprehensive, modern dashboard interface designed for quantitative traders and algorithmic trading bot managers. It features dark-mode aesthetics, rich interactive charts, and an array of components optimized for managing trading backtests, strategies, risk monitors, and live market intelligence.
 
 This project was built to showcase a high-performance frontend implementation using **React, Vite, TypeScript, Tailwind CSS**, and **shadcn-ui**.
 
