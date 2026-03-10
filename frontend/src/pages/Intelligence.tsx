@@ -1,8 +1,9 @@
-import { Panel } from '@/components/shared/Panel';
-import { StatusBadge } from '@/components/shared/StatusBadge';
-import { StatCard } from '@/components/shared/StatCard';
-import { mockNews, mockAlerts } from '@/lib/mock-data';
-import { cn } from '@/lib/utils';
+import { Panel } from '@/shared/components/Panel';
+import { StatusBadge } from '@/shared/components/StatusBadge';
+import { StatCard } from '@/shared/components/StatCard';
+import { mockNews } from '@/domains/market/mocks';
+import { mockAlerts } from '@/domains/system/mocks';
+import { cn } from '@/core/utils';
 import { useState } from 'react';
 import { AlertTriangle, Newspaper, Gauge, Globe, TrendingUp, TrendingDown } from 'lucide-react';
 

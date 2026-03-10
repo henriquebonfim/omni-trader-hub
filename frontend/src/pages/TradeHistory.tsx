@@ -1,15 +1,16 @@
 import { useState } from 'react';
-import { Panel } from '@/components/shared/Panel';
-import { StatusBadge } from '@/components/shared/StatusBadge';
-import { StatCard } from '@/components/shared/StatCard';
-import { mockTrades } from '@/lib/mock-data';
-import { cn } from '@/lib/utils';
+import { Panel } from '@/shared/components/Panel';
+import { StatusBadge } from '@/shared/components/StatusBadge';
+import { StatCard } from '@/shared/components/StatCard';
+import { mockTrades } from '@/domains/trade/mocks';
+import { cn } from '@/core/utils';
 import { Download, ChevronDown, ChevronUp, Search } from 'lucide-react';
+import type { Trade } from '@/domains/trade/types';
 
 export default function TradeHistory() {
   const [period, setPeriod] = useState<'today' | 'week' | 'month' | 'all'>('all');
   const [search, setSearch] = useState('');
-  const [sortField, setSortField] = useState<string>('timestamp');
+  const [sortField, setSortField] = useState<keyof Trade>('timestamp');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
   const [page, setPage] = useState(0);
   const [expanded, setExpanded] = useState<number | null>(null);
@@ -22,8 +23,9 @@ export default function TradeHistory() {
   );
 
   const sorted = [...filtered].sort((a, b) => {
-    const aVal = (a as any)[sortField];
-    const bVal = (b as any)[sortField];
+    const aVal = a[sortField];
+    const bVal = b[sortField];
+    if (aVal === undefined || bVal === undefined) return 0;
     return sortDir === 'asc' ? (aVal > bVal ? 1 : -1) : (aVal < bVal ? 1 : -1);
   });
 
@@ -34,12 +36,12 @@ export default function TradeHistory() {
   const wins = closedTrades.filter(t => (t.pnl || 0) > 0).length;
   const winRate = closedTrades.length > 0 ? (wins / closedTrades.length) * 100 : 0;
 
-  const toggleSort = (field: string) => {
+  const toggleSort = (field: keyof Trade) => {
     if (sortField === field) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
     else { setSortField(field); setSortDir('desc'); }
   };
 
-  const SortIcon = ({ field }: { field: string }) => (
+  const SortIcon = ({ field }: { field: keyof Trade }) => (
     sortField === field ? (sortDir === 'asc' ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />) : null
   );
 
@@ -108,18 +110,17 @@ export default function TradeHistory() {
                   <th
                     key={col.key}
                     className="text-left px-4 py-3 font-medium text-muted-foreground cursor-pointer hover:text-foreground whitespace-nowrap"
-                    onClick={() => toggleSort(col.key)}
+                    onClick={() => toggleSort(col.key as keyof Trade)}
                   >
-                    <span className="flex items-center gap-1">{col.label} <SortIcon field={col.key} /></span>
+                    <span className="flex items-center gap-1">{col.label} <SortIcon field={col.key as keyof Trade} /></span>
                   </th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {paginated.map(trade => (
-                <>
+                <React.Fragment key={trade.id}>
                   <tr
-                    key={trade.id}
                     className="border-b border-border/30 hover:bg-secondary/30 cursor-pointer"
                     onClick={() => setExpanded(expanded === trade.id ? null : trade.id)}
                   >
@@ -137,7 +138,7 @@ export default function TradeHistory() {
                     <td className="px-4 py-2.5 text-muted-foreground">{trade.reason}</td>
                   </tr>
                   {expanded === trade.id && (
-                    <tr key={`${trade.id}-detail`} className="bg-secondary/20">
+                    <tr className="bg-secondary/20">
                       <td colSpan={8} className="px-4 py-3">
                         <div className="grid grid-cols-4 gap-3 text-[11px]">
                           <div><span className="text-muted-foreground">Notional:</span> <span className="font-mono">${trade.notional.toFixed(2)}</span></div>
@@ -148,7 +149,7 @@ export default function TradeHistory() {
                       </td>
                     </tr>
                   )}
-                </>
+                </React.Fragment>
               ))}
             </tbody>
           </table>

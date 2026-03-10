@@ -1,11 +1,11 @@
 import { useState } from 'react';
-import { Panel } from '@/components/shared/Panel';
-import { StatusBadge } from '@/components/shared/StatusBadge';
-import { EmptyState } from '@/components/shared/EmptyState';
-import { mockStrategies } from '@/lib/mock-data';
-import { cn } from '@/lib/utils';
+import { Panel } from '@/shared/components/Panel';
+import { StatusBadge } from '@/shared/components/StatusBadge';
+import { EmptyState } from '@/shared/components/EmptyState';
+import { mockStrategies } from '@/domains/strategy/mocks';
+import { cn } from '@/core/utils';
 import { Plus, FlaskConical, Edit2, Copy, Target, Trash2, X, Search } from 'lucide-react';
-import type { Strategy } from '@/types';
+import type { Strategy } from '@/domains/strategy/types';
 
 const TA_CATEGORIES: Record<string, string[]> = {
   'Overlap Studies': ['BBANDS', 'DEMA', 'EMA', 'HT_TRENDLINE', 'KAMA', 'MA', 'MAMA', 'SMA', 'T3', 'TEMA', 'TRIMA', 'WMA'],

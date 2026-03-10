@@ -5,7 +5,7 @@ import pytest
 from src.exchanges.base import Position
 from src.main import OmniTrader
 from src.risk import RiskManager
-from src.strategies.base import Signal
+from src.strategy.base import Signal
 
 
 @pytest.mark.asyncio

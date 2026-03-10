@@ -1,10 +1,11 @@
 import { useState } from 'react';
-import { Panel } from '@/components/shared/Panel';
-import { StatusBadge } from '@/components/shared/StatusBadge';
-import { EmptyState } from '@/components/shared/EmptyState';
-import { useAppStore } from '@/stores/app-store';
-import { mockBots, mockPrices, mockMarkets } from '@/lib/mock-data';
-import { cn } from '@/lib/utils';
+import { Panel } from '@/shared/components/Panel';
+import { StatusBadge } from '@/shared/components/StatusBadge';
+import { EmptyState } from '@/shared/components/EmptyState';
+import { useAppStore } from '@/app/store/app-store';
+import { mockBots } from '@/domains/bot/mocks';
+import { mockPrices, mockMarkets } from '@/domains/market/mocks';
+import { cn } from '@/core/utils';
 import { Plus, Play, Pause, Square, Trash2, Settings, Bot, X, Search } from 'lucide-react';
 
 export default function BotsAssets() {

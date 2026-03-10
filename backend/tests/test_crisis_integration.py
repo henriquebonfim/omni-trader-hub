@@ -1,9 +1,11 @@
-import pytest
-import asyncio
 from unittest.mock import AsyncMock, patch
-from src.main import OmniTrader
+
+import pytest
+
 from src.config import Config
-from src.graph.crisis import CrisisManager
+from src.intelligence.crisis import CrisisManager
+from src.main import OmniTrader
+
 
 @pytest.fixture
 def mock_config():

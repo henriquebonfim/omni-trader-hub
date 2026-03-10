@@ -82,7 +82,7 @@ def analyze_strategy(
         ``{"signal": str, "reason": str, "indicators": dict}``
     """
     try:
-        from src.strategies import get_strategy
+        from src.strategy import get_strategy
 
         market_data = json_to_market_data(market_data_json)
         config = _build_config(config_dict)
@@ -128,10 +128,10 @@ def analyze_regime(self, ohlcv_json: str) -> str:
     Returns
     -------
     str
-        :class:`~src.analysis.regime.MarketRegime` value string.
+        :class:`~src.intelligence.regime.MarketRegime` value string.
     """
     try:
-        from src.analysis.regime import RegimeClassifier
+        from src.intelligence.regime import RegimeClassifier
 
         ohlcv = json_to_df(ohlcv_json)
         classifier = RegimeClassifier()
@@ -160,8 +160,8 @@ def ingest_news_cycle(self) -> dict:
 
     from src.config import get_config
     from src.database import MemgraphDatabase
-    from src.graph.ingestor import NewsIngestor
-    from src.graph.nlp import OllamaNLP
+    from src.intelligence.ingestor import NewsIngestor
+    from src.intelligence.nlp import OllamaNLP
 
     config = get_config()
 
@@ -266,7 +266,7 @@ def analyze_knowledge_graph(
 
     try:
         from src.database import DatabaseFactory
-        from src.graph.analytics import GraphAnalytics
+        from src.intelligence.analytics import GraphAnalytics
 
         # Helper inner async func
         async def _run_analytics():

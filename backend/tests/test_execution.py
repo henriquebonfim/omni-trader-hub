@@ -388,7 +388,6 @@ async def test_reconcile_positions_fallback(bot):
 @pytest.mark.asyncio
 async def test_paper_mode_long_pnl_calculation():
     from src.exchanges import ExchangeFactory
-    from src.exchanges.ccxt_adapter import CCXTExchange
 
     with patch("src.exchanges.ccxt_adapter.get_config") as mock_config:
         mock_config.return_value.exchange.paper_mode = True
@@ -424,7 +423,6 @@ async def test_paper_mode_long_pnl_calculation():
 @pytest.mark.asyncio
 async def test_paper_mode_short_pnl_calculation():
     from src.exchanges import ExchangeFactory
-    from src.exchanges.ccxt_adapter import CCXTExchange
 
     with patch("src.exchanges.ccxt_adapter.get_config") as mock_config:
         mock_config.return_value.exchange.paper_mode = True
@@ -459,7 +457,6 @@ async def test_paper_mode_short_pnl_calculation():
 
 def test_paper_mode_long_sl_trigger():
     from src.exchanges import ExchangeFactory
-    from src.exchanges.ccxt_adapter import CCXTExchange
 
     with patch("src.exchanges.ccxt_adapter.get_config") as mock_config:
         mock_config.return_value.exchange.paper_mode = True
@@ -495,7 +492,6 @@ def test_paper_mode_long_sl_trigger():
 
 def test_paper_mode_long_tp_trigger():
     from src.exchanges import ExchangeFactory
-    from src.exchanges.ccxt_adapter import CCXTExchange
 
     with patch("src.exchanges.ccxt_adapter.get_config") as mock_config:
         mock_config.return_value.exchange.paper_mode = True
@@ -531,7 +527,6 @@ def test_paper_mode_long_tp_trigger():
 
 def test_paper_mode_short_sl_trigger():
     from src.exchanges import ExchangeFactory
-    from src.exchanges.ccxt_adapter import CCXTExchange
 
     with patch("src.exchanges.ccxt_adapter.get_config") as mock_config:
         mock_config.return_value.exchange.paper_mode = True
@@ -567,7 +562,6 @@ def test_paper_mode_short_sl_trigger():
 
 def test_paper_mode_short_tp_trigger():
     from src.exchanges import ExchangeFactory
-    from src.exchanges.ccxt_adapter import CCXTExchange
 
     with patch("src.exchanges.ccxt_adapter.get_config") as mock_config:
         mock_config.return_value.exchange.paper_mode = True
@@ -603,7 +597,6 @@ def test_paper_mode_short_tp_trigger():
 
 def test_paper_mode_no_trigger_on_non_crossing_price():
     from src.exchanges import ExchangeFactory
-    from src.exchanges.ccxt_adapter import CCXTExchange
 
     with patch("src.exchanges.ccxt_adapter.get_config") as mock_config:
         mock_config.return_value.exchange.paper_mode = True
@@ -772,7 +765,6 @@ async def test_open_position_atr_stops_calculation_failure(bot):
 @pytest.mark.asyncio
 async def test_market_long_invalid_amount():
     from src.exchanges import ExchangeFactory
-    from src.exchanges.ccxt_adapter import CCXTExchange
 
     with patch("src.exchanges.ccxt_adapter.get_config") as mock_config:
         mock_config.return_value.exchange.paper_mode = True
@@ -796,7 +788,6 @@ async def test_market_long_invalid_amount():
 @pytest.mark.asyncio
 async def test_market_short_invalid_amount():
     from src.exchanges import ExchangeFactory
-    from src.exchanges.ccxt_adapter import CCXTExchange
 
     with patch("src.exchanges.ccxt_adapter.get_config") as mock_config:
         mock_config.return_value.exchange.paper_mode = True

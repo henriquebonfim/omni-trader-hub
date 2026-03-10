@@ -17,10 +17,20 @@ import pandas as pd
 import structlog
 
 from src import indicators
+from src.shared.domain.value_objects import Leverage, Percentage, Price, Side
+from src.trading.domain.services import risk_validator
 
 from .config import get_config
 
 logger = structlog.get_logger()
+
+
+def _to_side(side: str) -> Side:
+    if side == "long":
+        return Side.LONG
+    if side == "short":
+        return Side.SHORT
+    raise ValueError(f"Unsupported side: {side}")
 
 
 @dataclass
@@ -301,56 +311,20 @@ class RiskManager:
         Returns:
             Position size in base currency (e.g., BTC)
         """
-        # Determine effective leverage (Auto-Deleverage)
-        effective_leverage = self.leverage
-
-        # Check for significant drawdown against peak equity
         if balance > self.peak_equity:
             self.peak_equity = balance
 
-        if self.peak_equity > 0:
-            drawdown_pct = ((self.peak_equity - balance) / self.peak_equity) * 100
-            if drawdown_pct >= self.auto_deleverage_threshold:
-                effective_leverage = 1
-                logger.warning(
-                    "auto_deleverage_active",
-                    drawdown_pct=drawdown_pct,
-                    threshold=self.auto_deleverage_threshold,
-                    original_leverage=self.leverage,
-                    new_leverage=1,
-                )
-
-        # Risk amount in USDT
-        risk_amount = balance * (self.position_size_pct / 100)
-
-        # With leverage, we can open a larger position
-        notional_value = risk_amount * effective_leverage
-
-        # Convert to base currency
-        position_size = notional_value / entry_price
-
-        # Drawdown sizing: Reduce size by 50% if 3+ consecutive losses
-        if self.consecutive_losses >= 3:
-            original_size = position_size
-            position_size *= 0.5
-            logger.warning(
-                "drawdown_sizing_active",
-                consecutive_losses=self.consecutive_losses,
-                original_size=original_size,
-                new_size=position_size,
-            )
-
-        logger.debug(
-            "position_size_calculated",
+        size = risk_validator.calculate_position_size(
             balance=balance,
-            risk_pct=self.position_size_pct,
-            leverage=effective_leverage,
-            notional=notional_value,
-            size=position_size,
+            entry_price=Price(entry_price),
+            position_size_pct=Percentage(self.position_size_pct),
+            leverage=Leverage(self.leverage),
+            peak_equity=self.peak_equity,
+            auto_deleverage_threshold_pct=Percentage(self.auto_deleverage_threshold),
             consecutive_losses=self.consecutive_losses,
         )
 
-        return position_size
+        return float(size)
 
     def calculate_stop_loss(self, entry_price: float, side: str) -> float:
         """
@@ -363,10 +337,13 @@ class RiskManager:
         Returns:
             Stop loss price
         """
-        if side == "long":
-            return entry_price * (1 - self.stop_loss_pct / 100)
-        else:  # short
-            return entry_price * (1 + self.stop_loss_pct / 100)
+        return float(
+            risk_validator.calculate_stop_loss(
+                entry_price=Price(entry_price),
+                side=_to_side(side),
+                stop_loss_pct=Percentage(self.stop_loss_pct),
+            )
+        )
 
     def calculate_take_profit(self, entry_price: float, side: str) -> float:
         """
@@ -379,10 +356,13 @@ class RiskManager:
         Returns:
             Take profit price
         """
-        if side == "long":
-            return entry_price * (1 + self.take_profit_pct / 100)
-        else:  # short
-            return entry_price * (1 - self.take_profit_pct / 100)
+        return float(
+            risk_validator.calculate_take_profit(
+                entry_price=Price(entry_price),
+                side=_to_side(side),
+                take_profit_pct=Percentage(self.take_profit_pct),
+            )
+        )
 
     def calculate_atr_stops(
         self, entry_price: float, side: str, ohlcv: pd.DataFrame
@@ -461,37 +441,6 @@ class RiskManager:
         Returns:
             RiskCheck with approval status and calculated values
         """
-        # Check circuit breaker
-        if self._circuit_breaker_active:
-            return RiskCheck(
-                approved=False,
-                reason=f"Circuit breaker active: daily loss exceeded {self.max_daily_loss_pct}%",
-            )
-
-        # Check max positions
-        if current_positions >= self.max_positions:
-            return RiskCheck(
-                approved=False, reason=f"Max positions reached ({self.max_positions})"
-            )
-
-        # Check minimum balance
-        min_balance = 10.0  # Minimum $10 to trade
-        if balance < min_balance:
-            return RiskCheck(
-                approved=False,
-                reason=f"Insufficient balance: ${balance:.2f} < ${min_balance}",
-            )
-
-        # Calculate position parameters
-        position_size = self.calculate_position_size(balance, entry_price)
-
-        if self.use_atr_stops and ohlcv is not None:
-            stop_loss, take_profit = self.calculate_atr_stops(entry_price, side, ohlcv)
-            logger.info("using_atr_stops", sl=stop_loss, tp=take_profit)
-        else:
-            stop_loss = self.calculate_stop_loss(entry_price, side)
-            take_profit = self.calculate_take_profit(entry_price, side)
-
         # Validate position size - fetch min from exchange if available
         min_size = 0.001  # Fallback default (BTC)
         if exchange is not None and symbol in exchange.markets:
@@ -513,18 +462,64 @@ class RiskManager:
                     fallback_min_size=min_size,
                 )
 
-        if position_size < min_size:
-            return RiskCheck(
-                approved=False,
-                reason=f"Position too small: {position_size:.6f} < {min_size} ({symbol})",
+        if self.use_atr_stops and ohlcv is not None:
+            check = risk_validator.validate_trade(
+                side=_to_side(side),
+                balance=balance,
+                entry_price=Price(entry_price),
+                position_size_pct=Percentage(self.position_size_pct),
+                leverage=Leverage(self.leverage),
+                peak_equity=self.peak_equity,
+                auto_deleverage_threshold_pct=Percentage(
+                    self.auto_deleverage_threshold
+                ),
+                consecutive_losses=self.consecutive_losses,
+                stop_loss_pct=Percentage(self.stop_loss_pct),
+                take_profit_pct=Percentage(self.take_profit_pct),
+                circuit_breaker_active=self._circuit_breaker_active,
+                max_positions=self.max_positions,
+                current_positions=current_positions,
+                min_size=min_size,
             )
+            if not check.approved:
+                return RiskCheck(approved=False, reason=check.reason)
+
+            stop_loss, take_profit = self.calculate_atr_stops(entry_price, side, ohlcv)
+            logger.info("using_atr_stops", sl=stop_loss, tp=take_profit)
+            return RiskCheck(
+                approved=True,
+                reason=check.reason,
+                position_size=float(check.position_size),
+                stop_loss_price=stop_loss,
+                take_profit_price=take_profit,
+            )
+
+        check = risk_validator.validate_trade(
+            side=_to_side(side),
+            balance=balance,
+            entry_price=Price(entry_price),
+            position_size_pct=Percentage(self.position_size_pct),
+            leverage=Leverage(self.leverage),
+            peak_equity=self.peak_equity,
+            auto_deleverage_threshold_pct=Percentage(self.auto_deleverage_threshold),
+            consecutive_losses=self.consecutive_losses,
+            stop_loss_pct=Percentage(self.stop_loss_pct),
+            take_profit_pct=Percentage(self.take_profit_pct),
+            circuit_breaker_active=self._circuit_breaker_active,
+            max_positions=self.max_positions,
+            current_positions=current_positions,
+            min_size=min_size,
+        )
+
+        if not check.approved:
+            return RiskCheck(approved=False, reason=check.reason)
 
         return RiskCheck(
             approved=True,
-            reason="Trade approved",
-            position_size=position_size,
-            stop_loss_price=stop_loss,
-            take_profit_price=take_profit,
+            reason=check.reason,
+            position_size=float(check.position_size),
+            stop_loss_price=float(check.stop_loss_price),
+            take_profit_price=float(check.take_profit_price),
         )
 
     def calculate_trailing_stop(

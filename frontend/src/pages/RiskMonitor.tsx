@@ -1,8 +1,9 @@
-import { Panel } from '@/components/shared/Panel';
-import { StatCard } from '@/components/shared/StatCard';
-import { StatusBadge } from '@/components/shared/StatusBadge';
-import { mockBots, mockCircuitBreakers } from '@/lib/mock-data';
-import { cn } from '@/lib/utils';
+import { Panel } from '@/shared/components/Panel';
+import { StatCard } from '@/shared/components/StatCard';
+import { StatusBadge } from '@/shared/components/StatusBadge';
+import { mockBots } from '@/domains/bot/mocks';
+import { mockCircuitBreakers } from '@/domains/risk/mocks';
+import { cn } from '@/core/utils';
 import { Shield, AlertTriangle } from 'lucide-react';
 
 export default function RiskMonitor() {

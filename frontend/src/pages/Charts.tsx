@@ -1,24 +1,39 @@
-import { useEffect, useRef, useState } from 'react';
-import { Panel } from '@/components/shared/Panel';
-import { StatusBadge } from '@/components/shared/StatusBadge';
-import { mockBots, mockPrices } from '@/lib/mock-data';
-import { cn } from '@/lib/utils';
-import { createChart, ColorType, CandlestickSeries, HistogramSeries } from 'lightweight-charts';
+import { useEffect, useRef, useState, useMemo } from 'react';
+import { Panel } from '@/shared/components/Panel';
+import { StatusBadge } from '@/shared/components/StatusBadge';
+import { mockBots } from '@/domains/bot/mocks';
+import { mockPrices } from '@/domains/market/mocks';
+import { cn } from '@/core/utils';
+import { createChart, ColorType, CandlestickSeries, HistogramSeries, UTCTimestamp } from 'lightweight-charts';
 import { Maximize2, Minimize2 } from 'lucide-react';
 
-function generateCandleData(basePrice: number, count: number) {
-  const data = [];
+interface CandleData {
+  time: UTCTimestamp;
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+}
+
+interface VolumeData {
+  time: UTCTimestamp;
+  value: number;
+  color: string;
+}
+
+function generateCandleData(basePrice: number, count: number): CandleData[] {
+  const data: CandleData[] = [];
   let price = basePrice;
   const now = Math.floor(Date.now() / 1000);
   for (let i = count; i >= 0; i--) {
-    const time = now - i * 3600;
+    const time = (now - i * 3600) as UTCTimestamp;
     const open = price;
     const high = open + Math.random() * open * 0.015;
     const low = open - Math.random() * open * 0.015;
     const close = low + Math.random() * (high - low);
     price = close;
     data.push({
-      time: time as any,
+      time,
       open: +open.toFixed(2),
       high: +high.toFixed(2),
       low: +low.toFixed(2),
@@ -28,8 +43,8 @@ function generateCandleData(basePrice: number, count: number) {
   return data;
 }
 
-function generateVolumeData(candleData: any[]) {
-  return candleData.map((c: any) => ({
+function generateVolumeData(candleData: CandleData[]): VolumeData[] {
+  return candleData.map((c) => ({
     time: c.time,
     value: Math.random() * 1000000 + 500000,
     color: c.close >= c.open ? 'rgba(63, 185, 80, 0.3)' : 'rgba(248, 81, 73, 0.3)',
@@ -43,8 +58,9 @@ export default function Charts() {
   const chartContainerRef = useRef<HTMLDivElement>(null);
 
   const basePrice = mockPrices[selectedSymbol] || 67000;
-  const candleData = generateCandleData(basePrice * 0.95, 200);
-  const volumeData = generateVolumeData(candleData);
+  
+  const candleData = useMemo(() => generateCandleData(basePrice * 0.95, 200), [basePrice]);
+  const volumeData = useMemo(() => generateVolumeData(candleData), [candleData]);
 
   useEffect(() => {
     if (!chartContainerRef.current) return;
@@ -100,7 +116,7 @@ export default function Charts() {
       observer.disconnect();
       chart.remove();
     };
-  }, [selectedSymbol, timeframe, fullscreen]);
+  }, [candleData, volumeData]);
 
   return (
     <div className={cn('space-y-4 animate-fade-in', fullscreen && 'fixed inset-0 z-50 bg-background p-4')}>

@@ -203,6 +203,85 @@
 
 ---
 
+### T33. News Ingestion & NLP Pipeline ✅ **COMPLETED 2026-03-09**
+- [x] **Phase 2a: Extended graph schema**
+    - Added node labels: `:Asset`, `:NewsEvent`, `:Sector`, `:MacroIndicator`, `:Candle`
+    - Added relationships: `IMPACTS`, `MENTIONS`, `BELONGS_TO`, `CORRELATES_WITH`, `TRIGGERED_BY`
+    - Added indexes for `NewsEvent(published_at)`, `Candle(symbol, timeframe, timestamp)`, `MacroIndicator(name)`
+- [x] **Phase 2b: News ingestor service** (`backend/src/graph/ingestor.py`)
+    - Integrated CryptoPanic polling, Fear & Greed ingestion, and RSS ingestion
+    - Implemented deduplication and relationship linking to assets/sectors
+    - Added pruning windows for short-lived news context
+- [x] **Phase 2c: Ollama NLP entity extraction** (`backend/src/graph/nlp.py`)
+    - Added structured extraction prompt for assets/sectors/sentiment/impact
+    - Added resilient fallback behavior when Ollama is unavailable
+- **Consolidates**: BACKLOG.md B4 (Macro Risk), B13 (Ollama sidecar)
+
+---
+
+### T34. Graph Analytics, Crisis Mode & Pipeline Integration ✅ **COMPLETED 2026-03-09**
+- [x] **Phase 3a: Graph analytics queries** (`backend/src/graph/analytics.py`)
+    - Implemented sentiment aggregation, crisis detection, divergence checks, and contagion analysis
+- [x] **Phase 3b: Celery task + concurrent dispatch**
+    - Added `analyze_knowledge_graph` task and integrated dispatch in cycle flow
+- [x] **Phase 3c: Crisis mode protocol** (`backend/src/graph/crisis.py`)
+    - Added automatic and manual crisis activation with persisted state
+    - Added risk override profile for crisis mode
+- [x] **Phase 3d: Signal gating with graph context**
+    - Added long/short gating and confidence reduction based on graph signals
+- [x] **Phase 3e: API endpoints** (`backend/src/api/routes/graph.py`)
+    - Added sentiment, crisis, and news API endpoints
+- [ ] **Phase 3f: Frontend components & WebSocket**
+    - Deferred to T43 by plan
+
+---
+
+### T35. Backtesting Engine on Memgraph ✅ **COMPLETED 2026-03-09**
+- [x] **Phase 4a: Historical candle storage**
+    - Added candle persistence and retrieval patterns on Memgraph with deduplication keys
+- [x] **Phase 4b: Event-driven backtest simulator** (`backend/src/backtest/engine.py`)
+    - Implemented chronological simulation loop with strategy reuse and SL/TP checks
+    - Added cost model (fees, spread, funding assumptions)
+- [x] **Phase 4c: Walk-forward validation + metrics** (`backend/src/backtest/metrics.py`)
+    - Added rolling splits, performance metrics, bootstrap confidence intervals
+    - Added export-ready output structures for analysis artifacts
+- **Consolidates**: BACKLOG.md B1, B2, B3
+
+---
+
+### T36. Exchange Adapter Architecture ✅ **COMPLETED 2026-03-09**
+- [x] **Phase 5a: Abstract exchange interface** (`backend/src/exchanges/base.py`)
+    - Added standardized adapter interface and shared exchange data model
+- [x] **Phase 5b: CCXT adapter implementation** (`backend/src/exchanges/ccxt_adapter.py`)
+    - Migrated legacy exchange implementation into adapter form
+- [x] **Phase 5c: Binance direct REST adapter** (`backend/src/exchanges/binance_direct.py`)
+    - Added signed request path, retry behavior, and rate-limit-aware direct adapter
+- [x] **Phase 5d: Adapter factory + config** (`backend/src/exchanges/factory.py`)
+    - Added adapter selection from config and fallback wiring
+- [x] **Phase 5e: Integration + tests**
+    - Integrated adapter factory into runtime and updated exchange-related tests
+
+---
+
+### T44. Backend DDD Migration (Clean Restructure) ✅ **COMPLETED 2026-03-09**
+- [x] **Phase 14a: Shared kernel foundation**
+    - Added shared domain value objects, event bus, aggregate root, and exceptions
+- [x] **Phase 14b: First pure trading domain extraction**
+    - Added pure risk validation domain service with typed outputs
+- [x] **Phase 14c: Risk manager internal delegation**
+    - Delegated risk calculations and validations to domain service while preserving public API
+- [x] **Phase 14d: Position use-case extraction**
+    - Added `OpenPositionUseCase` and `ClosePositionUseCase` with domain event emission
+- [x] **Phase 14e: run_cycle orchestrator split**
+    - Refactored runtime flow into helper methods and DTO-based coordination
+- [x] **Phase 14f: Context moves**
+    - Migrated legacy strategy/intelligence modules to bounded contexts and added architecture guardrail tests
+- **Validation status**:
+    - New DDD-focused tests added and passing
+    - Integration checks and full Phase 14 verification passed
+
+---
+
 ### T32. Memgraph Infrastructure & Database Layer Rewrite ✅ **COMPLETED 2026-03-09**
 - [x] **Phase 1a: Docker infrastructure**
     - Removed PostgreSQL service from compose.yml

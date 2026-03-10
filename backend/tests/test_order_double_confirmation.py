@@ -4,7 +4,6 @@ import pytest
 
 from src.config import Config
 from src.exchanges import ExchangeFactory
-from src.exchanges.ccxt_adapter import CCXTExchange
 from src.main import OmniTrader
 
 

@@ -8,8 +8,8 @@ from unittest.mock import MagicMock
 import pandas as pd
 import pytest
 
-from src.strategies.smc.analysis import SMCAnalyzer
-from src.strategies.smc.structure import (
+from src.strategy.smc.analysis import SMCAnalyzer
+from src.strategy.smc.structure import (
     MarketStructure,
     SwingType,
     Trend,

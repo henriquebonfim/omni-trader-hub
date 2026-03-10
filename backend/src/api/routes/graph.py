@@ -3,7 +3,7 @@ from typing import Any, Dict
 from fastapi import APIRouter, Depends, HTTPException, Request
 
 from src.api.auth import verify_api_key
-from src.graph.analytics import GraphAnalytics
+from src.intelligence.analytics import GraphAnalytics
 
 router = APIRouter(prefix="/graph", tags=["graph"])
 
@@ -73,6 +73,6 @@ async def get_asset_news(
                     }
                 )
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
     return {"symbol": symbol, "news": news}
