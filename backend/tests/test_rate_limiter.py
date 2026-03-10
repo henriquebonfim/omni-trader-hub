@@ -212,14 +212,15 @@ async def test_concurrent_acquires_do_not_overdraft():
 def test_exchange_has_rate_limiter_instance():
     """Exchange.__init__ should set _rate_limiter to a LeakyBucketRateLimiter."""
     with (
-        patch("src.exchange.get_config") as mock_cfg,
+        patch("src.exchanges.ccxt_adapter.get_config") as mock_cfg,
         patch("ccxt.async_support.binance"),
     ):
         mock_cfg.return_value = MagicMock(
             exchange=MagicMock(paper_mode=True, leverage=10),
             trading=MagicMock(symbol="BTC/USDT:USDT", timeframe="5m"),
         )
-        from src.exchange import Exchange
+        from src.exchanges import ExchangeFactory
+        from src.exchanges.ccxt_adapter import CCXTExchange
 
-        ex = Exchange()
+        ex = ExchangeFactory.create_exchange()
         assert isinstance(ex._rate_limiter, LeakyBucketRateLimiter)

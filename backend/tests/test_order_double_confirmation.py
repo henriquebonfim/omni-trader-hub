@@ -3,7 +3,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from src.config import Config
-from src.exchange import Exchange
+from src.exchanges import ExchangeFactory
+from src.exchanges.ccxt_adapter import CCXTExchange
 from src.main import OmniTrader
 
 
@@ -18,10 +19,10 @@ async def test_order_fill_confirmation_success():
     config = Config(config_data)
 
     with (
-        patch("src.exchange.ccxt.binance"),
-        patch("src.exchange.get_config", return_value=config),
+        patch("src.exchanges.ccxt_adapter.ccxt.binance"),
+        patch("src.exchanges.ccxt_adapter.get_config", return_value=config),
     ):
-        exchange = Exchange()
+        exchange = ExchangeFactory.create_exchange()
         exchange.paper_mode = False  # Force non-paper mode for trade fetching logic
 
         # Mock fetch_my_trades to return trades for the order
@@ -60,10 +61,10 @@ async def test_order_fill_confirmation_timeout():
     config = Config(config_data)
 
     with (
-        patch("src.exchange.ccxt.binance"),
-        patch("src.exchange.get_config", return_value=config),
+        patch("src.exchanges.ccxt_adapter.ccxt.binance"),
+        patch("src.exchanges.ccxt_adapter.get_config", return_value=config),
     ):
-        exchange = Exchange()
+        exchange = ExchangeFactory.create_exchange()
         exchange.paper_mode = False
 
         # Mock fetch_my_trades to always return empty
@@ -82,7 +83,7 @@ async def test_order_fill_confirmation_timeout():
 async def test_bot_logs_warning_on_unconfirmed_fill():
     # Setup bot with mocked exchange
     with (
-        patch("src.main.Exchange") as MockExchange,
+        patch("src.main.ExchangeFactory.create_exchange") as MockExchange,
         patch("src.main.DatabaseFactory"),
         patch("src.main.RiskManager") as MockRiskManager,
         patch("src.main.Notifier") as MockNotifier,
@@ -95,7 +96,7 @@ async def test_bot_logs_warning_on_unconfirmed_fill():
         mock_get_config.return_value = mock_config
 
         bot = OmniTrader()
-        bot.exchange = MockExchange()
+        bot.exchange = MockExchange.return_value
 
         # Mock risk check approved
         MockRiskManager.return_value.validate_trade.return_value.approved = True

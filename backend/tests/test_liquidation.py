@@ -2,7 +2,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from src.exchange import Position
+from src.exchanges.base import Position
 from src.main import OmniTrader
 from src.risk import RiskManager
 from src.strategies.base import Signal
