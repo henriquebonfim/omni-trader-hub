@@ -42,8 +42,8 @@ Ensure you have [Node.js](https://nodejs.org/) (v18 or higher recommended) and `
 
 1. **Clone the repository**
    ```bash
-   git clone https://github.com/your-username/alpha-trader-hub.git
-   cd alpha-trader-hub
+   git clone https://github.com/henriquebonfim/omni-trader-hub.git
+   cd omni-trader-hub
    ```
 
 2. **Install dependencies**
@@ -58,33 +58,6 @@ Ensure you have [Node.js](https://nodejs.org/) (v18 or higher recommended) and `
 
 4. **Open in browser**
    Navigate to `http://localhost:8080` (or the port specified by Vite in your terminal).
-
-## 🌍 Deployment
-
-This application is optimized for static hosting platforms like **Firebase Hosting**, Vercel, or Netlify.
-
-### Firebase Hosting
-
-1. Install the Firebase CLI:
-   ```bash
-   npm install -g firebase-tools
-   ```
-2. Login to Firebase:
-   ```bash
-   firebase login
-   ```
-3. Initialize the project (already configured via `firebase.json` in this repo, so you just need to link your project):
-   ```bash
-   firebase use --add
-   ```
-4. Build the project:
-   ```bash
-   npm run build
-   ```
-5. Deploy:
-   ```bash
-   firebase deploy --only hosting
-   ```
 
 ## 📝 License
 
