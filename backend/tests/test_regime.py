@@ -4,7 +4,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from src.analysis.regime import MarketRegime, RegimeClassifier
+from src.intelligence.regime import MarketRegime, RegimeClassifier
 
 
 @pytest.fixture
@@ -21,9 +21,9 @@ def sample_ohlcv():
     return df
 
 
-@patch("src.analysis.regime.ta.sma")
-@patch("src.analysis.regime.ta.atr")
-@patch("src.analysis.regime.ta.adx")
+@patch("src.intelligence.regime.ta.sma")
+@patch("src.intelligence.regime.ta.atr")
+@patch("src.intelligence.regime.ta.adx")
 def test_hysteresis_trending(mock_adx, mock_atr, mock_sma, sample_ohlcv):
     classifier = RegimeClassifier(hysteresis_enabled=True)
 
@@ -60,9 +60,9 @@ def test_hysteresis_trending(mock_adx, mock_atr, mock_sma, sample_ohlcv):
     assert regime == MarketRegime.RANGING
 
 
-@patch("src.analysis.regime.ta.sma")
-@patch("src.analysis.regime.ta.atr")
-@patch("src.analysis.regime.ta.adx")
+@patch("src.intelligence.regime.ta.sma")
+@patch("src.intelligence.regime.ta.atr")
+@patch("src.intelligence.regime.ta.adx")
 def test_hysteresis_volatile(mock_adx, mock_atr, mock_sma, sample_ohlcv):
     classifier = RegimeClassifier(hysteresis_enabled=True)
 
@@ -93,9 +93,9 @@ def test_hysteresis_volatile(mock_adx, mock_atr, mock_sma, sample_ohlcv):
     assert regime == MarketRegime.RANGING
 
 
-@patch("src.analysis.regime.ta.sma")
-@patch("src.analysis.regime.ta.atr")
-@patch("src.analysis.regime.ta.adx")
+@patch("src.intelligence.regime.ta.sma")
+@patch("src.intelligence.regime.ta.atr")
+@patch("src.intelligence.regime.ta.adx")
 def test_no_hysteresis(mock_adx, mock_atr, mock_sma, sample_ohlcv):
     classifier = RegimeClassifier(
         hysteresis_enabled=False, adx_threshold=25, atr_multiplier=1.5

@@ -6,6 +6,16 @@ description: /start-workflow
 
 Full-cycle: PO review → triage → implement → PR → review → merge → release.
 
+DDD mode: every change must preserve bounded contexts, explicit layer boundaries, and dependency direction.
+
+---
+
+## DDD Guardrail Defaults
+
+- Keep domain rules in domain/application layers; keep orchestration thin.
+- Prevent cross-context leakage and architecture shortcuts.
+- Require `make ddd-guard` to pass before review/merge.
+
 ---
 
 ## Step 0 — SOP Validation Gate
@@ -34,12 +44,15 @@ trap cleanup_workflow EXIT
 
 ## Step 1 — PO Gate
 
-> **sequential-thinking**: Assess tasks/TASKS.md freshness, Docker health, test status. Decide: proceed or run `/handle-po-review` first.
+> **sequential-thinking**: Assess tasks/TASKS.md freshness, Docker health, test status, and DDD boundary health. Decide: proceed or run `/handle-po-review` first.
 
 ```bash
 TASKS_AGE=$(( ($(date +%s) - $(stat -c %Y tasks/TASKS.md 2>/dev/null || echo 0)) / 3600 ))
 echo "tasks/TASKS.md age: ${TASKS_AGE}h"
 [ $TASKS_AGE -gt 24 ] && echo "⚠️  Stale — run /handle-po-review" || echo "✅ Current"
+
+# Quick DDD boundary sanity
+make ddd-guard || true
 ```
 
 If stale → `/handle-po-review` first. If current → Step 2.
@@ -70,6 +83,11 @@ New issues → `/handle-backlog-triage`. Otherwise → Step 3.
 ## Step 4 — Pick Top Task
 
 > **sequential-thinking**: Read tasks/TASKS.md. Validate top item is not already an open PR or Jules session. Confirm prerequisites (Docker + tests green via `make build && make test`).
+>
+> DDD checks before dispatch:
+- Map task to one bounded context.
+- Define expected layer changes (`domain`, `application`, `infrastructure`).
+- Reject tasks that bypass boundaries or dependency direction.
 
 ```bash
 cat tasks/TASKS.md | head -50
@@ -101,6 +119,9 @@ make j-poll ID=<id>
 git checkout -b feature/<task-slug>
 make j-pull ID=<id>
 make test && make lint
+
+# DDD architecture boundary gate (mandatory)
+make ddd-guard
 ```
 
 ---
@@ -146,3 +167,4 @@ Remove completed item from tasks/TASKS.md. Pick next. Return to Step 4.
 - Test suite broken → fix first
 - Docker broken → fix first
 - TASKS.md empty → `/handle-po-review`
+- `make ddd-guard` fails → STOP and fix before review

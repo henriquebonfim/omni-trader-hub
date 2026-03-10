@@ -1,7 +1,10 @@
-import pytest
+from unittest.mock import AsyncMock, MagicMock, patch
+
 import httpx
-from unittest.mock import AsyncMock, patch, MagicMock
-from src.graph.nlp import OllamaNLP
+import pytest
+
+from src.intelligence.nlp import OllamaNLP
+
 
 @pytest.fixture
 def nlp():

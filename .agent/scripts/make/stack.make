@@ -18,8 +18,14 @@ TYPE_CMD   = $(COMPOSE_DEV) run --rm -e PYTHONPATH=/app omnitrader mypy src/ && 
 BUILD_CMD  = $(COMPOSE_DEV) build
 DEV_CMD    = $(COMPOSE_DEV) up
 
+# DDD guardrail contract (override per project as needed)
+DDD_BOUNDARY_CMD ?= true
+DDD_LINT_CMD ?= true
+DDD_IMPORT_GUARD_CMD ?= true
+DDD_GUARD_CMD = $(DDD_BOUNDARY_CMD) && $(DDD_LINT_CMD) && $(DDD_IMPORT_GUARD_CMD)
+
 # ─── Targets ──────────────────────────────────────────────
-.PHONY: setup start stop test tests lint typecheck build dev logs ps start-prod stop-prod build-prod stack-info
+.PHONY: setup start stop test tests lint typecheck build dev ddd-guard logs ps start-prod stop-prod build-prod stack-info
 
 setup:
 	@echo "Setting up OmniTrader..."
@@ -66,6 +72,11 @@ build:
 dev:
 	$(DEV_CMD)
 
+ddd-guard:
+	@echo "Running DDD architecture guard..."
+	@$(DDD_GUARD_CMD)
+	@echo "✓ DDD guard passed"
+
 stack-info:
 	@echo "Stack Configuration:"
 	@echo "  Runtime:    $(RUNTIME)"
@@ -79,6 +90,7 @@ stack-info:
 	@echo "  make logs       - View container logs"
 	@echo "  make build      - Rebuild Docker images"
 	@echo "  make dev        - Start in foreground (with logs)"
+	@echo "  make ddd-guard  - Run project DDD guardrails"
 	@echo "  make start-prod - Start production compose stack"
 	@echo "  make stop-prod  - Stop production compose stack"
 	@echo "  make build-prod - Build production compose images"

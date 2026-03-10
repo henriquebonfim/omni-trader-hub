@@ -220,7 +220,6 @@ def test_exchange_has_rate_limiter_instance():
             trading=MagicMock(symbol="BTC/USDT:USDT", timeframe="5m"),
         )
         from src.exchanges import ExchangeFactory
-        from src.exchanges.ccxt_adapter import CCXTExchange
 
         ex = ExchangeFactory.create_exchange()
         assert isinstance(ex._rate_limiter, LeakyBucketRateLimiter)

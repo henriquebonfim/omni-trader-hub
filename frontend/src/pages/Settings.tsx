@@ -1,8 +1,8 @@
 import { useState } from 'react';
-import { Panel } from '@/components/shared/Panel';
-import { StatusBadge } from '@/components/shared/StatusBadge';
-import { mockEnvVars } from '@/lib/mock-data';
-import { cn } from '@/lib/utils';
+import { Panel } from '@/shared/components/Panel';
+import { StatusBadge } from '@/shared/components/StatusBadge';
+import { mockEnvVars } from '@/domains/system/mocks';
+import { cn } from '@/core/utils';
 import { Eye, EyeOff, Save, RotateCcw, AlertTriangle, Send, CheckCircle, XCircle } from 'lucide-react';
 
 type SettingsTab = 'general' | 'environment' | 'risk' | 'notifications' | 'exchange' | 'system';
@@ -112,7 +112,11 @@ function EnvironmentTab() {
 
   const toggleReveal = (key: string) => {
     const next = new Set(revealed);
-    next.has(key) ? next.delete(key) : next.add(key);
+    if (next.has(key)) {
+      next.delete(key);
+    } else {
+      next.add(key);
+    }
     setRevealed(next);
   };
 

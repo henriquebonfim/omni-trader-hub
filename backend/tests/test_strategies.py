@@ -9,16 +9,16 @@ import pytest
 
 from src.config import Config
 from src.risk import RiskManager
-from src.strategies import (
+from src.strategy import (
     get_strategy,
     list_strategies,
 )
-from src.strategies.adx_trend import ADXTrendStrategy
-from src.strategies.base import BaseStrategy, Signal
-from src.strategies.bollinger_bands import BollingerBandsStrategy
-from src.strategies.breakout import BreakoutStrategy
-from src.strategies.ema_volume import EMAVolumeStrategy
-from src.strategies.z_score import ZScoreStrategy
+from src.strategy.adx_trend import ADXTrendStrategy
+from src.strategy.base import BaseStrategy, Signal
+from src.strategy.bollinger_bands import BollingerBandsStrategy
+from src.strategy.breakout import BreakoutStrategy
+from src.strategy.ema_volume import EMAVolumeStrategy
+from src.strategy.z_score import ZScoreStrategy
 
 
 @pytest.fixture

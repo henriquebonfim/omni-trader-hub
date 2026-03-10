@@ -11,7 +11,16 @@ import structlog
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from .routes import bot, candles, config, notifications, status, strategies, trades, graph
+from .routes import (
+    bot,
+    candles,
+    config,
+    graph,
+    notifications,
+    status,
+    strategies,
+    trades,
+)
 from .websocket import router as ws_router
 
 logger = structlog.get_logger()

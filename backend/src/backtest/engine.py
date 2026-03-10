@@ -6,7 +6,7 @@ import pandas as pd
 
 from src.backtest.metrics import calculate_metrics
 from src.config import Config
-from src.strategies.base import BaseStrategy, Signal
+from src.strategy.base import BaseStrategy, Signal
 
 logger = logging.getLogger(__name__)
 

@@ -1,6 +1,9 @@
+from unittest.mock import AsyncMock, MagicMock, patch
+
 import pytest
-from unittest.mock import AsyncMock, patch, MagicMock
-from src.graph.ingestor import NewsIngestor
+
+from src.intelligence.ingestor import NewsIngestor
+
 
 @pytest.fixture
 def ingestor():

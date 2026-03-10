@@ -4,7 +4,7 @@ Strategy listing route.
 
 from fastapi import APIRouter, Request
 
-from src.strategies.registry import get_all_strategies
+from src.strategy.registry import get_all_strategies
 
 router = APIRouter(tags=["strategies"])
 

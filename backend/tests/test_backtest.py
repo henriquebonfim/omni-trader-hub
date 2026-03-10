@@ -11,7 +11,7 @@ from src.backtest.metrics import (
 )
 from src.config import Config
 from src.database.memgraph import MemgraphDatabase
-from src.strategies.bollinger_bands import BollingerBandsStrategy
+from src.strategy.bollinger_bands import BollingerBandsStrategy
 
 
 def test_metrics_calculation():

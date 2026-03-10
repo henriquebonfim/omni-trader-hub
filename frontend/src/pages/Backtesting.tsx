@@ -1,8 +1,10 @@
 import { useState } from 'react';
-import { Panel } from '@/components/shared/Panel';
-import { StatusBadge } from '@/components/shared/StatusBadge';
-import { mockBacktestResults, mockStrategies, mockMarkets } from '@/lib/mock-data';
-import { cn } from '@/lib/utils';
+import { Panel } from '@/shared/components/Panel';
+import { StatusBadge } from '@/shared/components/StatusBadge';
+import { mockStrategies } from '@/domains/strategy/mocks';
+import { mockBacktestResults } from '@/domains/trade/mocks';
+import { mockMarkets } from '@/domains/market/mocks';
+import { cn } from '@/core/utils';
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, BarChart, Bar, Cell } from 'recharts';
 import { Play, Download } from 'lucide-react';
 

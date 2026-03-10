@@ -1,12 +1,15 @@
-import { StatCard } from '@/components/shared/StatCard';
-import { StatusBadge } from '@/components/shared/StatusBadge';
-import { Panel } from '@/components/shared/Panel';
-import { useAppStore } from '@/stores/app-store';
-import { mockBots, mockPrices, mockTrades, mockAlerts, mockEquitySnapshots } from '@/lib/mock-data';
-import { cn } from '@/lib/utils';
-import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, Area, AreaChart } from 'recharts';
+import { StatCard } from '@/shared/components/StatCard';
+import { StatusBadge } from '@/shared/components/StatusBadge';
+import { Panel } from '@/shared/components/Panel';
+import { useAppStore } from '@/app/store/app-store';
+import { mockBots } from '@/domains/bot/mocks';
+import { mockTrades, mockEquitySnapshots } from '@/domains/trade/mocks';
+import { mockPrices } from '@/domains/market/mocks';
+import { mockAlerts } from '@/domains/system/mocks';
+import { cn } from '@/core/utils';
+import { XAxis, YAxis, Tooltip, ResponsiveContainer, Area, AreaChart } from 'recharts';
 import { Link } from 'react-router-dom';
-import { Play, Pause, Square, ArrowRight, TrendingUp, TrendingDown, Minus, Zap, ArrowUpDown } from 'lucide-react';
+import { Play, Pause, Square, ArrowRight, TrendingUp, Minus, Zap, ArrowUpDown } from 'lucide-react';
 import { useState } from 'react';
 
 const regimeIcons: Record<string, React.ReactNode> = {
@@ -74,7 +77,7 @@ export default function Dashboard() {
                     <StatusBadge variant="info" size="sm">{bot.active_strategy || '—'}</StatusBadge>
                     <StatusBadge variant={bot.mode === 'auto' ? 'info' : 'neutral'} size="sm">{bot.mode}</StatusBadge>
                     {bot.regime && (
-                      <StatusBadge variant={regimeColors[bot.regime] as any} size="sm">
+                      <StatusBadge variant={regimeColors[bot.regime] as "success" | "danger" | "warning" | "info" | "neutral"} size="sm">
                         {regimeIcons[bot.regime]} {bot.regime.toUpperCase()}
                       </StatusBadge>
                     )}

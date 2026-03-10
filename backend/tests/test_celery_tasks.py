@@ -128,7 +128,7 @@ def test_market_data_json_is_valid_json():
 
 def test_analyze_regime_returns_string():
     """Task should return a MarketRegime value string."""
-    from src.analysis.regime import MarketRegime
+    from src.intelligence.regime import MarketRegime
 
     ohlcv = _make_ohlcv(60)
     result = analyze_regime.apply(args=(df_to_json(ohlcv),)).get()
@@ -170,7 +170,7 @@ def test_analyze_strategy_returns_expected_keys():
 
 def test_analyze_strategy_signal_is_valid():
     """signal value must be a valid Signal enum member."""
-    from src.strategies import Signal
+    from src.strategy import Signal
 
     market_data = {"5m": _make_ohlcv(60)}
     result = analyze_strategy.apply(
