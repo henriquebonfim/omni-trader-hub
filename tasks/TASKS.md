@@ -18,7 +18,7 @@ Fallback triage triggered because GitHub issue queue is empty. Promote highest-i
 	Scope: Wire `frontend/src/pages/Intelligence.tsx` to live graph endpoints (`/api/graph/sentiment/{symbol}`, `/api/graph/news`, `/api/graph/crisis`) with loading/error states and graceful fallback.
 	Acceptance: Intelligence page renders live sentiment/news/crisis state without mock-only dependencies.
 
-- [ ] **T46. SMC Confirmation Layer Integration**
+- [x] **T46. SMC Confirmation Layer Integration** — PR #77
 	Scope: Integrate SMC output as a confirmation/filter layer for existing strategy signals (not standalone strategy), including config flags and test coverage.
 	Acceptance: Signal flow can apply BOS/CHoCH bias gating and is fully covered by strategy/risk tests.
 
