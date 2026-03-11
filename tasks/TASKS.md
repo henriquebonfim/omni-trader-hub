@@ -3,10 +3,10 @@
 Single source of truth for all technical work: architecture items, audit-discovered bugs, and risk gaps.
 Institutional-grade audit completed **2026-03-03** — findings integrated below.
 Multi-asset autonomous platform expansion added **2026-03-09** — T37-T42 driven by frontend spec (PROMPT.md).
-Last updated: 2026-03-10 | Sprint status: T32-T40 completed and merged to master. Next: T41-T42.
+Last updated: 2026-03-10 | Sprint status: T32-T41 completed and merged to master. Next: T42.
 Frontend-backend integration migration added **2026-03-09** — T43 bridges new frontend to existing backend.
 
-> Last updated: 2026-03-10 | Sprint status: T32-T40 completed and merged to master. Next: T41-T42 (Env Management, Markets Discovery)
+> Last updated: 2026-03-10 | Sprint status: T32-T41 completed and merged to master. Next: T42 (Markets Discovery)
 
 ---
 
@@ -252,7 +252,8 @@ Frontend-backend integration migration added **2026-03-09** — T43 bridges new 
     - Delete strategy → fails if any bot is actively using it
 
 ### T41. Environment Variable Management API
-- [ ] **Phase 11a: Env reader** ([backend/src/api/routes/env.py](backend/src/api/routes/env.py))
+> **T41 COMPLETED**: ✅ Env reader/updater API with masking + atomic writes, and restart endpoint with open-position safety checks (2026-03-10). Commit `9fca480`.
+- [x] **Phase 11a: Env reader** ([backend/src/api/routes/env.py](backend/src/api/routes/env.py))
     - `GET /api/env` — read `.env` file from project root, parse key=value pairs
     - Group by category:
         - **Binance API**: `BINANCE_API_KEY`, `BINANCE_SECRET`
@@ -263,7 +264,7 @@ Frontend-backend integration migration added **2026-03-09** — T43 bridges new 
     - Masked fields (secrets): `BINANCE_API_KEY`, `BINANCE_SECRET`, `MEMGRAPH_PASSWORD`, `OMNITRADER_API_KEY`
     - Response per var: `{key, value, masked, category, description, requires_restart}`
     - `requires_restart`: true for DB/Redis connection vars, false for webhook URL
-- [ ] **Phase 11b: Env updater**
+- [x] **Phase 11b: Env updater**
     - `PUT /api/env` — update env vars (auth required)
     - Request body: `{variables: [{key: "DISCORD_WEBHOOK_URL", value: "https://..."}]}`
     - Validation:
@@ -273,7 +274,7 @@ Frontend-backend integration migration added **2026-03-09** — T43 bridges new 
     - Write atomically: write `.env.tmp` → rename to `.env` (prevents corruption on crash)
     - Audit log: store change event as `:Signal {type: 'env_change', key: ..., changed_by: ...}`
     - Return: `{updated: ["DISCORD_WEBHOOK_URL"], requires_restart: false}`
-- [ ] **Phase 11c: Service restart endpoint**
+- [x] **Phase 11c: Service restart endpoint**
     - `POST /api/system/restart` — requires auth + confirmation body `{confirm: true}`
     - Executes `docker compose restart` via subprocess (only restarts, not recreates)
     - Returns immediately with `{status: "restarting"}` — frontend shows progress
