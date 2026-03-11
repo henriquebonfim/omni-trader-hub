@@ -1,7 +1,7 @@
 import { request } from '@/core/api';
-import type { SentimentData, NewsItem, MarketPair } from './types';
 import type { CrisisStatus } from '@/domains/system/types';
 import { stubMarkets } from '@/lib/stubs';
+import type { MarketPair, NewsItem, SentimentData } from './types';
 
 export const fetchSentiment = async (symbol: string) => {
   return request<SentimentData>(`/api/graph/sentiment/${encodeURIComponent(symbol)}`);

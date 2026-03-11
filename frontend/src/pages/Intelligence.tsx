@@ -1,8 +1,8 @@
 import { cn } from '@/core/utils';
+import { EmptyState } from '@/shared/components/EmptyState';
 import { Panel } from '@/shared/components/Panel';
 import { StatusBadge } from '@/shared/components/StatusBadge';
-import { EmptyState } from '@/shared/components/EmptyState';
-import { AlertTriangle, Newspaper, TrendingDown, TrendingUp, Loader2, AlertCircle } from 'lucide-react';
+import { AlertCircle, AlertTriangle, Loader2, Newspaper, TrendingDown, TrendingUp } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
 import { fetchCrisisStatus, fetchNews, fetchSentiment } from '@/domains/market/api';
