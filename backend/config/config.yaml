@@ -55,6 +55,9 @@ strategy:
   ema_fast: 10
   ema_slow: 21
   name: ema_volume
+  smc_confirmation: false
+  smc_swing_window: 5
+  smc_timeframe: 4h
   volume_sma: 20
   volume_threshold: 1.5
   z_score_threshold: 2.0
