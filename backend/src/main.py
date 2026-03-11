@@ -108,6 +108,10 @@ class OmniTrader:
 
         # Setup event handlers (domain events → notifier side effects)
         self._setup_event_handlers()
+        
+        from src.strategy.selector import StrategySelector
+        self.strategy_selector = StrategySelector(database=self.database)
+        self.last_strategy_rotation = datetime.min.replace(tzinfo=timezone.utc)
 
         # Load strategy dynamically
         strategy_name = getattr(self.config.strategy, "name", "ema_volume")
@@ -683,13 +687,47 @@ class OmniTrader:
         market_trend: str,
     ):
         """Analyze strategy/regime/graph and apply gating rules."""
+        strategy_mode = getattr(self.config.strategy, "mode", "manual")
+        
+        # Determine regime first if in auto mode
+        regime_value = MarketRegime.TRENDING.value
+        primary_ohlcv_json = df_to_json(primary_ohlcv)
+        try:
+            regime_value_result = await dispatch(
+                analyze_regime,
+                primary_ohlcv_json,
+                timeout=25.0,
+            )
+            if not isinstance(regime_value_result, Exception):
+                regime_value = regime_value_result
+        except Exception as e:
+            logger.warning("regime_analysis_failed_fallback_to_trending", error=str(e))
+            current_regime_fallback = self.regime_classifier.analyze(primary_ohlcv)
+            regime_value = current_regime_fallback.value
+            
+        current_regime = MarketRegime(regime_value)
+
+        # Handle strategy auto-selection
+        if strategy_mode == "auto":
+            now = datetime.now(timezone.utc)
+            if not current_side and (now - self.last_strategy_rotation).total_seconds() >= 14400: # 4 hours cooldown
+                best_strategy = await self.strategy_selector.get_best_strategy(current_regime)
+                if best_strategy != getattr(self.config.strategy, "name", "ema_volume"):
+                    logger.info("strategy_rotated", old=getattr(self.config.strategy, "name", "ema_volume"), new=best_strategy, regime=current_regime.value)
+                    self.config.strategy.name = best_strategy
+                    try:
+                        strategy_class = get_strategy(best_strategy)
+                        self.strategy = strategy_class(self.config)
+                    except Exception as e:
+                        logger.error("strategy_rotation_failed", error=str(e))
+                self.last_strategy_rotation = now
+
         strategy_name = getattr(self.config.strategy, "name", "ema_volume")
         config_dict = self._config_dict()
         market_data_json = market_data_to_json(market_data)
-        primary_ohlcv_json = df_to_json(primary_ohlcv)
 
         try:
-            strategy_result_dict, regime_value, graph_analytics_dict = (
+            strategy_result_dict, graph_analytics_dict = (
                 await asyncio.gather(
                     dispatch(
                         analyze_strategy,
@@ -698,11 +736,6 @@ class OmniTrader:
                         market_data_json,
                         current_side,
                         market_trend,
-                        timeout=25.0,
-                    ),
-                    dispatch(
-                        analyze_regime,
-                        primary_ohlcv_json,
                         timeout=25.0,
                     ),
                     dispatch(
@@ -718,15 +751,12 @@ class OmniTrader:
 
             if isinstance(strategy_result_dict, Exception):
                 raise strategy_result_dict
-            if isinstance(regime_value, Exception):
-                raise regime_value
 
             result = StrategyResult(
                 signal=Signal(strategy_result_dict["signal"]),
                 reason=strategy_result_dict["reason"],
                 indicators=strategy_result_dict["indicators"],
             )
-            current_regime = MarketRegime(regime_value)
             graph_analytics = (
                 graph_analytics_dict
                 if not isinstance(graph_analytics_dict, Exception)
@@ -740,7 +770,6 @@ class OmniTrader:
             result = self.strategy.analyze(
                 market_data, current_side, market_trend=market_trend
             )
-            current_regime = self.regime_classifier.analyze(primary_ohlcv)
             graph_analytics = {}
 
         if graph_analytics:
