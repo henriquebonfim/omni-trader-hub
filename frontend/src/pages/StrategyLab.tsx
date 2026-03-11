@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Panel } from '@/shared/components/Panel';
 import { StatusBadge } from '@/shared/components/StatusBadge';
 import { EmptyState } from '@/shared/components/EmptyState';
@@ -16,12 +16,21 @@ const TA_CATEGORIES: Record<string, string[]> = {
   'Cycle': ['HT_DCPERIOD', 'HT_DCPHASE', 'HT_PHASOR', 'HT_SINE', 'HT_TRENDMODE'],
 };
 
+import { fetchStrategies } from '@/domains/strategy/api';
+
 export default function StrategyLab() {
   const [showEditor, setShowEditor] = useState(false);
   const [editingStrategy, setEditingStrategy] = useState<Strategy | null>(null);
+  const [strategies, setStrategies] = useState<Strategy[]>(mockStrategies);
 
-  const builtins = mockStrategies.filter(s => s.builtin);
-  const customs = mockStrategies.filter(s => !s.builtin);
+  useEffect(() => {
+    fetchStrategies().then(res => {
+      if (res && res.length > 0) setStrategies(res);
+    }).catch(console.error);
+  }, []);
+
+  const builtins = strategies.filter(s => s.builtin);
+  const customs = strategies.filter(s => !s.builtin);
 
   return (
     <div className="space-y-4 animate-fade-in">

@@ -1,14 +1,34 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Panel } from '@/shared/components/Panel';
 import { StatusBadge } from '@/shared/components/StatusBadge';
-import { mockEnvVars } from '@/domains/system/mocks';
 import { cn } from '@/core/utils';
 import { Eye, EyeOff, Save, RotateCcw, AlertTriangle, Send, CheckCircle, XCircle } from 'lucide-react';
+import { useAppStore } from '@/app/store/app-store';
+import { fetchConfig, updateConfig, fetchEnvVars } from '@/domains/system/api';
+import type { EnvVariable } from '@/domains/system/types';
+import { toast } from 'sonner';
 
 type SettingsTab = 'general' | 'environment' | 'risk' | 'notifications' | 'exchange' | 'system';
 
 export default function SettingsPage() {
   const [tab, setTab] = useState<SettingsTab>('general');
+  const config = useAppStore(s => s.config);
+  const setConfig = useAppStore(s => s.updateConfig);
+  const [envVars, setEnvVars] = useState<EnvVariable[]>([]);
+
+  useEffect(() => {
+    fetchConfig().then(data => setConfig(data)).catch(console.error);
+    fetchEnvVars().then(setEnvVars).catch(console.error);
+  }, [setConfig]);
+
+  const handleSaveConfig = async () => {
+    try {
+      await updateConfig(config);
+      toast.success('Configuration saved');
+    } catch (e) {
+      toast.error('Failed to save configuration');
+    }
+  };
 
   const tabs: { key: SettingsTab; label: string }[] = [
     { key: 'general', label: 'General' },
@@ -39,22 +59,32 @@ export default function SettingsPage() {
         ))}
       </div>
 
-      {tab === 'general' && <GeneralTab />}
-      {tab === 'environment' && <EnvironmentTab />}
-      {tab === 'risk' && <RiskTab />}
-      {tab === 'notifications' && <NotificationsTab />}
-      {tab === 'exchange' && <ExchangeTab />}
+        {tab === 'general' && <GeneralTab config={config} />}
+        {tab === 'environment' && <EnvironmentTab envVars={envVars} />}
+        {tab === 'risk' && <RiskTab config={config} />}
+        {tab === 'notifications' && <NotificationsTab config={config} />}
+        {tab === 'exchange' && <ExchangeTab config={config} />}
       {tab === 'system' && <SystemTab />}
     </div>
   );
 }
 
-function GeneralTab() {
-  const [mode, setMode] = useState<'paper' | 'live'>('paper');
-  const [leverage, setLeverage] = useState(3);
-  const [posSize, setPosSize] = useState(5);
-  const [autoStrategy, setAutoStrategy] = useState(true);
-  const [timeframe, setTimeframe] = useState('1h');
+import type { AppConfig } from '@/domains/system/types';
+
+function GeneralTab({ config }: { config: AppConfig }) {
+  const [mode, setMode] = useState<'paper' | 'live'>(config.mode);
+  const [leverage, setLeverage] = useState(config.default_leverage);
+  const [posSize, setPosSize] = useState(config.default_position_size_pct);
+  const [autoStrategy, setAutoStrategy] = useState(config.auto_strategy_mode);
+  const [timeframe, setTimeframe] = useState(config.default_timeframe);
+
+  useEffect(() => {
+    setMode(config.mode);
+    setLeverage(config.default_leverage);
+    setPosSize(config.default_position_size_pct);
+    setAutoStrategy(config.auto_strategy_mode);
+    setTimeframe(config.default_timeframe);
+  }, [config]);
 
   return (
     <Panel title="General Settings">
@@ -106,9 +136,13 @@ function GeneralTab() {
   );
 }
 
-function EnvironmentTab() {
-  const [vars, setVars] = useState(mockEnvVars);
+function EnvironmentTab({ envVars }: { envVars: EnvVariable[] }) {
+  const [vars, setVars] = useState(envVars);
   const [revealed, setRevealed] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    setVars(envVars);
+  }, [envVars]);
 
   const toggleReveal = (key: string) => {
     const next = new Set(revealed);
@@ -172,7 +206,7 @@ function EnvironmentTab() {
   );
 }
 
-function RiskTab() {
+function RiskTab({ config }: { config: AppConfig }) {
   return (
     <Panel title="Risk Defaults">
       <div className="space-y-4 max-w-lg">
@@ -205,8 +239,25 @@ function RiskTab() {
   );
 }
 
-function NotificationsTab() {
-  const [checks, setChecks] = useState({ trades: true, cb: true, daily: true, errors: true, rotations: false });
+function NotificationsTab({ config }: { config: AppConfig }) {
+  const [checks, setChecks] = useState({
+    trades: config.notify_trades,
+    cb: config.notify_circuit_breakers,
+    daily: config.notify_daily_summary,
+    errors: config.notify_errors,
+    rotations: config.notify_strategy_rotations
+  });
+
+  useEffect(() => {
+    setChecks({
+      trades: config.notify_trades,
+      cb: config.notify_circuit_breakers,
+      daily: config.notify_daily_summary,
+      errors: config.notify_errors,
+      rotations: config.notify_strategy_rotations
+    });
+  }, [config]);
+
   return (
     <Panel title="Notification Settings">
       <div className="space-y-4 max-w-lg">
@@ -238,7 +289,7 @@ function NotificationsTab() {
   );
 }
 
-function ExchangeTab() {
+function ExchangeTab({ config }: { config: AppConfig }) {
   return (
     <Panel title="Exchange Connection">
       <div className="space-y-4 max-w-lg">

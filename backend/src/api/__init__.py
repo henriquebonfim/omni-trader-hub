@@ -25,6 +25,7 @@ from .routes import (
     strategies,
     system,
     trades,
+    stubs,
 )
 from .websocket import router as ws_router
 
@@ -101,6 +102,7 @@ def create_api(bot_instance=None, bot_manager=None) -> FastAPI:
     app.include_router(markets.router, prefix="/api")
     app.include_router(env.router, prefix="/api")
     app.include_router(system.router, prefix="/api")
+    app.include_router(stubs.router, prefix="/api")
     app.include_router(ws_router)
 
     @app.get("/api/health")

@@ -1,14 +1,35 @@
 import { request } from '@/core/api';
 import type { Bot } from './types';
+import { adaptBotState } from '@/lib/adapters';
+import { stubBots } from '@/lib/stubs';
 
-export const fetchBots = () => request<Bot[]>('/api/bots');
+export const fetchBots = async () => {
+  try {
+    type ApiObject = Record<string, unknown>;
+    const [status, position, balance] = await Promise.all([
+      request<ApiObject>('/api/status'),
+      request<ApiObject>('/api/position'),
+      request<ApiObject>('/api/balance'),
+    ]);
+    const realBot = adaptBotState(status, position, balance);
+    return stubBots(realBot);
+  } catch (e) {
+    console.error('fetchBots error', e);
+    return stubBots();
+  }
+};
+
 export const createBot = (config: Partial<Bot>) =>
   request<Bot>('/api/bots', { method: 'POST', body: JSON.stringify(config) });
 export const updateBot = (id: string, config: Partial<Bot>) =>
   request<Bot>(`/api/bots/${id}`, { method: 'PUT', body: JSON.stringify(config) });
 export const deleteBot = (id: string) =>
   request<void>(`/api/bots/${id}`, { method: 'DELETE' });
-export const startBot = (id: string) =>
-  request<void>(`/api/bots/${id}/start`, { method: 'POST' });
-export const stopBot = (id: string) =>
-  request<void>(`/api/bots/${id}/stop`, { method: 'POST' });
+export const startBot = async (id: string) => {
+  if (id === 'default') return request<void>('/api/bot/start', { method: 'POST' });
+  return request<void>(`/api/bots/${id}/start`, { method: 'POST' });
+};
+export const stopBot = async (id: string) => {
+  if (id === 'default') return request<void>('/api/bot/stop', { method: 'POST' });
+  return request<void>(`/api/bots/${id}/stop`, { method: 'POST' });
+};

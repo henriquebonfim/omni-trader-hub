@@ -104,12 +104,12 @@ export default function BotsAssets() {
                         </button>
                       )}
                       {(bot.status === 'paused' || bot.status === 'stopped') && (
-                        <button className="p-1.5 rounded hover:bg-success/15 text-success transition-colors" title="Start">
+                        <button className="p-1.5 rounded hover:bg-success/15 text-success transition-colors" title="Start" onClick={(e) => { e.stopPropagation(); handleStartBot(bot.id); }}>
                           <Play className="h-3.5 w-3.5" />
                         </button>
                       )}
                       {bot.status !== 'stopped' && (
-                        <button className="p-1.5 rounded hover:bg-danger/15 text-danger transition-colors" title="Stop">
+                        <button className="p-1.5 rounded hover:bg-danger/15 text-danger transition-colors" title="Stop" onClick={(e) => { e.stopPropagation(); handleStopBot(bot.id); }}>
                           <Square className="h-3.5 w-3.5" />
                         </button>
                       )}

@@ -1,13 +1,13 @@
 import { Panel } from '@/shared/components/Panel';
 import { StatCard } from '@/shared/components/StatCard';
 import { StatusBadge } from '@/shared/components/StatusBadge';
-import { mockBots } from '@/domains/bot/mocks';
+import { useAppStore } from '@/app/store/app-store';
 import { mockCircuitBreakers } from '@/domains/risk/mocks';
 import { cn } from '@/core/utils';
 import { Shield, AlertTriangle } from 'lucide-react';
 
 export default function RiskMonitor() {
-  const bots = mockBots;
+  const bots = useAppStore(s => s.bots);
   const activeBots = bots.filter(b => b.status === 'running');
   const totalExposure = activeBots.reduce((s, b) => s + b.balance_allocated * b.leverage, 0);
   const totalAllocated = bots.reduce((s, b) => s + b.balance_allocated, 0);

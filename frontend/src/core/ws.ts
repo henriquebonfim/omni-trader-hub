@@ -1,8 +1,7 @@
 import { useEffect, useRef, useCallback } from 'react';
 import { useAppStore } from '@/app/store/app-store';
-import type { CycleMessage, AlertMessage, TradeMessage } from '@/domains/system/types';
-
-const WS_URL = import.meta.env.VITE_WS_URL || 'ws://localhost:8000/ws';
+import type { AlertMessage, TradeMessage } from '@/domains/system/types';
+import { adaptWsMessage } from '@/lib/adapters';
 
 export function useLiveFeed() {
   const wsRef = useRef<WebSocket | null>(null);
@@ -15,7 +14,9 @@ export function useLiveFeed() {
 
   const connect = useCallback(() => {
     try {
-      const ws = new WebSocket(WS_URL);
+      // Connect relative to current host via proxy, or use absolute URL
+      const wsUrl = import.meta.env.VITE_WS_URL || `ws://${window.location.host}/ws/live`;
+      const ws = new WebSocket(wsUrl);
       wsRef.current = ws;
 
       ws.onopen = () => {
@@ -25,10 +26,18 @@ export function useLiveFeed() {
 
       ws.onmessage = (event) => {
         try {
-          const data = JSON.parse(event.data);
+          const rawData = JSON.parse(event.data);
+          // Backend sends a raw flat cycle JSON currently, we need to adapt it
+          // Check if it's already structured or needs adaptation
+          let data = rawData;
+          
+          if (!rawData.type || rawData.type === 'cycle_update') {
+             data = adaptWsMessage(rawData);
+          }
+
           switch (data.type) {
             case 'cycle_update':
-              updateBotFromCycle(data as CycleMessage);
+              updateBotFromCycle(data);
               break;
             case 'alert':
               addAlert(data as AlertMessage);

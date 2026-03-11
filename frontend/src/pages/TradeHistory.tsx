@@ -7,6 +7,9 @@ import { cn } from '@/core/utils';
 import { Download, ChevronDown, ChevronUp, Search } from 'lucide-react';
 import type { Trade } from '@/domains/trade/types';
 
+import { fetchTradeHistory } from '@/domains/trade/api';
+import { useEffect } from 'react';
+
 export default function TradeHistory() {
   const [period, setPeriod] = useState<'today' | 'week' | 'month' | 'all'>('all');
   const [search, setSearch] = useState('');
@@ -15,8 +18,16 @@ export default function TradeHistory() {
   const [page, setPage] = useState(0);
   const [expanded, setExpanded] = useState<number | null>(null);
   const perPage = 20;
+  
+  const [trades, setTrades] = useState<Trade[]>(mockTrades);
 
-  const closedTrades = mockTrades.filter(t => t.pnl !== undefined);
+  useEffect(() => {
+    fetchTradeHistory({ limit: '500' }).then(res => {
+      if (res && res.trades && res.trades.length > 0) setTrades(res.trades);
+    }).catch(console.error);
+  }, []);
+
+  const closedTrades = trades.filter(t => t.pnl !== undefined);
   const filtered = closedTrades.filter(t =>
     t.symbol.toLowerCase().includes(search.toLowerCase()) ||
     t.strategy.toLowerCase().includes(search.toLowerCase())
