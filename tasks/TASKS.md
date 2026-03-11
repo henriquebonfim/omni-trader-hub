@@ -3,10 +3,10 @@
 Single source of truth for all technical work: architecture items, audit-discovered bugs, and risk gaps.
 Institutional-grade audit completed **2026-03-03** — findings integrated below.
 Multi-asset autonomous platform expansion added **2026-03-09** — T37-T42 driven by frontend spec (PROMPT.md).
-Last updated: 2026-03-10 | Sprint status: T32-T39 completed and merged to master. Next: T40-T42.
+Last updated: 2026-03-10 | Sprint status: T32-T40 completed and merged to master. Next: T41-T42.
 Frontend-backend integration migration added **2026-03-09** — T43 bridges new frontend to existing backend.
 
-> Last updated: 2026-03-10 | Sprint status: T32-T38 completed and merged to master. Next: T39-T42 (TA-Lib Indicators, Custom Strategies, Frontend Integration)
+> Last updated: 2026-03-10 | Sprint status: T32-T40 completed and merged to master. Next: T41-T42 (Env Management, Markets Discovery)
 
 ---
 
@@ -194,7 +194,8 @@ Frontend-backend integration migration added **2026-03-09** — T43 bridges new 
     - Compute endpoint returns RSI values for BTC/USDT 1h candles
 
 ### T40. Custom Strategy System (CRUD + Execution)
-- [ ] **Phase 10a: Custom strategy data model**
+> **T40 COMPLETED**: ✅ Custom strategy persistence, CRUD API, TA-Lib executor, and runtime integration delivered (2026-03-10). See PR #73.
+- [x] **Phase 10a: Custom strategy data model**
     - New node: `:CustomStrategy {name (unique), description, regime_affinity, entry_long_json, entry_short_json, exit_long_json, exit_short_json, indicators_json, stop_loss_atr_mult, take_profit_atr_mult, min_bars_between_entries, created_at, updated_at}`
     - Condition JSON schema:
         ```json
@@ -212,7 +213,7 @@ Frontend-backend integration migration added **2026-03-09** — T43 bridges new 
         ]
         ```
     - Validation: all referenced indicators in conditions must exist in indicators array
-- [ ] **Phase 10b: Custom strategy CRUD API** ([backend/src/api/routes/strategies.py](backend/src/api/routes/strategies.py))
+- [x] **Phase 10b: Custom strategy CRUD API** ([backend/src/api/routes/strategies.py](backend/src/api/routes/strategies.py))
     - `GET /api/strategies` — returns combined list:
         - Built-in: `{name, type: "built-in", description, regime_affinity, editable: false}`
         - Custom: `{name, type: "custom", description, regime_affinity, conditions, indicators, editable: true}`
@@ -222,7 +223,7 @@ Frontend-backend integration migration added **2026-03-09** — T43 bridges new 
         - Store as `:CustomStrategy` node in Memgraph
     - `PUT /api/strategies/{name}` — update (auth, must be `type: custom`)
     - `DELETE /api/strategies/{name}` — delete (auth, must be `type: custom`, warn if active on any bot)
-- [ ] **Phase 10c: Custom strategy executor** ([backend/src/strategies/custom_executor.py](backend/src/strategies/custom_executor.py))
+- [x] **Phase 10c: Custom strategy executor** ([backend/src/strategies/custom_executor.py](backend/src/strategies/custom_executor.py))
     - `CustomStrategyExecutor(BaseStrategy)`:
         - On init: load `:CustomStrategy` config from Memgraph
         - `analyze()`:
@@ -238,7 +239,7 @@ Frontend-backend integration migration added **2026-03-09** — T43 bridges new 
             - Value can be numeric or another indicator name (e.g., `ema_9 crosses_above ema_21`)
     - Register dynamically: on bot startup, if strategy is custom, instantiate `CustomStrategyExecutor` with that config
     - Hot reload: if strategy is updated via API while bot is running, reload on next cycle
-- [ ] **Phase 10d: Integration with backtesting and auto-selection**
+- [x] **Phase 10d: Integration with backtesting and auto-selection**
     - Custom strategies work with `BacktestEngine` (T35) — no special handling needed (same `BaseStrategy` interface)
     - Auto-selection (T38) can include custom strategies if they have ≥20 backtest trades
     - Strategy Lab page shows backtest results per custom strategy
