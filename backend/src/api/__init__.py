@@ -23,9 +23,9 @@ from .routes import (
     notifications,
     status,
     strategies,
+    stubs,
     system,
     trades,
-    stubs,
 )
 from .websocket import router as ws_router
 

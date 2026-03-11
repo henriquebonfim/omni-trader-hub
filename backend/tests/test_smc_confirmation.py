@@ -1,9 +1,8 @@
 import pandas as pd
-import pytest
 
 from src.config import Config
 from src.strategy.base import BaseStrategy, Signal
-from src.strategy.smc.structure import Trend
+
 
 class DummyStrategy(BaseStrategy):
     def __init__(self, config):
