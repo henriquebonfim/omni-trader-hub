@@ -17,6 +17,7 @@ from .routes import (
     candles,
     config,
     graph,
+    indicators,
     notifications,
     status,
     strategies,
@@ -93,6 +94,7 @@ def create_api(bot_instance=None, bot_manager=None) -> FastAPI:
     app.include_router(notifications.router, prefix="/api")
     app.include_router(candles.router, prefix="/api")
     app.include_router(graph.router, prefix="/api")
+    app.include_router(indicators.router, prefix="/api")
     app.include_router(ws_router)
 
     @app.get("/api/health")
