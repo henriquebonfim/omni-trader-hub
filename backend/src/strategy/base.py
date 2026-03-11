@@ -15,6 +15,8 @@ import structlog
 from src import indicators
 from src.config import Config
 from src.intelligence.regime import MarketRegime
+from src.strategy.smc.analysis import SMCAnalyzer
+from src.strategy.smc.structure import Trend
 
 logger = structlog.get_logger()
 
@@ -97,7 +99,7 @@ class BaseStrategy(ABC):
     def required_timeframes(self) -> list[str]:
         """
         List of timeframes required by the strategy.
-        Defaults to the configured trading timeframe + bias confirmation TF.
+        Defaults to the configured trading timeframe + bias confirmation TF + SMC TF.
         """
         tfs = [self.config.trading.timeframe]
         bias_enabled = getattr(self.config.strategy, "bias_confirmation", False)
@@ -105,6 +107,13 @@ class BaseStrategy(ABC):
             bias_tf = getattr(self.config.strategy, "bias_timeframe", "4h")
             if bias_tf not in tfs:
                 tfs.append(bias_tf)
+                
+        smc_enabled = getattr(self.config.strategy, "smc_confirmation", False)
+        if smc_enabled:
+            smc_tf = getattr(self.config.strategy, "smc_timeframe", "4h")
+            if smc_tf not in tfs:
+                tfs.append(smc_tf)
+                
         return tfs
 
     @abstractmethod
@@ -260,6 +269,52 @@ class BaseStrategy(ABC):
                     )
                     signal = Signal.HOLD
                     reason = f"Bias Filter ({bias_tf}: {bias}) blocked Short"
+
+        # Apply SMC Confirmation Filter
+        smc_enabled = getattr(self.config.strategy, "smc_confirmation", False)
+        if smc_enabled and signal in (Signal.LONG, Signal.SHORT):
+            smc_tf = getattr(self.config.strategy, "smc_timeframe", "4h")
+            smc_swing_window = getattr(self.config.strategy, "smc_swing_window", 5)
+            smc_ohlcv = market_data.get(smc_tf)
+            
+            if smc_ohlcv is not None and not smc_ohlcv.empty:
+                smc_analyzer = SMCAnalyzer(swing_window=smc_swing_window)
+                smc_results = smc_analyzer.analyze({smc_tf: smc_ohlcv})
+                smc_bias = smc_analyzer.get_bias(smc_results, bias_tf=smc_tf)
+                
+                # If neutral, we allow it (no confirmation available to block it)
+                if smc_bias != Trend.NEUTRAL:
+                    if signal == Signal.LONG and smc_bias == Trend.BEARISH:
+                        logger.info(
+                            "smc_confirmation_rejected",
+                            signal="LONG",
+                            smc_bias="bearish",
+                            tf=smc_tf,
+                        )
+                        signal = Signal.HOLD
+                        reason = f"SMC Bias Filter ({smc_tf}: bearish) blocked Long"
+                    elif signal == Signal.SHORT and smc_bias == Trend.BULLISH:
+                        logger.info(
+                            "smc_confirmation_rejected",
+                            signal="SHORT",
+                            smc_bias="bullish",
+                            tf=smc_tf,
+                        )
+                        signal = Signal.HOLD
+                        reason = f"SMC Bias Filter ({smc_tf}: bullish) blocked Short"
+            else:
+                logger.warning(
+                    "smc_confirmation_missing_data",
+                    tf=smc_tf,
+                )
+                # If missing data, degrade to HOLD for safety in the confirmation layer.
+                logger.info(
+                    "smc_confirmation_rejected_missing_data",
+                    signal=signal.value,
+                    tf=smc_tf,
+                )
+                signal = Signal.HOLD
+                reason = f"SMC Bias Filter missing data for {smc_tf}"
 
         elif current_position == "long":
             if self.should_exit():
