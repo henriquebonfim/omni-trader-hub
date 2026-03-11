@@ -117,10 +117,18 @@ class OmniTrader:
         strategy_name = getattr(self.config.strategy, "name", "ema_volume")
         logger.info("loading_strategy", name=strategy_name)
 
+        # To support async database operations inside __init__ logic
+        # We define a helper that gets called inside start() instead, 
+        # but for initial load we assume it might be a built-in strategy.
         try:
             strategy_class = get_strategy(strategy_name)
             self.strategy = strategy_class(self.config)
             logger.info("strategy_loaded", metadata=self.strategy.metadata)
+        except ValueError:
+            # If it's custom, we load it dynamically later in start() or assume ema_volume for now
+            logger.warning("strategy_not_found_in_registry_deferring_load", name=strategy_name)
+            strategy_class = get_strategy("ema_volume")
+            self.strategy = strategy_class(self.config)
         except Exception as e:
             logger.critical("strategy_load_failed", error=str(e))
             raise
@@ -303,8 +311,16 @@ class OmniTrader:
                 logger.info(
                     "strategy_switching", old=old_strategy_name, new=new_strategy_name
                 )
-                strategy_class = get_strategy(new_strategy_name)
-                self.strategy = strategy_class(self.config)
+                try:
+                    strategy_class = get_strategy(new_strategy_name)
+                    self.strategy = strategy_class(self.config)
+                except ValueError:
+                    from src.strategy.custom_executor import CustomStrategyExecutor
+                    cs_data = await self.database.get_custom_strategy(new_strategy_name)
+                    if cs_data:
+                        self.strategy = CustomStrategyExecutor(self.config, cs_data)
+                    else:
+                        raise ValueError(f"Strategy {new_strategy_name} not found")
                 logger.info("strategy_switched", metadata=self.strategy.metadata)
             else:
                 self.strategy.update_config(self.config)
@@ -348,6 +364,17 @@ class OmniTrader:
         # Initialize daily stats
         balance_info = await self.exchange.get_balance()
         await self.risk.initialize_daily_stats(balance_info["total"])
+
+        # Load custom strategy if needed
+        strategy_name = getattr(self.config.strategy, "name", "ema_volume")
+        if self.strategy.metadata.get("name") != strategy_name:
+            from src.strategy.custom_executor import CustomStrategyExecutor
+            cs_data = await self.database.get_custom_strategy(strategy_name)
+            if cs_data:
+                self.strategy = CustomStrategyExecutor(self.config, cs_data)
+                logger.info("custom_strategy_loaded_on_start", name=strategy_name)
+            else:
+                logger.error("strategy_not_found_in_db_or_registry", name=strategy_name)
 
         # Send startup notification
         await self.notifier.bot_started(self.config.trading.symbol, paper_mode)
@@ -716,8 +743,16 @@ class OmniTrader:
                     logger.info("strategy_rotated", old=getattr(self.config.strategy, "name", "ema_volume"), new=best_strategy, regime=current_regime.value)
                     self.config.strategy.name = best_strategy
                     try:
-                        strategy_class = get_strategy(best_strategy)
-                        self.strategy = strategy_class(self.config)
+                        try:
+                            strategy_class = get_strategy(best_strategy)
+                            self.strategy = strategy_class(self.config)
+                        except ValueError:
+                            from src.strategy.custom_executor import CustomStrategyExecutor
+                            cs_data = await self.database.get_custom_strategy(best_strategy)
+                            if cs_data:
+                                self.strategy = CustomStrategyExecutor(self.config, cs_data)
+                            else:
+                                raise ValueError(f"Strategy {best_strategy} not found")
                     except Exception as e:
                         logger.error("strategy_rotation_failed", error=str(e))
                 self.last_strategy_rotation = now

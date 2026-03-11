@@ -162,3 +162,36 @@ class BaseDatabase(ABC):
         Retrieve ordered candles from the database.
         """
         pass
+
+    @abstractmethod
+    async def save_custom_strategy(
+        self,
+        name: str,
+        description: str,
+        regime_affinity: list[str],
+        entry_long_json: list[dict],
+        entry_short_json: list[dict],
+        exit_long_json: list[dict],
+        exit_short_json: list[dict],
+        indicators_json: list[dict],
+        stop_loss_atr_mult: Optional[float] = None,
+        take_profit_atr_mult: Optional[float] = None,
+        min_bars_between_entries: int = 10,
+    ) -> None:
+        """Save a custom strategy."""
+        pass
+
+    @abstractmethod
+    async def get_custom_strategy(self, name: str) -> Optional[dict]:
+        """Get a custom strategy by name."""
+        pass
+
+    @abstractmethod
+    async def list_custom_strategies(self) -> list[dict]:
+        """List all custom strategies."""
+        pass
+
+    @abstractmethod
+    async def delete_custom_strategy(self, name: str) -> bool:
+        """Delete a custom strategy by name. Returns True if deleted, False if not found."""
+        pass

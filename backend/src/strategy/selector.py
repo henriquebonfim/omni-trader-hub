@@ -104,6 +104,28 @@ class StrategySelector:
         except Exception as e:
             logger.error("failed_to_fetch_strategy_scores", error=str(e), regime=regime.value)
             
+        # If we need custom strategies to "feed into score queries", let's ensure they are returned 
+        # even if they have 0 trades, so they appear in /api/strategies/performance
+        scored_names = {s.name for s in scores}
+        
+        # Add custom strategies with 0 trades if they have affinity for this regime
+        if hasattr(self.database, "list_custom_strategies"):
+            try:
+                custom_strats = await self.database.list_custom_strategies()
+                for cs in custom_strats:
+                    affinity = cs.get("regime_affinity", [])
+                    if (not affinity or regime.value in affinity) and cs["name"] not in scored_names:
+                        scores.append(StrategyScore(
+                            name=cs["name"],
+                            sample_size=0,
+                            sharpe=0.0,
+                            profit_factor=0.0,
+                            win_rate=0.0,
+                            composite_score=0.0
+                        ))
+            except Exception as e:
+                logger.error("failed_to_fetch_custom_strategies_for_scores", error=str(e))
+
         return scores
         
     async def get_best_strategy(self, regime: MarketRegime, respect_cooldown: bool = True) -> str:
