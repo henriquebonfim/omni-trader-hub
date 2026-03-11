@@ -1,10 +1,11 @@
+
 import pytest
-import asyncio
 from fastapi.testclient import TestClient
-from src.api.routes.strategies import router
+
+from src.api import create_api
 from src.config import Config
 from src.strategy.custom_executor import CustomStrategyExecutor
-from src.api import create_api
+
 
 class MockDatabase:
     def __init__(self):
@@ -105,8 +106,8 @@ async def test_custom_strategy_crud():
     assert "test_custom_rsi" in names
     
     # 4. Executor check logic
-    import pandas as pd
     import numpy as np
+    import pandas as pd
     cs = await db.get_custom_strategy("test_custom_rsi")
     executor = CustomStrategyExecutor(Config({"trading": {"timeframe": "1h"}, "strategy": {}, "risk": {}}), cs)
     
@@ -122,7 +123,7 @@ async def test_custom_strategy_crud():
     
     executor.update(ohlcv)
     executor._indicators["rsi_14"] = pd.Series([40, 40, 20])
-    assert executor.should_long() == True
+    assert executor.should_long()
     
     # 5. DELETE fails for built-in
     res = client.delete("/api/strategies/ema_volume", headers=headers)

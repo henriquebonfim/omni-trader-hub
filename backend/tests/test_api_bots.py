@@ -1,11 +1,13 @@
+from unittest.mock import AsyncMock
+
 import pytest
 from fastapi.testclient import TestClient
-from unittest.mock import AsyncMock, patch
 
 from src.api import create_api
 from src.bot_manager import BotManager
-from src.main import OmniTrader
 from src.config import Config
+from src.main import OmniTrader
+
 
 @pytest.fixture
 def mock_bot_manager():
@@ -83,7 +85,7 @@ def test_get_bot(client):
     assert response.status_code == 200
     bot = response.json()
     assert bot["id"] == "bot1"
-    assert bot["running"] == True
+    assert bot["running"]
     assert bot["daily_pnl"] == 100.0
 
 def test_get_bot_not_found(client):
@@ -97,7 +99,7 @@ def test_create_bot_unauthorized(client):
 def test_create_bot_authorized(client, auth_headers):
     response = client.post("/api/bots", json={"config": {"trading": {"symbol": "SOL/USDT"}}}, headers=auth_headers)
     assert response.status_code == 200
-    assert response.json()["ok"] == True
+    assert response.json()["ok"]
     assert response.json()["bot_id"] == "bot3"
 
 def test_status_aggregation(client):
@@ -105,6 +107,6 @@ def test_status_aggregation(client):
     assert response.status_code == 200
     status = response.json()
     assert status["total_bots"] == 2
-    assert status["running"] == True
+    assert status["running"]
     assert status["running_count"] == 1
     assert status["symbol"] == "multiple"

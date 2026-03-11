@@ -1,7 +1,9 @@
-import pytest
 import pandas as pd
-from src.strategy.custom_executor import CustomStrategyExecutor
+import pytest
+
 from src.config import Config
+from src.strategy.custom_executor import CustomStrategyExecutor
+
 
 @pytest.fixture
 def config():
@@ -57,5 +59,5 @@ def test_custom_strategy_executor_crosses_above(config):
     df.loc[df.index[-1], "close"] = 6
     executor.ohlcv = df
     
-    assert executor.should_long() == True
+    assert executor.should_long()
 

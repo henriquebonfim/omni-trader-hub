@@ -2,14 +2,15 @@
 Strategy listing route.
 """
 
-from fastapi import APIRouter, Request, HTTPException, Depends
-from typing import List, Optional, Any, Dict
-from pydantic import BaseModel
-import talib
+from typing import Any, Dict, List, Optional
 
-from src.strategy.registry import get_all_strategies, get_strategy
-from src.intelligence.regime import MarketRegime
+import talib
+from fastapi import APIRouter, Depends, HTTPException, Request
+from pydantic import BaseModel
+
 from src.api.auth import verify_api_key
+from src.intelligence.regime import MarketRegime
+from src.strategy.registry import get_all_strategies, get_strategy
 
 router = APIRouter(tags=["strategies"])
 
@@ -130,8 +131,8 @@ def validate_custom_strategy(strat: CustomStrategyCreate):
     for ind in strat.indicators_json:
         try:
             talib.abstract.Function(ind.function)
-        except Exception:
-            raise HTTPException(status_code=400, detail=f"Invalid TA-Lib function: {ind.function}")
+        except Exception as e:
+            raise HTTPException(status_code=400, detail=f"Invalid TA-Lib function: {ind.function}") from e
 
     # Check conditions
     all_conditions = (
@@ -146,8 +147,8 @@ def validate_custom_strategy(strat: CustomStrategyCreate):
         if isinstance(cond.value, str) and cond.value not in indicator_outputs:
             try:
                 float(cond.value)
-            except ValueError:
-                raise HTTPException(status_code=400, detail=f"Condition value must be number or valid indicator, got: {cond.value}")
+            except ValueError as e:
+                raise HTTPException(status_code=400, detail=f"Condition value must be number or valid indicator, got: {cond.value}") from e
 
 
 @router.get("/strategies/{name}")

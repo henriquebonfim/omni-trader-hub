@@ -96,6 +96,7 @@ def analyze_strategy(
             # We need to fetch from DB synchronously? We can't use async driver easily here unless we asyncio.run
             # Actually Celery tasks are sync. We should use a helper to fetch custom strategy or pass it in config
             import asyncio
+
             from src.database.factory import DatabaseFactory
 
             async def _fetch_custom(name):
@@ -107,7 +108,7 @@ def analyze_strategy(
 
             cs_data = asyncio.run(_fetch_custom(strategy_name))
             if not cs_data:
-                raise ValueError(f"Strategy {strategy_name} not found in registry or DB")
+                raise ValueError(f"Strategy {strategy_name} not found in registry or DB") from None
             strategy = CustomStrategyExecutor(config, cs_data)
 
         result = strategy.analyze(market_data, current_side, market_trend=market_trend)

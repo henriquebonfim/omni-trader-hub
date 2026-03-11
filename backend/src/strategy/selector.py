@@ -1,7 +1,9 @@
-import structlog
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import List
-from dataclasses import dataclass
+
+import structlog
+
 from src.intelligence.regime import MarketRegime
 
 ROTATION_COOLDOWN_HOURS = 4

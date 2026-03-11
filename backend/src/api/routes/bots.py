@@ -1,5 +1,6 @@
 import asyncio
-from fastapi import APIRouter, Depends, Request, HTTPException
+
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
 
 from src.api.auth import verify_api_key
@@ -64,7 +65,7 @@ async def update_bot(request: Request, bot_id: str, body: ConfigUpdate):
             raise HTTPException(status_code=404, detail="Bot not found")
         return {"ok": True, "message": "Bot updated"}
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=400, detail=str(e)) from e
 
 @router.delete("/{bot_id}", dependencies=[Depends(verify_api_key)])
 async def delete_bot(request: Request, bot_id: str):

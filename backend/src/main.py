@@ -320,7 +320,7 @@ class OmniTrader:
                     if cs_data:
                         self.strategy = CustomStrategyExecutor(self.config, cs_data)
                     else:
-                        raise ValueError(f"Strategy {new_strategy_name} not found")
+                        raise ValueError(f"Strategy {new_strategy_name} not found") from None
                 logger.info("strategy_switched", metadata=self.strategy.metadata)
             else:
                 self.strategy.update_config(self.config)
@@ -747,12 +747,14 @@ class OmniTrader:
                             strategy_class = get_strategy(best_strategy)
                             self.strategy = strategy_class(self.config)
                         except ValueError:
-                            from src.strategy.custom_executor import CustomStrategyExecutor
+                            from src.strategy.custom_executor import (
+                                CustomStrategyExecutor,
+                            )
                             cs_data = await self.database.get_custom_strategy(best_strategy)
                             if cs_data:
                                 self.strategy = CustomStrategyExecutor(self.config, cs_data)
                             else:
-                                raise ValueError(f"Strategy {best_strategy} not found")
+                                raise ValueError(f"Strategy {best_strategy} not found") from None
                     except Exception as e:
                         logger.error("strategy_rotation_failed", error=str(e))
                 self.last_strategy_rotation = now

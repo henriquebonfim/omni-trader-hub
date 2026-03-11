@@ -1,10 +1,12 @@
 import asyncio
 import uuid
-import structlog
 from typing import Dict, List, Optional
-from src.main import OmniTrader
-from src.config import get_config, Config
+
+import structlog
+
+from src.config import Config, get_config
 from src.database.factory import DatabaseFactory
+from src.main import OmniTrader
 
 logger = structlog.get_logger()
 
@@ -158,7 +160,7 @@ class BotManager:
     async def stop_all(self):
         """Stop all running bots gracefully."""
         tasks = []
-        for bot_id, bot in self.bots.items():
+        for _bot_id, bot in self.bots.items():
             if bot._running:
                 tasks.append(bot.stop("manager_shutdown"))
         if tasks:
