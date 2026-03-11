@@ -192,3 +192,8 @@ class BaseExchange(ABC):
     ) -> Dict[str, Any]:
         """Verify order fills and return actual average price and fees."""
         pass
+
+    @abstractmethod
+    async def fetch_markets(self) -> List[Dict[str, Any]]:
+        """Fetch all active markets (symbols) from the exchange."""
+        pass

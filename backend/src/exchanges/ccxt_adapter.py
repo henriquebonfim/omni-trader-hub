@@ -15,7 +15,7 @@ import structlog
 
 from ..config import get_config
 from ..rate_limiter import LeakyBucketRateLimiter
-from .base import BaseExchange, Position
+from .base import BaseExchange, ExchangeError, NetworkError, Position
 
 logger = structlog.get_logger()
 
@@ -1032,3 +1032,63 @@ class CCXTExchange(BaseExchange):
             "fee_currency": None,
             "confirmed": False,
         }
+
+    async def fetch_markets(self) -> list[dict]:
+        """
+        Fetch all active markets (symbols) from the exchange.
+        Returns detailed information including minimum sizes and volume.
+        """
+        try:
+            # We use load_markets to ensure we have the latest market data
+            await self.client.load_markets(reload=True)
+            markets = self.client.markets
+
+            # Fetch 24h tickers to get volume and last price
+            # In ccxt, fetching all tickers at once is usually fast
+            tickers = await self.client.fetch_tickers()
+
+            result = []
+            for symbol, market in markets.items():
+                # We only want active, perpetual (swap) markets settling in quote currency
+                if not market.get("active", False):
+                    continue
+                if market.get("type") != "swap":
+                    continue
+                
+                # Default status if active is True
+                status = "active"
+                
+                ticker = tickers.get(symbol, {})
+                
+                # Get limits
+                limits = market.get("limits", {})
+                amount_limits = limits.get("amount", {})
+                price_limits = limits.get("price", {})
+                
+                min_size = amount_limits.get("min", 0.0)
+                tick_size = price_limits.get("min", 0.0) # tick size is usually price min
+                if "info" in market and "filters" in market["info"]:
+                    for f in market["info"]["filters"]:
+                        if f.get("filterType") == "PRICE_FILTER":
+                            tick_size = float(f.get("tickSize", tick_size))
+                        elif f.get("filterType") == "LOT_SIZE":
+                            min_size = float(f.get("minQty", min_size))
+
+                result.append({
+                    "symbol": symbol,
+                    "base": market.get("base"),
+                    "quote": market.get("quote"),
+                    "min_size": min_size,
+                    "tick_size": tick_size,
+                    "volume_24h": ticker.get("quoteVolume", 0.0), # Quote volume is usually preferred, or baseVolume
+                    "last_price": ticker.get("last", 0.0),
+                    "status": status,
+                })
+            
+            return result
+        except ccxt.NetworkError as e:
+            logger.error("ccxt_network_error_fetch_markets", error=str(e))
+            raise NetworkError(f"Network error fetching markets: {e}") from e
+        except Exception as e:
+            logger.error("ccxt_fetch_markets_error", error=str(e))
+            raise ExchangeError(f"Error fetching markets: {e}") from e

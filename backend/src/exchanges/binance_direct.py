@@ -855,3 +855,50 @@ class BinanceDirectExchange(BaseExchange):
             "fee_currency": None,
             "confirmed": False,
         }
+
+    async def fetch_markets(self) -> List[Dict[str, Any]]:
+        """
+        Fetch all active markets (symbols) from the exchange.
+        """
+        exchange_info = await self._public_request("GET", "/fapi/v1/exchangeInfo")
+        tickers = await self._public_request("GET", "/fapi/v1/ticker/24hr")
+        
+        tickers_map = {t["symbol"]: t for t in tickers}
+        
+        result = []
+        for symbol_info in exchange_info.get("symbols", []):
+            if symbol_info.get("status") != "TRADING":
+                continue
+            if symbol_info.get("contractType") != "PERPETUAL":
+                continue
+                
+            symbol = symbol_info["symbol"]
+            
+            # Format symbol to standard format (e.g. BTC/USDT)
+            base = symbol_info.get("baseAsset", "")
+            quote = symbol_info.get("quoteAsset", "")
+            formatted_symbol = f"{base}/{quote}"
+            
+            ticker = tickers_map.get(symbol, {})
+            
+            min_size = 0.0
+            tick_size = 0.0
+            
+            for f in symbol_info.get("filters", []):
+                if f.get("filterType") == "PRICE_FILTER":
+                    tick_size = float(f.get("tickSize", 0.0))
+                elif f.get("filterType") == "LOT_SIZE":
+                    min_size = float(f.get("minQty", 0.0))
+            
+            result.append({
+                "symbol": formatted_symbol,
+                "base": base,
+                "quote": quote,
+                "min_size": min_size,
+                "tick_size": tick_size,
+                "volume_24h": float(ticker.get("quoteVolume", 0.0)),
+                "last_price": float(ticker.get("lastPrice", 0.0)),
+                "status": "active"
+            })
+            
+        return result
