@@ -14,7 +14,7 @@ Frontend-backend integration migration added **2026-03-09** — T43 bridges new 
 
 Fallback triage triggered because GitHub issue queue is empty. Promote highest-impact internal planning items to active execution queue.
 
-- [ ] **T45. Intelligence Frontend Real-Data Integration (Complete T34 Phase 3f)**
+- [x] **T45. Intelligence Frontend Real-Data Integration (Complete T34 Phase 3f)** — PR #76
 	Scope: Wire `frontend/src/pages/Intelligence.tsx` to live graph endpoints (`/api/graph/sentiment/{symbol}`, `/api/graph/news`, `/api/graph/crisis`) with loading/error states and graceful fallback.
 	Acceptance: Intelligence page renders live sentiment/news/crisis state without mock-only dependencies.
 

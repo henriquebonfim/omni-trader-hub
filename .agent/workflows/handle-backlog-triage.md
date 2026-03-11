@@ -128,15 +128,17 @@ echo "Current state: TASKS=$TASKS_COUNT | TODO=$TODO_COUNT | BACKLOG=$BACKLOG_CO
 
 ---
 
-## Step 2 — Check Issue Volume
+## Step 2 — Check Issue Volume and Select Mode
 
 ```bash
 # Check issue volume
 ISSUE_COUNT=$(gh issue list --limit 1000 --json number --state open | jq 'length' 2>/dev/null || echo "0")
 
 if [ "$ISSUE_COUNT" -eq 0 ]; then
-  echo "✅ No open issues to triage"
-  exit 0
+  TRIAGE_MODE="local"
+  echo "✅ No open issues found — switching to local planning-file triage"
+else
+  TRIAGE_MODE="issues"
 fi
 
 if [ "$ISSUE_COUNT" -gt 200 ]; then
@@ -144,40 +146,67 @@ if [ "$ISSUE_COUNT" -gt 200 ]; then
 else
   echo "Processing $ISSUE_COUNT open issues..."
 fi
+
+echo "Triage mode: $TRIAGE_MODE"
 ```
 
 ---
 
-## Step 3 — Triage (Issues Only)
+## Step 3 — Triage
+
+### Step 3A — GitHub Issue Triage (when issues exist)
 
 ```bash
-make po-triage ARGS="--output-dir .agent/tmp/"
-TRIAGE_EXIT=$?
+if [ "$TRIAGE_MODE" = "issues" ]; then
+  make po-triage ARGS="--output-dir .agent/tmp/"
+  TRIAGE_EXIT=$?
 
-if [ $TRIAGE_EXIT -ne 0 ]; then
-  echo "❌ Triage script failed with exit code $TRIAGE_EXIT"
-  exit $TRIAGE_EXIT
-fi
+  if [ $TRIAGE_EXIT -ne 0 ]; then
+    echo "❌ Triage script failed with exit code $TRIAGE_EXIT"
+    exit $TRIAGE_EXIT
+  fi
 
-# Validate output JSON
-if [ ! -f .agent/tmp/triage-matrix.json ]; then
-  echo "❌ Triage script did not produce triage-matrix.json"
-  exit 1
-fi
+  # Validate output JSON
+  if [ ! -f .agent/tmp/triage-matrix.json ]; then
+    echo "❌ Triage script did not produce triage-matrix.json"
+    exit 1
+  fi
 
-if ! jq empty .agent/tmp/triage-matrix.json 2>/dev/null; then
-  echo "❌ Triage matrix is invalid JSON"
-  cat .agent/tmp/triage-matrix.json
-  exit 1
-fi
+  if ! jq empty .agent/tmp/triage-matrix.json 2>/dev/null; then
+    echo "❌ Triage matrix is invalid JSON"
+    cat .agent/tmp/triage-matrix.json
+    exit 1
+  fi
 
-# Check if any issues were triaged
-TRIAGED_COUNT=$(jq 'length' .agent/tmp/triage-matrix.json 2>/dev/null || echo "0")
-if [ "$TRIAGED_COUNT" -eq 0 ]; then
-  echo "✅ No issues needed triage changes"
-  exit 0
+  # Check if any issues were triaged
+  TRIAGED_COUNT=$(jq 'length' .agent/tmp/triage-matrix.json 2>/dev/null || echo "0")
+  if [ "$TRIAGED_COUNT" -eq 0 ]; then
+    echo "✅ No issue-driven planning changes"
+  else
+    echo "✅ Triaged $TRIAGED_COUNT issues"
+  fi
 fi
-echo "✅ Triaged $TRIAGED_COUNT issues"
+```
+
+### Step 3B — Local Planning-File Fallback (when no issues exist)
+
+When `TRIAGE_MODE=local`, continue by triaging local planning files instead of exiting.
+
+Required actions:
+- Read `tasks/TASKS.md`, `tasks/TODO.md`, and `tasks/BACKLOG.md`.
+- Re-prioritize current work based on latest repo state (recent merges, active regressions, unfinished integrations).
+- Promote 1-3 concrete implementation items into `tasks/TASKS.md` (priority now).
+- Keep next-sprint items in `tasks/TODO.md`.
+- Keep research/deferred items in `tasks/BACKLOG.md`.
+- Add a dated section header: `Local Triage (No Open GitHub Issues) - YYYY-MM-DD`.
+- Ensure edits are additive and traceable (do not delete historical audit sections).
+
+```bash
+if [ "$TRIAGE_MODE" = "local" ]; then
+  echo "Running local tasks triage fallback (TASKS/TODO/BACKLOG)"
+  # This step is intentionally human/agent-driven file triage.
+  # After edits, continue to Step 5 commit.
+fi
 ```
 
 ---
@@ -185,14 +214,18 @@ echo "✅ Triaged $TRIAGED_COUNT issues"
 ## Step 4 — Post Issue Comments
 
 ```bash
-make po-post ARGS="--matrix .agent/tmp/triage-matrix.json"
-POST_EXIT=$?
+if [ "$TRIAGE_MODE" = "issues" ]; then
+  make po-post ARGS="--matrix .agent/tmp/triage-matrix.json"
+  POST_EXIT=$?
 
-if [ $POST_EXIT -ne 0 ]; then
-  echo "❌ Post comments failed with exit code $POST_EXIT"
-  exit $POST_EXIT
+  if [ $POST_EXIT -ne 0 ]; then
+    echo "❌ Post comments failed with exit code $POST_EXIT"
+    exit $POST_EXIT
+  fi
+  echo "✅ Posted triage comments to GitHub"
+else
+  echo "ℹ️  Skipping GitHub comments (local fallback mode)"
 fi
-echo "✅ Posted triage comments to GitHub"
 ```
 
 ---
@@ -209,6 +242,15 @@ fi
 
 # Stage changes
 git add tasks/TASKS.md tasks/TODO.md tasks/BACKLOG.md
+
+# Safety: ensure only planning files are staged for this workflow commit
+EXTRA_STAGED=$(git diff --cached --name-only | grep -vE '^tasks/(TASKS|TODO|BACKLOG)\.md$' || true)
+if [ -n "$EXTRA_STAGED" ]; then
+  echo "❌ Refusing commit: unrelated staged files detected"
+  echo "$EXTRA_STAGED"
+  echo "Run: git restore --staged <files> (or commit them separately), then rerun triage"
+  exit 1
+fi
 
 # Check if there are changes to commit
 if git diff --cached --quiet; then
@@ -250,7 +292,7 @@ echo ""
 if [ "$TASKS_COUNT" -gt 0 ]; then
   echo "Next action: /start-workflow"
 else
-  echo "Next action: /handle-po-review (no priority tasks)"
+  echo "Next action: /handle-po-review (no priority tasks after fallback triage)"
 fi
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 ```

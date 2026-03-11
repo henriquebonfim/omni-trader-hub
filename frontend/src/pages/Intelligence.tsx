@@ -1,8 +1,8 @@
 import { cn } from '@/core/utils';
-import { mockNews } from '@/domains/market/mocks';
+import { EmptyState } from '@/shared/components/EmptyState';
 import { Panel } from '@/shared/components/Panel';
 import { StatusBadge } from '@/shared/components/StatusBadge';
-import { AlertTriangle, Newspaper, TrendingDown, TrendingUp } from 'lucide-react';
+import { AlertCircle, AlertTriangle, Loader2, Newspaper, TrendingDown, TrendingUp } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
 import { fetchCrisisStatus, fetchNews, fetchSentiment } from '@/domains/market/api';
@@ -13,14 +13,32 @@ export default function Intelligence() {
   const [newsFilter, setNewsFilter] = useState<'all' | 'high' | 'asset'>('all');
   const [sentimentData, setSentimentData] = useState<SentimentData | null>(null);
   const [crisisStatus, setCrisisStatus] = useState<CrisisStatus | null>(null);
-  const [news, setNews] = useState<NewsItem[]>(mockNews);
+  const [news, setNews] = useState<NewsItem[]>([]);
+
+  const [loadingSentiment, setLoadingSentiment] = useState(true);
+  const [errorSentiment, setErrorSentiment] = useState(false);
+
+  const [loadingCrisis, setLoadingCrisis] = useState(true);
+  const [errorCrisis, setErrorCrisis] = useState(false);
+
+  const [loadingNews, setLoadingNews] = useState(true);
+  const [errorNews, setErrorNews] = useState(false);
 
   useEffect(() => {
-    fetchSentiment('BTC/USDT').then(setSentimentData).catch(console.error);
-    fetchCrisisStatus().then(setCrisisStatus).catch(console.error);
-    fetchNews().then(res => {
-      if (res && res.length > 0) setNews(res);
-    }).catch(console.error);
+    fetchSentiment('BTC/USDT')
+      .then(res => { setSentimentData(res); setErrorSentiment(false); })
+      .catch(e => { console.error(e); setErrorSentiment(true); })
+      .finally(() => setLoadingSentiment(false));
+
+    fetchCrisisStatus()
+      .then(res => { setCrisisStatus(res); setErrorCrisis(false); })
+      .catch(e => { console.error(e); setErrorCrisis(true); })
+      .finally(() => setLoadingCrisis(false));
+
+    fetchNews()
+      .then(res => { if (res) setNews(res); setErrorNews(false); })
+      .catch(e => { console.error(e); setErrorNews(true); })
+      .finally(() => setLoadingNews(false));
   }, []);
 
   const sentiment = sentimentData?.score || 0;
@@ -41,32 +59,56 @@ export default function Intelligence() {
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
         {/* Sentiment */}
         <Panel title="Market Sentiment">
-          <div className="flex items-center gap-4">
-            <span className="text-4xl">{sentimentEmoji}</span>
-            <div>
-              <p className="text-lg font-semibold font-mono">{sentiment.toFixed(2)}</p>
-              <p className="text-xs text-muted-foreground">{sentimentLabel}</p>
-              <p className="text-[11px] text-muted-foreground mt-1">42 articles (24h)</p>
+          {loadingSentiment ? (
+            <div className="flex items-center justify-center h-[72px]">
+              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
             </div>
-          </div>
+          ) : errorSentiment ? (
+            <div className="flex items-center justify-center h-[72px] text-muted-foreground">
+              <AlertCircle className="h-5 w-5 mr-2 text-warning" />
+              <span className="text-sm">Sentiment unavailable</span>
+            </div>
+          ) : (
+            <div className="flex items-center gap-4">
+              <span className="text-4xl">{sentimentEmoji}</span>
+              <div>
+                <p className="text-lg font-semibold font-mono">{sentiment.toFixed(2)}</p>
+                <p className="text-xs text-muted-foreground">{sentimentLabel}</p>
+                <p className="text-[11px] text-muted-foreground mt-1">{sentimentData?.article_count || 0} articles (24h)</p>
+              </div>
+            </div>
+          )}
         </Panel>
 
         {/* Crisis Mode */}
         <Panel title="Crisis Mode">
-          <div className={cn(
-            'rounded-md p-3 border',
-            crisisActive ? 'border-danger animate-pulse-border bg-danger/5' : 'border-success/30 bg-success/5'
-          )}>
-            <p className={cn('text-sm font-semibold', crisisActive ? 'text-danger' : 'text-success')}>
-              {crisisActive ? '🚨 CRISIS MODE ACTIVE' : '✅ NORMAL TRADING'}
-            </p>
-            {crisisActive && (
-              <p className="text-[11px] text-muted-foreground mt-1">Leverage: 1×, Position: 0.5%, ADX Trend only</p>
-            )}
-          </div>
-          <button className="mt-3 w-full py-2 rounded-md border border-border text-xs font-medium hover:bg-secondary/50 transition-colors">
-            {crisisActive ? 'Deactivate Crisis Mode' : 'Activate Crisis Mode'}
-          </button>
+          {loadingCrisis ? (
+            <div className="flex items-center justify-center h-[96px]">
+              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+            </div>
+          ) : errorCrisis ? (
+            <div className="flex flex-col items-center justify-center h-[96px] text-muted-foreground">
+              <AlertCircle className="h-5 w-5 mb-1 text-warning" />
+              <span className="text-sm">Crisis status unavailable</span>
+            </div>
+          ) : (
+            <>
+              <div className={cn(
+                'rounded-md p-3 border',
+                crisisActive ? 'border-danger animate-pulse-border bg-danger/5' : 'border-success/30 bg-success/5'
+              )}>
+                <p className={cn('text-sm font-semibold', crisisActive ? 'text-danger' : 'text-success')}>
+                  {crisisActive ? '🚨 CRISIS MODE ACTIVE' : '✅ NORMAL TRADING'}
+                </p>
+                {crisisActive && (
+                  <p className="text-[11px] text-muted-foreground mt-1">Leverage: 1×, Position: 0.5%, ADX Trend only</p>
+                )}
+              </div>
+              <button className="mt-3 w-full py-2 rounded-md border border-border text-xs font-medium hover:bg-secondary/50 transition-colors">
+                {crisisActive ? 'Deactivate Crisis Mode' : 'Activate Crisis Mode'}
+              </button>
+            </>
+          )}
         </Panel>
 
         {/* Fear & Greed */}
@@ -115,6 +157,7 @@ export default function Intelligence() {
               <button
                 key={f}
                 onClick={() => setNewsFilter(f)}
+                disabled={loadingNews || errorNews}
                 className={cn(
                   'px-2 py-0.5 rounded text-[11px] transition-colors capitalize',
                   newsFilter === f ? 'bg-accent/15 text-accent' : 'text-muted-foreground hover:text-foreground'
@@ -127,32 +170,50 @@ export default function Intelligence() {
         }
       >
         <div className="space-y-2 max-h-[400px] overflow-y-auto">
-          {filteredNews.map(item => (
-            <div key={item.id} className="flex items-start gap-3 p-3 rounded-md border border-border/50 hover:bg-secondary/30 transition-colors">
-              <Newspaper className="h-4 w-4 text-muted-foreground shrink-0 mt-0.5" />
-              <div className="flex-1 min-w-0">
-                <p className="text-xs font-medium leading-snug">{item.title}</p>
-                <div className="flex items-center gap-2 mt-1.5 flex-wrap">
-                  <span className="text-[10px] text-muted-foreground">{item.source}</span>
-                  <StatusBadge
-                    variant={item.impact_level > 0.7 ? 'danger' : item.impact_level > 0.4 ? 'warning' : 'info'}
-                    size="sm"
-                  >
-                    {item.impact_level > 0.7 ? '🔴 HIGH' : item.impact_level > 0.4 ? '🟡 MED' : '🔵 LOW'}
-                  </StatusBadge>
-                  <span className="text-[10px]">
-                    {item.sentiment_score > 0 ? '🙂' : item.sentiment_score < 0 ? '😟' : '😐'} {item.sentiment_score.toFixed(2)}
-                  </span>
-                  {item.assets.map(a => (
-                    <StatusBadge key={a} variant="neutral" size="sm">{a}</StatusBadge>
-                  ))}
-                  <span className="text-[10px] text-muted-foreground ml-auto">
-                    {Math.floor((Date.now() - item.published_at) / 3600000)}h ago
-                  </span>
+          {loadingNews ? (
+            <div className="flex items-center justify-center py-12">
+              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+            </div>
+          ) : errorNews ? (
+            <EmptyState
+              icon={AlertCircle}
+              title="News feed unavailable"
+              description="Could not connect to the intelligence server."
+            />
+          ) : filteredNews.length === 0 ? (
+            <EmptyState
+              icon={Newspaper}
+              title="No news found"
+              description="There are no recent articles matching your filter."
+            />
+          ) : (
+            filteredNews.map(item => (
+              <div key={item.id} className="flex items-start gap-3 p-3 rounded-md border border-border/50 hover:bg-secondary/30 transition-colors">
+                <Newspaper className="h-4 w-4 text-muted-foreground shrink-0 mt-0.5" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-medium leading-snug">{item.title}</p>
+                  <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+                    <span className="text-[10px] text-muted-foreground">{item.source}</span>
+                    <StatusBadge
+                      variant={item.impact_level > 0.7 ? 'danger' : item.impact_level > 0.4 ? 'warning' : 'info'}
+                      size="sm"
+                    >
+                      {item.impact_level > 0.7 ? '🔴 HIGH' : item.impact_level > 0.4 ? '🟡 MED' : '🔵 LOW'}
+                    </StatusBadge>
+                    <span className="text-[10px]">
+                      {item.sentiment_score > 0 ? '🙂' : item.sentiment_score < 0 ? '😟' : '😐'} {item.sentiment_score.toFixed(2)}
+                    </span>
+                    {item.assets.map(a => (
+                      <StatusBadge key={a} variant="neutral" size="sm">{a}</StatusBadge>
+                    ))}
+                    <span className="text-[10px] text-muted-foreground ml-auto">
+                      {Math.floor((Date.now() - item.published_at) / 3600000)}h ago
+                    </span>
+                  </div>
                 </div>
               </div>
-            </div>
-          ))}
+            ))
+          )}
         </div>
       </Panel>
     </div>
