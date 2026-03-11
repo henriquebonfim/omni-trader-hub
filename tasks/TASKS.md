@@ -3,10 +3,10 @@
 Single source of truth for all technical work: architecture items, audit-discovered bugs, and risk gaps.
 Institutional-grade audit completed **2026-03-03** — findings integrated below.
 Multi-asset autonomous platform expansion added **2026-03-09** — T37-T42 driven by frontend spec (PROMPT.md).
-Last updated: 2026-03-10 | Sprint status: T32-T42 completed and merged to master. Next: T43.
+Last updated: 2026-03-11 | Sprint status: T32-T43 completed and merged to master. Next: TBD.
 Frontend-backend integration migration added **2026-03-09** — T43 bridges new frontend to existing backend.
 
-> Last updated: 2026-03-10 | Sprint status: T32-T42 completed and merged to master. Next: T43 (Frontend-Backend Integration)
+> Last updated: 2026-03-11 | Sprint status: T32-T43 completed and merged to master. Next: TBD
 
 ---
 
@@ -319,11 +319,12 @@ Frontend-backend integration migration added **2026-03-09** — T43 bridges new 
 > **Context (2026-03-09)**: The new React frontend (10 pages, full API client, WebSocket client) has zero actual backend integration — every page uses mock data. T43 connects the frontend to the existing backend now, using adapter + stub layers so unimplemented features (T33-T42) degrade gracefully instead of crashing. As each backend task completes, its corresponding frontend stub is replaced with real data.
 
 ### T43. Frontend-Backend Integration Migration
-- [ ] **Phase 13a: Infrastructure — Vite proxy + Nginx upstream + auth**
+> **T43 COMPLETED**: ✅ Frontend-backend integration migration implemented end-to-end (2026-03-11). See PR #75.
+- [x] **Phase 13a: Infrastructure — Vite proxy + Nginx upstream + auth**
     - Add dev proxy to [frontend/vite.config.ts](frontend/vite.config.ts): `/api/*` → `http://localhost:8000`, `/ws` → `ws://localhost:8000/ws/live`
     - Update [frontend/nginx.conf](frontend/nginx.conf): add `upstream backend` block and `proxy_pass` for `/api/` and `/ws` (production)
     - Add auth token injection to [frontend/src/lib/api.ts](frontend/src/lib/api.ts): `Authorization: Bearer <token>` header in `request()`, sourced from `VITE_API_KEY` env var
-- [ ] **Phase 13b: Adapter layer — backend shapes → frontend types**
+- [x] **Phase 13b: Adapter layer — backend shapes → frontend types**
     - Create [frontend/src/lib/adapters.ts](frontend/src/lib/adapters.ts) (~200 lines)
     - `adaptBotState(backendStatus, backendPosition, backendBalance) → Bot` — maps single-bot `/api/bot/state` + `/api/position` + `/api/balance` responses to frontend `Bot` type
     - `adaptTrade(backendTrade) → Trade` — field renames (`id` string→number, `timestamp` ISO→epoch, add missing `bot_id`, `notional`, `fee`)
@@ -332,7 +333,7 @@ Frontend-backend integration migration added **2026-03-09** — T43 bridges new 
     - `adaptConfig(backendConfig) → AppConfig` — flatten nested backend config (`exchange.leverage`, `risk.stop_loss_pct`, `notifications.discord_webhook`) into flat frontend `AppConfig`
     - `reverseAdaptConfig(appConfig) → ConfigUpdate` — reverse: flat frontend → nested backend `ConfigUpdate` schema
     - `adaptWsMessage(backendMsg) → CycleMessage` — map `current_price`→`price`, `market_regime`→`regime`, `circuit_breaker_active`→`circuit_breaker`, inject `bot_id` for first bot
-- [ ] **Phase 13c: Stub layer — typed fallbacks for unimplemented endpoints**
+- [x] **Phase 13c: Stub layer — typed fallbacks for unimplemented endpoints**
     - Create [frontend/src/lib/stubs.ts](frontend/src/lib/stubs.ts) (~150 lines)
     - Each stub annotated with future task ID: `// STUB: replaced by T{N}`
     - `stubBots() → Bot[]` — returns mock bots from `mock-data.ts`, first bot enriched with real data at call site
@@ -342,7 +343,7 @@ Frontend-backend integration migration added **2026-03-09** — T43 bridges new 
     - `stubBacktestResults() → BacktestResults` — mock results from `mock-data.ts` (→ T35)
     - `stubMarkets() → MarketPair[]` — hardcoded top-20 pairs with approximate volumes (→ T42)
     - `stubEnvVars() → EnvVariable[]` — mock env vars from `mock-data.ts` (→ T41)
-- [ ] **Phase 13d: API client rewiring — try/real → catch/stub**
+- [x] **Phase 13d: API client rewiring — try/real → catch/stub**
     - Rewire all functions in [frontend/src/lib/api.ts](frontend/src/lib/api.ts):
     - **Real endpoints** (backend exists now):
         - `fetchBots()` → call `GET /api/bot/state` + `/api/position` + `/api/balance`, adapt to `Bot[]` (single bot as first item, rest from stubs)
@@ -358,13 +359,13 @@ Frontend-backend integration migration added **2026-03-09** — T43 bridges new 
         - `runBacktest()` / `fetchBacktestResults()` → stub (→ T35)
         - `fetchMarkets()` → stub (→ T42)
         - `fetchEnvVars()` / `updateEnvVars()` → stub (→ T41)
-- [ ] **Phase 13e: WebSocket integration**
+- [x] **Phase 13e: WebSocket integration**
     - Update [frontend/src/lib/ws.ts](frontend/src/lib/ws.ts): connect via proxy `ws://${location.host}/ws`
     - Adapt incoming messages using `adaptWsMessage()`: backend sends flat cycle JSON → frontend `CycleMessage`
     - Field mapping: `current_price`→`price`, `market_regime`→`regime`, `circuit_breaker_active`→`circuit_breaker`, `balance`→`balance_allocated`
     - Only handle cycle messages (backend has no `alert` or `trade` WS types yet)
     - Keep existing auto-reconnect with exponential backoff
-- [ ] **Phase 13f: Page-by-page wiring (all pages)**
+- [x] **Phase 13f: Page-by-page wiring (all pages)**
     - **Dashboard.tsx**: TanStack Query hooks for `fetchBots()`, `fetchTradeHistory()`, `fetchEquitySnapshots()`. Live data from WS store. Alerts: mock fallback
     - **BotsAssets.tsx**: wire start/stop buttons to `startBot()`/`stopBot()`. CRUD drawers use stub mutations
     - **Charts.tsx**: replace procedurally-generated candles with `GET /api/candles/?timeframe=X`. Symbol selector from real bot symbols
@@ -375,7 +376,7 @@ Frontend-backend integration migration added **2026-03-09** — T43 bridges new 
     - **Intelligence.tsx**: all stub — sentiment gauge, crisis toggle, news feed, macro indicators
     - **Backtesting.tsx**: all stub — config form, metrics display, equity chart, monthly returns
     - **Topbar.tsx + AppSidebar.tsx**: already wired to Zustand store; live once WS connects (Phase 13e). Alerts: mock fallback
-- [ ] **Phase 13g: Backend stub routes (recommended)**
+- [x] **Phase 13g: Backend stub routes (recommended)**
     - Create [backend/src/api/routes/stubs.py](backend/src/api/routes/stubs.py) — placeholder endpoints returning `501 Not Implemented` with JSON bodies:
         - `GET /api/bots` → `[{single bot from current /api/bot/state}]`
         - `POST/PUT/DELETE /api/bots/*` → 501 `{"error": "Not implemented", "task": "T37"}`
