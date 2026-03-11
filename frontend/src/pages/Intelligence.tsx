@@ -4,7 +4,7 @@ import { StatCard } from '@/shared/components/StatCard';
 import { mockNews } from '@/domains/market/mocks';
 import { mockAlerts } from '@/domains/system/mocks';
 import { cn } from '@/core/utils';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { AlertTriangle, Newspaper, Gauge, Globe, TrendingUp, TrendingDown } from 'lucide-react';
 
 import { fetchSentiment, fetchCrisisStatus, fetchNews } from '@/domains/market/api';

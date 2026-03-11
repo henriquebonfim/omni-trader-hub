@@ -66,18 +66,4 @@ async def get_backtest_results(backtest_id: str):
 async def get_backtest_history():
     return stub_response("T35")
 
-@router.get("/markets")
-async def get_markets():
-    return stub_response("T42")
-
-@router.get("/env")
-async def get_env():
-    return stub_response("T41")
-
-@router.put("/env")
-async def update_env():
-    return stub_response("T41")
-
-@router.post("/system/restart")
-async def restart_system():
-    return stub_response("T41")
+# NOTE: /markets, /env, /system/restart are real routes (T41/T42) — no stubs needed.

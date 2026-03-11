@@ -3,6 +3,7 @@ import { Panel } from '@/shared/components/Panel';
 import { StatusBadge } from '@/shared/components/StatusBadge';
 import { EmptyState } from '@/shared/components/EmptyState';
 import { useAppStore } from '@/app/store/app-store';
+import { startBot, stopBot } from '@/domains/bot/api';
 import { mockBots } from '@/domains/bot/mocks';
 import { mockPrices, mockMarkets } from '@/domains/market/mocks';
 import { cn } from '@/core/utils';
@@ -22,6 +23,14 @@ export default function BotsAssets() {
     b.symbol.toLowerCase().includes(search.toLowerCase()) ||
     b.active_strategy.toLowerCase().includes(search.toLowerCase())
   );
+
+  const handleStartBot = (id: string) => {
+    startBot(id).catch(console.error);
+  };
+
+  const handleStopBot = (id: string) => {
+    stopBot(id).catch(console.error);
+  };
 
   return (
     <div className="space-y-4 animate-fade-in">
