@@ -357,3 +357,69 @@
     - **Note**: Phases 9b (Indicator catalog API) and 9c (Compute endpoint) remain pending
 
 ---
+
+### T43. Frontend-Backend Integration Migration
+- [x] **Phase 13a: Infrastructure — Vite proxy + Nginx upstream + auth**
+    - `frontend/vite.config.ts`: dev proxy `/api/*` → `http://localhost:8000`, `/ws` → `ws://localhost:8000` (handles `/ws/live`)
+    - `frontend/nginx.conf`: `upstream backend { server omnitrader:8000; }` + `proxy_pass` for `/api/` and `/ws/` (production)
+    - `frontend/src/core/api.ts`: `Authorization: Bearer ${API_KEY}` header injected if `VITE_API_KEY` env var is set
+- [x] **Phase 13b: Adapter layer — `frontend/src/lib/adapters.ts`** (~210 lines)
+    - `adaptBotState(status, position, balance) → Bot`
+    - `adaptTrade(backendTrade) → Trade` — id string→number, ISO timestamps, adds bot_id/notional/fee
+    - `adaptEquitySnapshot(snapshot) → EquitySnapshot` — `balance` field mapped to `equity`
+    - `adaptStrategy(strategy) → Strategy` — defaults for all optional fields
+    - `adaptConfig(config) → AppConfig` — flattens nested `exchange`/`risk`/`notifications` into flat `AppConfig`
+    - `reverseAdaptConfig(appConfig) → JsonObject` — reverse for `PUT /api/config`
+    - `adaptWsMessage(msg) → CycleMessage` — `current_price`→`price`, `market_regime`→`regime`, `circuit_breaker_active`→`circuit_breaker`
+    - All parameters fully typed with `Record<string, unknown>` — no `any`
+- [x] **Phase 13c: Stub layer — `frontend/src/lib/stubs.ts`** (~70 lines)
+    - `stubBots(realBot?) → Bot[]` — enriches first item with real backend data (→ T37)
+    - `stubSentiment() → SentimentData` — neutral fallback (→ T33/T34)
+    - `stubCrisis() → CrisisStatus` — `{ active: false, source: 'auto' }` (→ T34)
+    - `stubNews() → NewsItem[]` — empty array (→ T33)
+    - `stubBacktestResults() → BacktestResults` — mock from `mocks.ts` (→ T35)
+    - `stubMarkets() → MarketPair[]` — hardcoded top-5 perpetuals (→ T42)
+    - `stubEnvVars() → EnvVariable[]` — masked mock credentials (→ T41)
+- [x] **Phase 13d: API client rewiring** — all domain APIs wired with real→stub fallback
+    - `fetchBots()` → `GET /api/status` + `/api/position` + `/api/balance` + `adaptBotState()` → `stubBots(realBot)`
+    - `startBot(id)` / `stopBot(id)` → `POST /api/bot/start|stop` for `default`
+    - `fetchStrategies()` → `GET /api/strategies` + `adaptStrategy()`
+    - `fetchTradeHistory()` → `GET /api/trades/history` + `adaptTrade()`
+    - `fetchEquitySnapshots()` → `GET /api/equity/snapshots` + `adaptEquitySnapshot()`
+    - `fetchConfig()` / `updateConfig()` → `GET|PUT /api/config` + bidirectional adapters
+    - `fetchMarkets()` → real `GET /api/markets`, catch → `stubMarkets()`
+    - `fetchEnvVars()` / `updateEnvVars()` → real `GET|PUT /api/env`, catch → `stubEnvVars()`
+    - `runBacktest()` / `fetchBacktestResults()` → try real, catch → stubs (→ T35)
+    - Sentiment/crisis/news → try real `GET /api/graph/*`, catch → stubs (→ T33/T34)
+- [x] **Phase 13e: WebSocket integration**
+    - `frontend/src/core/ws.ts`: connects to `VITE_WS_URL || ws://${location.host}/ws/live`
+    - Adapts messages via `adaptWsMessage()` before dispatching to Zustand store
+    - Only cycle messages routed (backend has no `alert`/`trade` WS types yet)
+    - Exponential backoff reconnect: `min(1000 * 2^retry, 30000)` ms
+- [x] **Phase 13f: Page-by-page wiring** — all 9 pages + Topbar + AppSidebar
+    - **Dashboard.tsx** — `fetchBots()`, `fetchTradeHistory()`, `fetchEquitySnapshots()` on mount; live WS via Zustand
+    - **BotsAssets.tsx** — reads bots from Zustand store; start/stop buttons call `startBot()`/`stopBot()`; CRUD drawers: stub
+    - **Charts.tsx** — real candles via `GET /api/candles?symbol=&timeframe=&limit=200`; falls back to generated mock
+    - **TradeHistory.tsx** — `fetchTradeHistory({ limit: '500' })` on mount; initializes with `mockTrades` while loading
+    - **Settings.tsx** — `fetchConfig()` on mount; `updateConfig()` on save (General/Risk/Notifications); `fetchEnvVars()` for Env tab
+    - **StrategyLab.tsx** — `fetchStrategies()` on mount; merges with mock fallback; custom CRUD: stub
+    - **RiskMonitor.tsx** — derives from Zustand bots store (fed by `fetchBots()` in AppSidebar)
+    - **Intelligence.tsx** — `fetchSentiment()`, `fetchCrisisStatus()`, `fetchNews()` on mount; stubs as fallback
+    - **Backtesting.tsx** — `runBacktest()` + `fetchBacktestResults()` wired; stub fallback
+    - **AppSidebar.tsx** — `fetchBots()` on mount populates global Zustand bots store for all pages
+- [x] **Phase 13g: Backend stub routes — `backend/src/api/routes/stubs.py`**
+    - `GET/POST/PUT/DELETE /api/bots/*` → `501 {"error": "Not implemented", "task": "T37"}`
+    - `GET /api/graph/sentiment/{symbol}` → 501 (→ T33)
+    - `GET|PUT /api/graph/crisis` → 501 (→ T34)
+    - `GET /api/graph/news` → 501 (→ T33)
+    - `POST /api/backtest/run`, `GET /api/backtest/results/{id}`, `GET /api/backtest/history` → 501 (→ T35)
+    - Real routes (`/markets`, `/env`, `/system/restart`) already wired — no stubs needed
+    - Registered last in `backend/src/api/__init__.py` so real routes always take priority
+- **Gap fixes applied post-merge** (`101aa50`):
+    - `Intelligence.tsx`: added missing `useEffect` to React import
+    - `BotsAssets.tsx`: added `startBot`/`stopBot` import + `handleStartBot`/`handleStopBot` handler functions
+    - `stubs.py`: removed dead stub entries for already-real `/markets`, `/env`, `/system/restart` routes
+- **Test count**: 207 passed (unchanged — T43 is pure frontend + stub Python, no new Python tests needed)
+- **Completed**: 2026-03-11 | PR #75 + fix commit `101aa50`
+
+---
