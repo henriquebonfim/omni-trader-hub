@@ -423,3 +423,117 @@
 - **Completed**: 2026-03-11 | PR #75 + fix commit `101aa50`
 
 ---
+
+### T37. Multi-Asset Bot Management API ✅ **COMPLETED 2026-03-10**
+- [x] **Phase 7a: Bot entity model in Memgraph**
+    - New node label: `:Bot {id (UUID), symbol, status, mode, active_strategy, regime, leverage, balance_allocated, timeframe, max_daily_loss_pct, stop_loss_mode, position_size_pct, created_at, updated_at}`
+    - Status enum: `running | stopped | paused | error`
+    - Mode enum: `auto | manual` (auto = bot picks strategy, manual = user locks one)
+    - Relationships: `(:Bot)-[:HAS_POSITION]->(:Position)`, `(:Bot)-[:EXECUTED]->(:Trade)`, `(:Bot)-[:USES_STRATEGY]->(:Strategy)`
+    - Indexes: `:Bot(id)`, `:Bot(symbol)`, `:Bot(status)`
+    - Risk state per bot: `:State {key: "risk:{bot_id}:daily_stats"}`, etc.
+- [x] **Phase 7b: Bot CRUD API endpoints** (`backend/src/api/routes/bots.py`)
+    - `GET /api/bots` — list all bots with current state, position, daily PnL
+    - `POST /api/bots` — create new bot (symbol, mode, strategy, leverage, allocation_pct, timeframe)
+    - `GET /api/bots/{id}` — full detail: config, position, last 5 signals, risk metrics
+    - `PUT /api/bots/{id}` — update config (mode, strategy, leverage, allocation)
+    - `DELETE /api/bots/{id}` — remove bot (guards: stopped, no open position)
+    - `POST /api/bots/{id}/start` / `stop` — lifecycle control
+    - `POST /api/bots/{id}/trade/open` / `close` — manual trade control
+    - All mutations require `verify_api_key`
+    - `GET /api/status` — global stats: total bots, combined PnL, portfolio value
+- [x] **Phase 7c: Bot lifecycle manager** (`backend/src/bot_manager.py`)
+    - `BotManager` orchestrates multiple `OmniTrader` instances with independent `run_cycle()` loops
+    - Shared exchange connection, rate limiter, Memgraph connection pool
+    - WebSocket: multi-symbol via CCXT Pro `watchTicker()` / `watchOHLCV()`
+    - Graceful shutdown with optional position close; `get_portfolio_summary()` aggregation
+- [x] **Phase 7d: Per-bot risk isolation + global portfolio risk**
+    - Independent daily loss tracker, consecutive loss counter, circuit breakers per bot
+    - Global: max allocation ≤ 100%, portfolio drawdown >10% from HWM → pause all, max concurrent positions, correlation check
+- [x] **Phase 7e: WebSocket per-bot updates**
+    - Per-bot `cycle_update` messages keyed by `bot_id` with price, signal, regime, position, balance, daily PnL
+    - New message types: `trade` (execution events), `alert` (circuit breakers, regime changes, strategy rotations)
+- **Consolidates**: BACKLOG B6 (Portfolio Construction / Multi-Asset)
+- **Completed**: 2026-03-10 | PR #70
+
+---
+
+### T38. Autonomous Strategy Selection Engine ✅ **COMPLETED 2026-03-10**
+- [x] **Phase 8a: Strategy scoring model** (`backend/src/strategy/selector.py`)
+    - `:StrategyScore {strategy_name, regime, sharpe_ratio, win_rate, profit_factor, sample_size, last_updated}` node per strategy-regime pair
+    - Populated from backtest results (T35) and live trading history; minimum 20 trades for eligibility
+    - Relationship: `(:Strategy)-[:SCORED_FOR {regime}]->(:StrategyScore)`
+- [x] **Phase 8b: Selection algorithm** (`backend/src/strategies/selector.py`)
+    - Composite score: `0.4 * normalized_sharpe + 0.3 * normalized_pf + 0.3 * normalized_wr`
+    - Fallback to `adx_trend` if no eligible strategy; 4h cooldown between rotations
+    - Regime change handling: close incompatible position → select new strategy → log rotation
+- [x] **Phase 8c: Manual override per bot**
+    - `PUT /api/bots/{id}` with `{mode: 'manual', active_strategy: '...'}` locks strategy regardless of regime
+- [x] **Phase 8d: Strategy performance API**
+    - `GET /api/strategies/performance` — all strategy scores grouped by regime (sharpe, win_rate, pf, samples)
+- **Deferred**: regime-driven position-close choreography on rotation
+- **Completed**: 2026-03-10 | PR #71
+
+---
+
+### T39. TA-Lib Migration & Indicator Service ✅ **COMPLETED 2026-03-10**
+- [x] **Phase 9a: TA-Lib strategy migration** (all 5 strategies)
+    - `adx_trend.py` → `talib.ADX()`, `talib.EMA()`; `bollinger_bands.py` → `talib.BBANDS()`, `talib.RSI()`
+    - `breakout.py` → `talib.MAX()`, `talib.MIN()`; `ema_volume.py` → `talib.EMA()`, `talib.SMA()`; `z_score.py` → `talib.SMA()`, `talib.STDDEV()`
+    - `backend/src/indicators.py` adapter with `_as_float64()` helper; `pandas-ta` removed
+- [x] **Phase 9b: Indicator catalog API** (`backend/src/api/routes/indicators.py`)
+    - `GET /api/indicators` — 158 TA-Lib functions in 9 categories, startup-cached
+    - Uses `talib.get_function_groups()` + `talib.abstract.Function(name)` for introspection
+- [x] **Phase 9c: Indicator computation endpoint**
+    - `POST /api/indicators/compute` — fetches OHLCV, computes indicator, returns values
+    - Rate limited: max 10 requests/minute; auth required
+- **Completed**: 2026-03-09 (Phase 9a) + 2026-03-10 (9b/9c) | PR #72
+
+---
+
+### T40. Custom Strategy System (CRUD + Execution) ✅ **COMPLETED 2026-03-10**
+- [x] **Phase 10a: Custom strategy data model**
+    - `:CustomStrategy {name, description, regime_affinity, entry/exit condition JSON, indicators JSON, stop_loss_atr_mult, take_profit_atr_mult, min_bars_between_entries, created_at, updated_at}`
+    - Condition schema: `[{indicator, operator, value}]`; Indicators schema: `[{function, params, output_name}]`
+- [x] **Phase 10b: Custom strategy CRUD API** (`backend/src/api/routes/strategies.py`)
+    - `GET /api/strategies` — combined built-in + custom list
+    - `GET|POST|PUT|DELETE /api/strategies/{name}` — full CRUD with validation (unique name, valid TA-Lib functions, no circular refs)
+    - Deletion blocked if strategy active on any bot
+- [x] **Phase 10c: Custom strategy executor** (`backend/src/strategies/custom_executor.py`)
+    - `CustomStrategyExecutor(BaseStrategy)`: loads config from Memgraph, computes TA-Lib indicators, evaluates AND-logic conditions
+    - Operators: `>`, `<`, `>=`, `<=`, `crosses_above`, `crosses_below` (supports indicator-vs-indicator)
+    - Hot reload: picks up updated config on next cycle
+- [x] **Phase 10d: Integration with backtesting and auto-selection**
+    - Same `BaseStrategy` interface — works transparently with `BacktestEngine` (T35) and `StrategySelector` (T38)
+- **Completed**: 2026-03-10 | PR #73
+
+---
+
+### T41. Environment Variable Management API ✅ **COMPLETED 2026-03-10**
+- [x] **Phase 11a: Env reader** (`backend/src/api/routes/env.py`)
+    - `GET /api/env` — reads `.env`, groups by category (Binance, Database, Redis, Notifications, Security)
+    - Masked fields: `BINANCE_API_KEY`, `BINANCE_SECRET`, `MEMGRAPH_PASSWORD`, `OMNITRADER_API_KEY`
+    - Per-var: `{key, value, masked, category, description, requires_restart}`
+- [x] **Phase 11b: Env updater**
+    - `PUT /api/env` — auth required; validates port numbers, URL formats, required fields
+    - Atomic write: `.env.tmp` → rename to `.env`
+    - Audit log: `:Signal {type: 'env_change', key, changed_by}`
+- [x] **Phase 11c: Service restart endpoint**
+    - `POST /api/system/restart` — auth + `{confirm: true}`; runs `docker compose restart`
+    - Returns immediately `{status: "restarting"}`; refuses if any bot has open position
+- **Security**: `.env` never served raw; only defined variables exposed; values never logged
+- **Completed**: 2026-03-10 | Commit `9fca480`
+
+---
+
+### T42. Markets Discovery API ✅ **COMPLETED 2026-03-10**
+- [x] **Phase 12a: Markets endpoint** (`backend/src/api/routes/markets.py`)
+    - `GET /api/markets` — all active Binance Futures perpetual pairs via CCXT `fetch_markets()`
+    - Response: `{symbol, base, quote, min_size, tick_size, volume_24h, last_price, status}`
+    - Redis cache: 5-minute TTL; sorted by `volume_24h` descending
+- [x] **Phase 12b: Search and filter**
+    - Query params: `?search=SOL&quote=USDT&min_volume=1000000`; max 100 results
+    - Used by frontend "Add Bot" drawer searchable symbol picker
+- **Completed**: 2026-03-10 | PR #74
+
+---
