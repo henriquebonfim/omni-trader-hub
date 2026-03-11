@@ -19,6 +19,7 @@ from .routes import (
     env,
     graph,
     indicators,
+    markets,
     notifications,
     status,
     strategies,
@@ -97,6 +98,7 @@ def create_api(bot_instance=None, bot_manager=None) -> FastAPI:
     app.include_router(candles.router, prefix="/api")
     app.include_router(graph.router, prefix="/api")
     app.include_router(indicators.router, prefix="/api")
+    app.include_router(markets.router, prefix="/api")
     app.include_router(env.router, prefix="/api")
     app.include_router(system.router, prefix="/api")
     app.include_router(ws_router)
