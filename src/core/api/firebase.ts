@@ -1,14 +1,14 @@
-import { initializeApp } from "firebase/app";
 import { getAnalytics } from "firebase/analytics";
+import { initializeApp } from "firebase/app";
 
 const firebaseConfig = {
-  apiKey: "AIzaSyBmPWZUs5dfwi1E7KkyXS6tjzW20er6cQg",
-  authDomain: "omni-trader.firebaseapp.com",
-  projectId: "omni-trader",
-  storageBucket: "omni-trader.firebasestorage.app",
-  messagingSenderId: "8451173174",
-  appId: "1:8451173174:web:f95c85b5cb8ea9a8eba197",
-  measurementId: "G-F8C9E0VVG8"
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+  appId: import.meta.env.VITE_FIREBASE_APP_ID,
+  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID
 };
 
 // Initialize Firebase
