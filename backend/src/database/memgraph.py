@@ -125,6 +125,7 @@ class MemgraphDatabase(BaseDatabase):
             "CREATE INDEX ON :NewsEvent(published_at);",
             "CREATE INDEX ON :Candle(symbol, timeframe, timestamp);",
             "CREATE INDEX ON :MacroIndicator(name);",
+            "CREATE INDEX ON :CustomStrategy(name);",
         ]
 
         async with self._driver.session() as session:
@@ -797,3 +798,161 @@ class MemgraphDatabase(BaseDatabase):
                 })
 
             return candles
+
+    # ==================== CUSTOM STRATEGIES ====================
+
+    async def save_custom_strategy(
+        self,
+        name: str,
+        description: str,
+        regime_affinity: list[str],
+        entry_long_json: list[dict],
+        entry_short_json: list[dict],
+        exit_long_json: list[dict],
+        exit_short_json: list[dict],
+        indicators_json: list[dict],
+        stop_loss_atr_mult: Optional[float] = None,
+        take_profit_atr_mult: Optional[float] = None,
+        min_bars_between_entries: int = 10,
+    ) -> None:
+        """Save a custom strategy."""
+        timestamp = int(time.time() * 1000)
+
+        query = """
+        MERGE (c:CustomStrategy {name: $name})
+        ON CREATE SET c.created_at = $timestamp
+        SET c.description = $description,
+            c.regime_affinity = $regime_affinity,
+            c.entry_long_json = $entry_long_json,
+            c.entry_short_json = $entry_short_json,
+            c.exit_long_json = $exit_long_json,
+            c.exit_short_json = $exit_short_json,
+            c.indicators_json = $indicators_json,
+            c.stop_loss_atr_mult = $stop_loss_atr_mult,
+            c.take_profit_atr_mult = $take_profit_atr_mult,
+            c.min_bars_between_entries = $min_bars_between_entries,
+            c.updated_at = $timestamp
+        """
+
+        async with self._driver.session() as session:
+            await session.run(
+                query,
+                name=name,
+                description=description,
+                regime_affinity=json.dumps(regime_affinity),
+                entry_long_json=json.dumps(entry_long_json),
+                entry_short_json=json.dumps(entry_short_json),
+                exit_long_json=json.dumps(exit_long_json),
+                exit_short_json=json.dumps(exit_short_json),
+                indicators_json=json.dumps(indicators_json),
+                stop_loss_atr_mult=stop_loss_atr_mult,
+                take_profit_atr_mult=take_profit_atr_mult,
+                min_bars_between_entries=min_bars_between_entries,
+                timestamp=timestamp,
+            )
+            logger.info("custom_strategy_saved", name=name)
+
+    async def get_custom_strategy(self, name: str) -> Optional[dict]:
+        """Get a custom strategy by name."""
+        query = """
+        MATCH (c:CustomStrategy {name: $name})
+        RETURN
+            c.name as name,
+            c.description as description,
+            c.regime_affinity as regime_affinity,
+            c.entry_long_json as entry_long_json,
+            c.entry_short_json as entry_short_json,
+            c.exit_long_json as exit_long_json,
+            c.exit_short_json as exit_short_json,
+            c.indicators_json as indicators_json,
+            c.stop_loss_atr_mult as stop_loss_atr_mult,
+            c.take_profit_atr_mult as take_profit_atr_mult,
+            c.min_bars_between_entries as min_bars_between_entries,
+            c.created_at as created_at,
+            c.updated_at as updated_at
+        """
+
+        async with self._driver.session() as session:
+            result = await session.run(query, name=name)
+            record = await result.single()
+
+            if not record:
+                return None
+
+            return {
+                "name": record["name"],
+                "description": record["description"],
+                "regime_affinity": json.loads(record["regime_affinity"] or "[]"),
+                "entry_long_json": json.loads(record["entry_long_json"] or "[]"),
+                "entry_short_json": json.loads(record["entry_short_json"] or "[]"),
+                "exit_long_json": json.loads(record["exit_long_json"] or "[]"),
+                "exit_short_json": json.loads(record["exit_short_json"] or "[]"),
+                "indicators_json": json.loads(record["indicators_json"] or "[]"),
+                "stop_loss_atr_mult": record["stop_loss_atr_mult"],
+                "take_profit_atr_mult": record["take_profit_atr_mult"],
+                "min_bars_between_entries": record["min_bars_between_entries"],
+                "created_at": record["created_at"],
+                "updated_at": record["updated_at"],
+            }
+
+    async def list_custom_strategies(self) -> list[dict]:
+        """List all custom strategies."""
+        query = """
+        MATCH (c:CustomStrategy)
+        RETURN
+            c.name as name,
+            c.description as description,
+            c.regime_affinity as regime_affinity,
+            c.entry_long_json as entry_long_json,
+            c.entry_short_json as entry_short_json,
+            c.exit_long_json as exit_long_json,
+            c.exit_short_json as exit_short_json,
+            c.indicators_json as indicators_json,
+            c.stop_loss_atr_mult as stop_loss_atr_mult,
+            c.take_profit_atr_mult as take_profit_atr_mult,
+            c.min_bars_between_entries as min_bars_between_entries,
+            c.created_at as created_at,
+            c.updated_at as updated_at
+        ORDER BY c.name ASC
+        """
+
+        async with self._driver.session() as session:
+            result = await session.run(query)
+            records = await result.fetch(1000)
+
+            strategies = []
+            for record in records:
+                strategies.append({
+                    "name": record["name"],
+                    "description": record["description"],
+                    "regime_affinity": json.loads(record["regime_affinity"] or "[]"),
+                    "entry_long_json": json.loads(record["entry_long_json"] or "[]"),
+                    "entry_short_json": json.loads(record["entry_short_json"] or "[]"),
+                    "exit_long_json": json.loads(record["exit_long_json"] or "[]"),
+                    "exit_short_json": json.loads(record["exit_short_json"] or "[]"),
+                    "indicators_json": json.loads(record["indicators_json"] or "[]"),
+                    "stop_loss_atr_mult": record["stop_loss_atr_mult"],
+                    "take_profit_atr_mult": record["take_profit_atr_mult"],
+                    "min_bars_between_entries": record["min_bars_between_entries"],
+                    "created_at": record["created_at"],
+                    "updated_at": record["updated_at"],
+                })
+
+            return strategies
+
+    async def delete_custom_strategy(self, name: str) -> bool:
+        """Delete a custom strategy by name. Returns True if deleted, False if not found."""
+        query = """
+        MATCH (c:CustomStrategy {name: $name})
+        WITH c, c IS NOT NULL as existed
+        DELETE c
+        RETURN existed
+        """
+
+        async with self._driver.session() as session:
+            result = await session.run(query, name=name)
+            record = await result.single()
+            if record and record["existed"]:
+                logger.info("custom_strategy_deleted", name=name)
+                return True
+            return False
