@@ -5,7 +5,7 @@ Institutional-grade audit completed **2026-03-03** — findings integrated below
 Multi-asset autonomous platform expansion added **2026-03-09** — T37-T42 driven by frontend spec (PROMPT.md).
 Frontend-backend integration migration added **2026-03-09** — T43 bridges new frontend to existing backend.
 
-> Last updated: 2026-03-09 | Sprint status: T32-T36 completed and merged to master. Next: T37-T42 (Multi-Asset Platform)
+> Last updated: 2026-03-10 | Sprint status: T32-T38 completed and merged to master. Next: T39-T42 (TA-Lib Indicators, Custom Strategies, Frontend Integration)
 
 ---
 
@@ -27,7 +27,8 @@ Frontend-backend integration migration added **2026-03-09** — T43 bridges new 
 > **Context (2026-03-09)**: The frontend design spec (PROMPT.md) defines a multi-asset dashboard with 9 pages. These tasks represent the backend features needed to support that frontend. Each task is a backend API/service that the frontend will consume.
 
 ### T37. Multi-Asset Bot Management API
-- [ ] **Phase 7a: Bot entity model in Memgraph**
+> **T37 COMPLETED**: ✅ Core bot management API, BotManager orchestrator, multi-bot CRUD/lifecycle, per-bot risk isolation, status aggregation (2026-03-10). See PR #70.
+- [x] **Phase 7a: Bot entity model in Memgraph**
     - New node label: `:Bot {id (UUID), symbol, status, mode, active_strategy, regime, leverage, balance_allocated, timeframe, max_daily_loss_pct, stop_loss_mode, position_size_pct, created_at, updated_at}`
     - Status enum: `running | stopped | paused | error`
     - Mode enum: `auto | manual` (auto = bot picks strategy, manual = user locks one)
@@ -113,7 +114,8 @@ Frontend-backend integration migration added **2026-03-09** — T43 bridges new 
     - WebSocket sends distinct `cycle_update` per bot
 
 ### T38. Autonomous Strategy Selection Engine
-- [ ] **Phase 8a: Strategy scoring model** ([backend/src/strategies/selector.py](backend/src/strategies/selector.py))
+> **T38 COMPLETED**: ✅ StrategySelector with composite scoring, eligibility gate, 4h cooldown, fallback; auto-mode integration with BotManager; manual override; GET /api/strategies/performance (2026-03-10). See PR #71. Deferred: regime-driven position-close choreography on rotation.
+- [x] **Phase 8a: Strategy scoring model** ([backend/src/strategy/selector.py](backend/src/strategy/selector.py))
     - New node: `:StrategyScore {strategy_name, regime, sharpe_ratio, win_rate, profit_factor, sample_size, last_updated}`
     - One node per strategy-regime combination (e.g., "adx_trend + trending", "bollinger_bands + ranging")
     - Populated from:
