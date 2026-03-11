@@ -3,10 +3,10 @@
 Single source of truth for all technical work: architecture items, audit-discovered bugs, and risk gaps.
 Institutional-grade audit completed **2026-03-03** — findings integrated below.
 Multi-asset autonomous platform expansion added **2026-03-09** — T37-T42 driven by frontend spec (PROMPT.md).
-Last updated: 2026-03-10 | Sprint status: T32-T41 completed and merged to master. Next: T42.
+Last updated: 2026-03-10 | Sprint status: T32-T42 completed and merged to master. Next: T43.
 Frontend-backend integration migration added **2026-03-09** — T43 bridges new frontend to existing backend.
 
-> Last updated: 2026-03-10 | Sprint status: T32-T41 completed and merged to master. Next: T42 (Markets Discovery)
+> Last updated: 2026-03-10 | Sprint status: T32-T42 completed and merged to master. Next: T43 (Frontend-Backend Integration)
 
 ---
 
@@ -288,7 +288,8 @@ Frontend-backend integration migration added **2026-03-09** — T43 bridges new 
     - Restart endpoint refuses if positions are open
 
 ### T42. Markets Discovery API
-- [ ] **Phase 12a: Markets endpoint** ([backend/src/api/routes/markets.py](backend/src/api/routes/markets.py))
+> **T42 COMPLETED**: ✅ Markets discovery API with search/filter/Redis caching implemented (2026-03-10). See PR #74.
+- [x] **Phase 12a: Markets endpoint** ([backend/src/api/routes/markets.py](backend/src/api/routes/markets.py))
     - `GET /api/markets` — fetch all active Binance Futures pairs
     - Source: `exchange.fetch_markets()` (CCXT) or `GET /fapi/v1/exchangeInfo` (direct)
     - Response:
@@ -301,7 +302,7 @@ Frontend-backend integration migration added **2026-03-09** — T43 bridges new 
     - Filter: only `status: "active"` pairs, only perpetual contracts
     - Cache in Redis with 5-minute TTL (market info changes rarely)
     - Sort by `volume_24h` descending (most liquid first)
-- [ ] **Phase 12b: Search and filter**
+- [x] **Phase 12b: Search and filter**
     - Query params: `GET /api/markets?search=SOL&quote=USDT&min_volume=1000000`
     - Used by frontend "Add Bot" drawer: searchable symbol picker showing symbol + volume + price
     - Response limited to 100 results max
