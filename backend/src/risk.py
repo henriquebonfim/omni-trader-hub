@@ -93,8 +93,8 @@ class RiskManager:
     - Daily loss limits (circuit breaker)
     """
 
-    def __init__(self, database=None):
-        config = get_config()
+    def __init__(self, database=None, bot_id: str = "default", config=None):
+        config = config if config else get_config()
         self.position_size_pct = config.trading.position_size_pct
         self.stop_loss_pct = config.risk.stop_loss_pct
         self.take_profit_pct = config.risk.take_profit_pct
@@ -133,9 +133,9 @@ class RiskManager:
 
         # Persistence
         from .database.factory import DatabaseFactory
-
         self.database = database or DatabaseFactory.get_database(config)
-        self._state_key_prefix = "omnitrader:risk:"
+        self._state_key_prefix = f"omnitrader:risk:{bot_id}:"
+
 
     async def load_state(self):
         """Restore state from persistent database."""

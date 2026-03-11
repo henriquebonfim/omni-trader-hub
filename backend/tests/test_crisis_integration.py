@@ -10,9 +10,9 @@ from src.main import OmniTrader
 @pytest.fixture
 def mock_config():
     return Config({
-        "trading": {"symbol": "BTC/USDT", "cycle_seconds": 60, "timeframe": "1h"},
+        "trading": {"symbol": "BTC/USDT", "cycle_seconds": 60, "timeframe": "1h", "position_size_pct": 5.0},
         "exchange": {"paper_mode": True, "leverage": 1},
-        "risk": {"max_positions": 1, "use_atr_stops": False},
+        "risk": {"max_positions": 1, "use_atr_stops": False, "stop_loss_pct": 2.0, "take_profit_pct": 4.0, "max_daily_loss_pct": 10.0},
         "strategy": {"name": "ema_volume", "ema_fast": 9, "ema_slow": 21, "volume_multiplier": 1.5, "volume_sma": 20, "volume_threshold": 1.5}
     })
 
