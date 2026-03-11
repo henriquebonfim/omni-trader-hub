@@ -17,25 +17,53 @@ async def health_check():
 
 @router.get("/status")
 async def get_status(request: Request):
-    """Bot status — running state, uptime, symbol, paper mode."""
-    bot = request.app.state.bot
+    """Bot status — running state, uptime, symbol, paper mode. Aggregated if multiple bots."""
+    manager = getattr(request.app.state, "bot_manager", None)
     started_at: datetime = request.app.state.started_at
-
     uptime_seconds = (datetime.now(timezone.utc) - started_at).total_seconds()
 
-    ws_clients = 0
-    if bot.ws_manager:
-        ws_clients = await bot.ws_manager.get_client_count()
+    if manager and manager.bots:
+        # Aggregate multi-bot stats
+        running_count = sum(1 for bot in manager.bots.values() if bot._running)
+        cb_active = any(bot.risk.check_circuit_breaker() for bot in manager.bots.values())
+        paper_mode = all(getattr(bot.config.exchange, "paper_mode", True) for bot in manager.bots.values())
+        
+        # Use primary bot for basic fields if there's only one, otherwise generalized
+        primary_bot = manager.get_bot("default") or list(manager.bots.values())[0]
+        symbol = primary_bot.config.trading.symbol if len(manager.bots) == 1 else "multiple"
+        strategy = getattr(primary_bot.config.strategy, "name", "unknown") if len(manager.bots) == 1 else "multiple"
+        
+        ws_clients = 0
+        if primary_bot.ws_manager:
+            ws_clients = await primary_bot.ws_manager.get_client_count()
+            
+        return {
+            "running": running_count > 0,
+            "running_count": running_count,
+            "total_bots": len(manager.bots),
+            "symbol": symbol,
+            "paper_mode": paper_mode,
+            "strategy": strategy,
+            "uptime_seconds": int(uptime_seconds),
+            "circuit_breaker_active": cb_active,
+            "ws_clients": ws_clients,
+        }
+    else:
+        # Fallback for single-bot legacy
+        bot = request.app.state.bot
+        ws_clients = 0
+        if bot.ws_manager:
+            ws_clients = await bot.ws_manager.get_client_count()
 
-    return {
-        "running": bot._running,
-        "symbol": bot.config.trading.symbol,
-        "paper_mode": bot.exchange.paper_mode,
-        "strategy": getattr(bot.config.strategy, "name", "ema_volume"),
-        "uptime_seconds": int(uptime_seconds),
-        "circuit_breaker_active": bot.risk.check_circuit_breaker(),
-        "ws_clients": ws_clients,
-    }
+        return {
+            "running": bot._running,
+            "symbol": bot.config.trading.symbol,
+            "paper_mode": bot.exchange.paper_mode,
+            "strategy": getattr(bot.config.strategy, "name", "ema_volume"),
+            "uptime_seconds": int(uptime_seconds),
+            "circuit_breaker_active": bot.risk.check_circuit_breaker(),
+            "ws_clients": ws_clients,
+        }
 
 
 @router.get("/balance")

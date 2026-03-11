@@ -13,6 +13,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from .routes import (
     bot,
+    bots,
     candles,
     config,
     graph,
@@ -26,12 +27,13 @@ from .websocket import router as ws_router
 logger = structlog.get_logger()
 
 
-def create_api(bot_instance) -> FastAPI:
+def create_api(bot_instance=None, bot_manager=None) -> FastAPI:
     """
     Create and configure the FastAPI application.
 
     Args:
-        bot_instance: Live OmniTrader instance shared with the trading loop.
+        bot_instance: (Legacy) Live OmniTrader instance shared with the trading loop.
+        bot_manager: Orchestrates multiple OmniTrader instances.
 
     Returns:
         Configured FastAPI app ready to be served with uvicorn.
@@ -42,8 +44,14 @@ def create_api(bot_instance) -> FastAPI:
         version="0.1.0",
     )
 
-    # Store bot reference — accessible in routes via request.app.state.bot
-    app.state.bot = bot_instance
+    # Store bot references
+    app.state.bot_manager = bot_manager
+    if bot_manager:
+        # Provide fallback for legacy consumers
+        bots_list = list(bot_manager.bots.values())
+        app.state.bot = bot_manager.get_bot("default") or (bots_list[0] if bots_list else bot_instance)
+    else:
+        app.state.bot = bot_instance
     app.state.started_at = datetime.now(timezone.utc)
 
     # CORS — allow local dashboard dev servers
@@ -66,12 +74,13 @@ def create_api(bot_instance) -> FastAPI:
     init_auth()
 
     # Warn if auth is auto-generated in production
-    paper_mode = getattr(bot_instance.config.exchange, "paper_mode", True)
-    if is_dev_mode() and not paper_mode:
-        logger.warning(
-            "auth_dev_mode_in_production",
-            message="OMNITRADER_API_KEY is not set while paper_mode is False. Auth is auto-generated in production!",
-        )
+    if getattr(app.state, "bot", None):
+        paper_mode = getattr(app.state.bot.config.exchange, "paper_mode", True)
+        if is_dev_mode() and not paper_mode:
+            logger.warning(
+                "auth_dev_mode_in_production",
+                message="OMNITRADER_API_KEY is not set while paper_mode is False. Auth is auto-generated in production!",
+            )
 
     # Mount routers
     app.include_router(status.router, prefix="/api")
@@ -79,6 +88,8 @@ def create_api(bot_instance) -> FastAPI:
     app.include_router(strategies.router, prefix="/api")
     app.include_router(config.router, prefix="/api")
     app.include_router(bot.router, prefix="/api")
+    app.include_router(bots.router, prefix="/api")
+
     app.include_router(notifications.router, prefix="/api")
     app.include_router(candles.router, prefix="/api")
     app.include_router(graph.router, prefix="/api")

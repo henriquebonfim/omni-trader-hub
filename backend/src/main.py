@@ -93,11 +93,12 @@ class OmniTrader:
     5. Send notifications
     """
 
-    def __init__(self):
-        self.config = get_config()
+    def __init__(self, bot_id: str = "default", config=None):
+        self.bot_id = bot_id
+        self.config = config if config else get_config()
         self.exchange = ExchangeFactory.create_exchange()
         self.database = DatabaseFactory.get_database(self.config)
-        self.risk = RiskManager(database=self.database)
+        self.risk = RiskManager(database=self.database, bot_id=bot_id, config=self.config)
         self.notifier = Notifier()
         self.regime_classifier = RegimeClassifier()
         self.crisis_manager = CrisisManager(database=self.database)
@@ -1128,11 +1129,18 @@ async def main():
     """Main entry point — runs trading loop + API server concurrently."""
     from .api import create_api
     from .api.websocket import manager as _ws_manager
+    from .bot_manager import BotManager
 
-    bot = OmniTrader()
-    bot.ws_manager = _ws_manager
+    # Initialize BotManager and load bots
+    bot_manager = BotManager()
+    await bot_manager.load_bots()
+    
+    # Pre-configure all loaded bots with the WebSocket manager
+    for bot in bot_manager.bots.values():
+        bot.ws_manager = _ws_manager
 
-    app = create_api(bot)
+    # Pass bot_manager to the API factory
+    app = create_api(bot_manager=bot_manager)
 
     api_config = uvicorn.Config(
         app,
@@ -1145,25 +1153,29 @@ async def main():
 
     # Setup signal handlers for graceful shutdown
     loop = asyncio.get_event_loop()
-
-    def signal_handler():
-        logger.info("shutdown_signal_received")
-        bot._running = False
-        bot._shutdown_event.set()
+    
+    def handle_shutdown(signum):
+        sig_name = signal.Signals(signum).name
+        logger.info("shutdown_signal_received", signal=sig_name)
+        
+        # Stop all bots concurrently
+        asyncio.create_task(bot_manager.stop_all())
+        
+        # Stop uvicorn server
         server.should_exit = True
 
-    for sig in (signal.SIGINT, signal.SIGTERM):
-        loop.add_signal_handler(sig, signal_handler)
+    for sig in (signal.SIGTERM, signal.SIGINT):
+        loop.add_signal_handler(sig, handle_shutdown, sig)
 
-    logger.info("api_server_starting", host="0.0.0.0", port=8000)
+    logger.info("omnitrader_system_starting")
 
-    try:
-        await asyncio.gather(bot.run(), server.serve())
-    except KeyboardInterrupt:
-        logger.info("keyboard_interrupt")
-    except Exception as e:
-        logger.error("fatal_error", error=str(e))
-        raise
+    # Start all bots concurrently
+    for bot_id in bot_manager.bots.keys():
+        await bot_manager.start_bot(bot_id)
+    
+    # Run the API server
+    await server.serve()
+
 
 
 if __name__ == "__main__":
