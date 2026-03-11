@@ -1,7 +1,10 @@
 import structlog
+from datetime import datetime, timezone
 from typing import List
 from dataclasses import dataclass
 from src.intelligence.regime import MarketRegime
+
+ROTATION_COOLDOWN_HOURS = 4
 
 logger = structlog.get_logger()
 
@@ -21,6 +24,18 @@ class StrategySelector:
         self.database = database
         self.min_sample_size = 20
         self.fallback_strategy = "adx_trend"
+        self._last_rotation_at: datetime | None = None
+
+    def can_rotate(self) -> bool:
+        """Return True if enough time has passed since the last strategy rotation."""
+        if self._last_rotation_at is None:
+            return True
+        elapsed = (datetime.now(timezone.utc) - self._last_rotation_at).total_seconds()
+        return elapsed >= ROTATION_COOLDOWN_HOURS * 3600
+
+    def record_rotation(self) -> None:
+        """Mark the current time as the last rotation timestamp."""
+        self._last_rotation_at = datetime.now(timezone.utc)
 
     async def get_strategy_performance(self, regime: MarketRegime) -> List[StrategyScore]:
         """
@@ -91,8 +106,11 @@ class StrategySelector:
             
         return scores
         
-    async def get_best_strategy(self, regime: MarketRegime) -> str:
-        """Get the best strategy for the given regime."""
+    async def get_best_strategy(self, regime: MarketRegime, respect_cooldown: bool = True) -> str:
+        """Get the best strategy for the given regime, respecting rotation cooldown."""
+        if respect_cooldown and not self.can_rotate():
+            logger.debug("strategy_rotation_cooldown_active", last_rotation=self._last_rotation_at)
+            return None  # Caller should keep current strategy
         scores = await self.get_strategy_performance(regime)
         if not scores:
             return self.fallback_strategy

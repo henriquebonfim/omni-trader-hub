@@ -137,6 +137,24 @@ class BotManager:
         logger.info("bot_deleted", bot_id=bot_id)
         return True
         
+    async def start_bot(self, bot_id: str) -> bool:
+        """Start a bot's trading loop. Returns False if already running."""
+        bot = self.bots.get(bot_id)
+        if not bot or bot._running:
+            return False
+        await bot.start()
+        logger.info("bot_started", bot_id=bot_id)
+        return True
+
+    async def stop_bot(self, bot_id: str, reason: str = "api_stop") -> bool:
+        """Stop a bot's trading loop. Returns False if not running."""
+        bot = self.bots.get(bot_id)
+        if not bot or not bot._running:
+            return False
+        await bot.stop(reason)
+        logger.info("bot_stopped", bot_id=bot_id, reason=reason)
+        return True
+
     async def stop_all(self):
         """Stop all running bots gracefully."""
         tasks = []

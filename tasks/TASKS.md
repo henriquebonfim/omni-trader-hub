@@ -124,7 +124,7 @@ Frontend-backend integration migration added **2026-03-09** — T43 bridges new 
     - Minimum sample size: 20 trades before strategy eligible for auto-selection
     - Update frequency: recalculate after each completed trade or daily batch
     - Relationship: `(:Strategy)-[:SCORED_FOR {regime}]->(:StrategyScore)`
-- [ ] **Phase 8b: Selection algorithm** ([backend/src/strategies/selector.py](backend/src/strategies/selector.py))
+- [x] **Phase 8b: Selection algorithm** ([backend/src/strategies/selector.py](backend/src/strategies/selector.py))
     - `select_strategy(regime: str, available_strategies: List[str]) -> str`:
         1. Query all `:StrategyScore` nodes for given regime
         2. Filter: only strategies with `sample_size >= 20`
@@ -138,11 +138,11 @@ Frontend-backend integration migration added **2026-03-09** — T43 bridges new 
             2. Select new best strategy for new regime
             3. Log rotation event
         - Cooldown: minimum 4 hours between strategy rotations (prevent churn)
-- [ ] **Phase 8c: Manual override per bot**
+- [x] **Phase 8c: Manual override per bot**
     - `PUT /api/bots/{id}` with `{mode: 'manual', active_strategy: 'bollinger_bands'}`
     - Ignores regime-based rotation; uses locked strategy regardless
     - Dashboard shows badge: "Auto 🤖" or "Manual 🔒"
-- [ ] **Phase 8d: Strategy performance API**
+- [x] **Phase 8d: Strategy performance API**
     - `GET /api/strategies/performance` — returns all strategy scores grouped by regime
     - Used by Strategy Lab's StrategyPerformanceComparison component
     - Response:
