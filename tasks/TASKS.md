@@ -10,6 +10,24 @@ Frontend-backend integration migration added **2026-03-09** — T43 bridges new 
 
 ---
 
+## Local Triage (No Open GitHub Issues) - 2026-03-11
+
+Fallback triage triggered because GitHub issue queue is empty. Promote highest-impact internal planning items to active execution queue.
+
+- [ ] **T45. Intelligence Frontend Real-Data Integration (Complete T34 Phase 3f)**
+	Scope: Wire `frontend/src/pages/Intelligence.tsx` to live graph endpoints (`/api/graph/sentiment/{symbol}`, `/api/graph/news`, `/api/graph/crisis`) with loading/error states and graceful fallback.
+	Acceptance: Intelligence page renders live sentiment/news/crisis state without mock-only dependencies.
+
+- [ ] **T46. SMC Confirmation Layer Integration**
+	Scope: Integrate SMC output as a confirmation/filter layer for existing strategy signals (not standalone strategy), including config flags and test coverage.
+	Acceptance: Signal flow can apply BOS/CHoCH bias gating and is fully covered by strategy/risk tests.
+
+- [ ] **T47. T43 Frontend Lint Hardening Follow-up**
+	Scope: Remove remaining `any` usage introduced during T43 bridge work; enforce typed API/domain contracts on touched pages and hooks.
+	Acceptance: `frontend` lint passes with `@typescript-eslint/no-explicit-any` clean.
+
+---
+
 ## 🔴 Critical (Capital-at-Risk Bugs)
 
 **Strategic Shift (2026-03-05)**: Replace PostgreSQL + planned Neo4j + QuestDB with unified **Memgraph** database. Single persistent store for trades, signals, equity, knowledge graph (news/assets/sectors), and candles. Redis drops to Celery-only. Data can be reset — clean slate.

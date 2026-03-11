@@ -1,7 +1,7 @@
 import { request } from '@/core/api';
-import type { Trade, BacktestConfig, BacktestResults, EquitySnapshot } from './types';
-import { adaptTrade, adaptEquitySnapshot } from '@/lib/adapters';
+import { adaptEquitySnapshot, adaptTrade } from '@/lib/adapters';
 import { stubBacktestResults } from '@/lib/stubs';
+import type { BacktestConfig, BacktestResults } from './types';
 
 export const fetchTradeHistory = async (filters?: Record<string, string>) => {
   const params = new URLSearchParams(filters);

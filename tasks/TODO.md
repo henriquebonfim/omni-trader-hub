@@ -7,6 +7,20 @@ Unified Memgraph Architecture → Multi-Asset Autonomous Trading Platform.
 
 ---
 
+## Local Triage (No Open GitHub Issues) - 2026-03-11
+
+Items kept in next-sprint queue after promoting T45-T47 to `TASKS.md`.
+
+- [ ] **T48. Alert and Notification Center (B19 Promotion)**
+    Scope: In-app notification stream plus configurable backend alert rules (circuit breaker, strategy rotation, regime change, PnL thresholds).
+    Acceptance: WebSocket-driven frontend notification queue with configurable rule persistence.
+
+- [ ] **T49. Correlation Matrix Analytics API + Dashboard (B17 Promotion)**
+    Scope: Add rolling correlation matrix endpoint and render heatmap in risk/intelligence surfaces.
+    Acceptance: API returns NxN matrix for active bot symbols; frontend displays interpretable heatmap.
+
+---
+
 > **⚠️ STRATEGIC PIVOT (2026-03-05)**: Memgraph as single source of truth. PostgreSQL + Redis + Alembic → Memgraph + Redis (Celery-only). Data reset OK.
 
 > **🚀 PLATFORM EXPANSION (2026-03-09)**: Evolving from single-pair BTC/USDT bot to **multi-asset autonomous trading platform**. Bots run per-asset, auto-select strategies via regime + backtest performance, and support custom user-created strategies built from 158 TA-Lib indicators. Frontend design spec (PROMPT.md) drives these new backend requirements (T37-T42).

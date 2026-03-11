@@ -1,6 +1,6 @@
 import { request } from '@/core/api';
-import type { Strategy } from './types';
 import { adaptStrategy } from '@/lib/adapters';
+import type { Strategy } from './types';
 
 export const fetchStrategies = async () => {
   try {

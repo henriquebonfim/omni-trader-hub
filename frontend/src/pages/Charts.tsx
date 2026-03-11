@@ -1,11 +1,11 @@
-import { useEffect, useRef, useState, useMemo } from 'react';
-import { Panel } from '@/shared/components/Panel';
-import { StatusBadge } from '@/shared/components/StatusBadge';
+import { cn } from '@/core/utils';
 import { mockBots } from '@/domains/bot/mocks';
 import { mockPrices } from '@/domains/market/mocks';
-import { cn } from '@/core/utils';
-import { createChart, ColorType, CandlestickSeries, HistogramSeries, UTCTimestamp } from 'lightweight-charts';
+import { Panel } from '@/shared/components/Panel';
+import { StatusBadge } from '@/shared/components/StatusBadge';
+import { CandlestickSeries, ColorType, createChart, HistogramSeries, UTCTimestamp } from 'lightweight-charts';
 import { Maximize2, Minimize2 } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 interface CandleData {
   time: UTCTimestamp;
@@ -87,7 +87,7 @@ export default function Charts() {
   }, [selectedSymbol, timeframe]);
 
   const basePrice = mockPrices[selectedSymbol] || 67000;
-  
+
   const mockCandleData = useMemo(() => generateCandleData(basePrice * 0.95, 200), [basePrice]);
   const candleData = backendCandles.length > 0 ? backendCandles : mockCandleData;
   const volumeData = useMemo(() => generateVolumeData(candleData), [candleData]);

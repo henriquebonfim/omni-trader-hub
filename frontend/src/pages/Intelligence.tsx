@@ -1,13 +1,11 @@
+import { cn } from '@/core/utils';
+import { mockNews } from '@/domains/market/mocks';
 import { Panel } from '@/shared/components/Panel';
 import { StatusBadge } from '@/shared/components/StatusBadge';
-import { StatCard } from '@/shared/components/StatCard';
-import { mockNews } from '@/domains/market/mocks';
-import { mockAlerts } from '@/domains/system/mocks';
-import { cn } from '@/core/utils';
-import { useState, useEffect } from 'react';
-import { AlertTriangle, Newspaper, Gauge, Globe, TrendingUp, TrendingDown } from 'lucide-react';
+import { AlertTriangle, Newspaper, TrendingDown, TrendingUp } from 'lucide-react';
+import { useEffect, useState } from 'react';
 
-import { fetchSentiment, fetchCrisisStatus, fetchNews } from '@/domains/market/api';
+import { fetchCrisisStatus, fetchNews, fetchSentiment } from '@/domains/market/api';
 import type { NewsItem, SentimentData } from '@/domains/market/types';
 import type { CrisisStatus } from '@/domains/system/types';
 

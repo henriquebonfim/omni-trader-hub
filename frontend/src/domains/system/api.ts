@@ -1,7 +1,7 @@
 import { request } from '@/core/api';
-import type { AppConfig, EnvVariable } from './types';
 import { adaptConfig, reverseAdaptConfig } from '@/lib/adapters';
 import { stubEnvVars } from '@/lib/stubs';
+import type { AppConfig, EnvVariable } from './types';
 
 export const fetchConfig = async () => {
   try {

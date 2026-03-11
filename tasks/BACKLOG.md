@@ -7,6 +7,16 @@ Items requiring design decisions, external dependencies, or are lower-priority l
 
 ---
 
+## Local Triage (No Open GitHub Issues) - 2026-03-11
+
+Fallback planning pass completed:
+
+- Promoted to `TASKS.md`: T45 (Intelligence real-data integration), T46 (SMC confirmation layer), T47 (frontend lint hardening).
+- Promoted to `TODO.md`: T48 (Alert/Notification Center), T49 (Correlation Matrix dashboard).
+- Remaining here as backlog candidates: B16 (Visual strategy builder), B18 (Trade journal), B20 (Theme toggle), and post-T35 research expansions.
+
+---
+
 ## 🔴 Research-Blocked (Need Design Before Implementation)
 
 ### B1. Build Backtesting Engine

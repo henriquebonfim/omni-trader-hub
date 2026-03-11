@@ -1,7 +1,7 @@
 import { request } from '@/core/api';
-import type { Bot } from './types';
 import { adaptBotState } from '@/lib/adapters';
 import { stubBots } from '@/lib/stubs';
+import type { Bot } from './types';
 
 export const fetchBots = async () => {
   try {

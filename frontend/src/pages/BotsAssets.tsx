@@ -1,13 +1,13 @@
-import { useState } from 'react';
-import { Panel } from '@/shared/components/Panel';
-import { StatusBadge } from '@/shared/components/StatusBadge';
-import { EmptyState } from '@/shared/components/EmptyState';
 import { useAppStore } from '@/app/store/app-store';
+import { cn } from '@/core/utils';
 import { startBot, stopBot } from '@/domains/bot/api';
 import { mockBots } from '@/domains/bot/mocks';
-import { mockPrices, mockMarkets } from '@/domains/market/mocks';
-import { cn } from '@/core/utils';
-import { Plus, Play, Pause, Square, Trash2, Settings, Bot, X, Search } from 'lucide-react';
+import { mockMarkets, mockPrices } from '@/domains/market/mocks';
+import { EmptyState } from '@/shared/components/EmptyState';
+import { Panel } from '@/shared/components/Panel';
+import { StatusBadge } from '@/shared/components/StatusBadge';
+import { Bot, Pause, Play, Plus, Search, Square, Trash2, X } from 'lucide-react';
+import { useState } from 'react';
 
 export default function BotsAssets() {
   const storeBots = useAppStore(s => s.bots);

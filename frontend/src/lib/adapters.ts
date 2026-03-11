@@ -1,7 +1,7 @@
 import type { Bot, Position } from '@/domains/bot/types';
-import type { Trade, EquitySnapshot } from '@/domains/trade/types';
 import type { Strategy } from '@/domains/strategy/types';
 import type { AppConfig, CycleMessage } from '@/domains/system/types';
+import type { EquitySnapshot, Trade } from '@/domains/trade/types';
 
 type JsonObject = Record<string, unknown>;
 
