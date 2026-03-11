@@ -4,9 +4,9 @@ import {
 } from 'lucide-react';
 import { NavLink } from 'react-router-dom';
 import { cn } from '@/core/utils';
-import { useState } from 'react';
-import { mockBots } from '@/domains/bot/mocks';
+import { useState, useEffect } from 'react';
 import { useAppStore } from '@/app/store/app-store';
+import { fetchBots } from '@/domains/bot/api';
 
 const navItems = [
   { to: '/', icon: LayoutDashboard, label: 'Dashboard' },
@@ -23,7 +23,13 @@ const navItems = [
 export function AppSidebar() {
   const [collapsed, setCollapsed] = useState(false);
   const storeBots = useAppStore((s) => s.bots);
-  const bots = storeBots.length > 0 ? storeBots : mockBots;
+  const setBots = useAppStore((s) => s.setBots);
+  
+  useEffect(() => {
+    fetchBots().then(setBots).catch(console.error);
+  }, [setBots]);
+
+  const bots = storeBots;
   const activeBots = bots.filter(b => b.status === 'running');
   const totalPnl = activeBots.reduce((s, b) => s + b.daily_pnl, 0);
   const totalBalance = bots.reduce((s, b) => s + b.balance_allocated, 0);

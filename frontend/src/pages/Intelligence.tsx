@@ -7,14 +7,30 @@ import { cn } from '@/core/utils';
 import { useState } from 'react';
 import { AlertTriangle, Newspaper, Gauge, Globe, TrendingUp, TrendingDown } from 'lucide-react';
 
+import { fetchSentiment, fetchCrisisStatus, fetchNews } from '@/domains/market/api';
+import type { NewsItem, SentimentData } from '@/domains/market/types';
+import type { CrisisStatus } from '@/domains/system/types';
+
 export default function Intelligence() {
   const [newsFilter, setNewsFilter] = useState<'all' | 'high' | 'asset'>('all');
-  const sentiment = 0.42;
-  const crisisActive = false;
+  const [sentimentData, setSentimentData] = useState<SentimentData | null>(null);
+  const [crisisStatus, setCrisisStatus] = useState<CrisisStatus | null>(null);
+  const [news, setNews] = useState<NewsItem[]>(mockNews);
+
+  useEffect(() => {
+    fetchSentiment('BTC/USDT').then(setSentimentData).catch(console.error);
+    fetchCrisisStatus().then(setCrisisStatus).catch(console.error);
+    fetchNews().then(res => {
+      if (res && res.length > 0) setNews(res);
+    }).catch(console.error);
+  }, []);
+
+  const sentiment = sentimentData?.score || 0;
+  const crisisActive = crisisStatus?.active || false;
 
   const filteredNews = newsFilter === 'high'
-    ? mockNews.filter(n => n.impact_level > 0.7)
-    : mockNews;
+    ? news.filter(n => n.impact_level > 0.7)
+    : news;
 
   const sentimentLabel = sentiment > 0.5 ? 'Bullish' : sentiment > 0.2 ? 'Slightly Bullish' : sentiment > -0.2 ? 'Neutral' : sentiment > -0.5 ? 'Slightly Bearish' : 'Bearish';
   const sentimentEmoji = sentiment > 0.5 ? '😊' : sentiment > 0.2 ? '🙂' : sentiment > -0.2 ? '😐' : sentiment > -0.5 ? '😟' : '😢';

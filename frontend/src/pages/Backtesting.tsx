@@ -16,17 +16,33 @@ const metricTargets: Record<string, { target: number; better: 'higher' | 'lower'
   win_rate_pct: { target: 45, better: 'higher' },
 };
 
+import { runBacktest, fetchBacktestResults } from '@/domains/trade/api';
+import type { BacktestResults } from '@/domains/trade/types';
+
 export default function Backtesting() {
   const [symbol, setSymbol] = useState('BTC/USDT');
   const [strategy, setStrategy] = useState('ADX Trend');
   const [timeframe, setTimeframe] = useState('1h');
   const [running, setRunning] = useState(false);
   const [hasResults, setHasResults] = useState(true);
-  const r = mockBacktestResults;
+  const [r, setR] = useState<BacktestResults>(mockBacktestResults);
 
-  const handleRun = () => {
+  const handleRun = async () => {
     setRunning(true);
-    setTimeout(() => { setRunning(false); setHasResults(true); }, 2000);
+    try {
+      const res = await runBacktest({
+        symbol, strategy, timeframe,
+        start_date: '2024-01-01', end_date: '2024-06-30',
+        initial_capital: 10000, position_size_pct: 5, leverage: 3
+      });
+      const results = await fetchBacktestResults(res.id);
+      setR(results);
+      setHasResults(true);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setRunning(false);
+    }
   };
 
   return (

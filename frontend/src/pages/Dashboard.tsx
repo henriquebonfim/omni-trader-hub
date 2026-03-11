@@ -2,15 +2,16 @@ import { StatCard } from '@/shared/components/StatCard';
 import { StatusBadge } from '@/shared/components/StatusBadge';
 import { Panel } from '@/shared/components/Panel';
 import { useAppStore } from '@/app/store/app-store';
-import { mockBots } from '@/domains/bot/mocks';
-import { mockTrades, mockEquitySnapshots } from '@/domains/trade/mocks';
 import { mockPrices } from '@/domains/market/mocks';
 import { mockAlerts } from '@/domains/system/mocks';
 import { cn } from '@/core/utils';
 import { XAxis, YAxis, Tooltip, ResponsiveContainer, Area, AreaChart } from 'recharts';
 import { Link } from 'react-router-dom';
 import { Play, Pause, Square, ArrowRight, TrendingUp, Minus, Zap, ArrowUpDown } from 'lucide-react';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { fetchBots } from '@/domains/bot/api';
+import { fetchTradeHistory, fetchEquitySnapshots } from '@/domains/trade/api';
+import type { Trade, EquitySnapshot } from '@/domains/trade/types';
 
 const regimeIcons: Record<string, React.ReactNode> = {
   trending: <TrendingUp className="h-3 w-3" />,
@@ -26,9 +27,19 @@ const regimeColors: Record<string, string> = {
 
 export default function Dashboard() {
   const storeBots = useAppStore(s => s.bots);
+  const setBots = useAppStore(s => s.setBots);
   const prices = useAppStore(s => s.livePrices);
-  const bots = storeBots.length > 0 ? storeBots : mockBots;
+  const bots = storeBots;
   const liveP = Object.keys(prices).length > 0 ? prices : mockPrices;
+
+  const [trades, setTrades] = useState<Trade[]>([]);
+  const [equityDataAll, setEquityDataAll] = useState<EquitySnapshot[]>([]);
+
+  useEffect(() => {
+    fetchBots().then(setBots).catch(console.error);
+    fetchTradeHistory().then(res => setTrades(res.trades.slice(0, 10))).catch(console.error);
+    fetchEquitySnapshots().then(setEquityDataAll).catch(console.error);
+  }, [setBots]);
 
   const activeBots = bots.filter(b => b.status === 'running');
   const totalValue = bots.reduce((s, b) => s + b.balance_allocated, 0);
@@ -37,7 +48,8 @@ export default function Dashboard() {
   const openPositions = bots.filter(b => b.position).length;
 
   const [equityRange, setEquityRange] = useState<'7D' | '30D' | '90D'>('30D');
-  const equityData = mockEquitySnapshots.slice(equityRange === '7D' ? -7 : equityRange === '30D' ? -30 : 0);
+  let equityData = equityDataAll.slice(equityRange === '7D' ? -7 : equityRange === '30D' ? -30 : 0);
+  if (equityData.length === 0) equityData = [{timestamp: Date.now(), equity: 0}];
 
   return (
     <div className="space-y-4 animate-fade-in">
@@ -182,7 +194,7 @@ export default function Dashboard() {
                 </tr>
               </thead>
               <tbody>
-                {mockTrades.filter(t => t.pnl !== undefined).slice(0, 10).map(trade => (
+                {trades.filter(t => t.pnl !== undefined).slice(0, 10).map(trade => (
                   <tr key={trade.id} className="border-b border-border/30 hover:bg-secondary/30 cursor-pointer">
                     <td className="py-2 text-muted-foreground font-mono">{new Date(trade.timestamp).toLocaleTimeString()}</td>
                     <td className="py-2 font-medium">{trade.symbol}</td>

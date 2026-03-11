@@ -21,6 +21,14 @@ interface VolumeData {
   color: string;
 }
 
+interface BackendCandle {
+  timestamp: string | number;
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+}
+
 function generateCandleData(basePrice: number, count: number): CandleData[] {
   const data: CandleData[] = [];
   let price = basePrice;
@@ -51,15 +59,37 @@ function generateVolumeData(candleData: CandleData[]): VolumeData[] {
   }));
 }
 
+import { request } from '@/core/api';
+
 export default function Charts() {
   const [selectedSymbol, setSelectedSymbol] = useState('BTC/USDT');
   const [timeframe, setTimeframe] = useState('1h');
   const [fullscreen, setFullscreen] = useState(false);
   const chartContainerRef = useRef<HTMLDivElement>(null);
+  const [backendCandles, setBackendCandles] = useState<CandleData[]>([]);
+
+  useEffect(() => {
+    // Fetch real candles from backend instead of generating mock ones
+    request<BackendCandle[]>(`/api/candles?symbol=${encodeURIComponent(selectedSymbol)}&timeframe=${timeframe}&limit=200`)
+      .then((res) => {
+        if (res && res.length > 0) {
+          const adapted: CandleData[] = res.map((c) => ({
+            time: typeof c.timestamp === 'string' ? new Date(c.timestamp).getTime() / 1000 : c.timestamp / 1000,
+            open: c.open,
+            high: c.high,
+            low: c.low,
+            close: c.close
+          })) as CandleData[];
+          setBackendCandles(adapted);
+        }
+      })
+      .catch(console.error);
+  }, [selectedSymbol, timeframe]);
 
   const basePrice = mockPrices[selectedSymbol] || 67000;
   
-  const candleData = useMemo(() => generateCandleData(basePrice * 0.95, 200), [basePrice]);
+  const mockCandleData = useMemo(() => generateCandleData(basePrice * 0.95, 200), [basePrice]);
+  const candleData = backendCandles.length > 0 ? backendCandles : mockCandleData;
   const volumeData = useMemo(() => generateVolumeData(candleData), [candleData]);
 
   useEffect(() => {
