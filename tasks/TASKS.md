@@ -3,6 +3,7 @@
 Single source of truth for all technical work: architecture items, audit-discovered bugs, and risk gaps.
 Institutional-grade audit completed **2026-03-03** — findings integrated below.
 Multi-asset autonomous platform expansion added **2026-03-09** — T37-T42 driven by frontend spec (PROMPT.md).
+Last updated: 2026-03-10 | Sprint status: T32-T39 completed and merged to master. Next: T40-T42.
 Frontend-backend integration migration added **2026-03-09** — T43 bridges new frontend to existing backend.
 
 > Last updated: 2026-03-10 | Sprint status: T32-T38 completed and merged to master. Next: T39-T42 (TA-Lib Indicators, Custom Strategies, Frontend Integration)
@@ -162,8 +163,9 @@ Frontend-backend integration migration added **2026-03-09** — T43 bridges new 
 
 ### T39. TA-Lib Migration & Indicator Service
 > **Phase 9a COMPLETED**: ✅ All strategies migrated to TA-Lib (2026-03-09). See DONE.md for details.
+> **T39 COMPLETED**: ✅ Indicator catalog (GET /api/indicators, startup-cached) and compute endpoint (POST /api/indicators/compute, 10 req/min rate-limited, auth required) implemented (2026-03-10). See PR #72.
 
-- [ ] **Phase 9b: Indicator catalog API** ([backend/src/api/routes/indicators.py](backend/src/api/routes/indicators.py))
+- [x] **Phase 9b: Indicator catalog API** ([backend/src/api/routes/indicators.py](backend/src/api/routes/indicators.py))
     - `GET /api/indicators` — returns all TA-Lib functions grouped by category:
         ```json
         {
@@ -177,7 +179,7 @@ Frontend-backend integration migration added **2026-03-09** — T43 bridges new 
         ```
     - Implementation: use `talib.get_function_groups()` + `talib.abstract.Function(name)` for introspection
     - Cache response (static data, recalculate only on startup)
-- [ ] **Phase 9c: Indicator computation endpoint**
+- [x] **Phase 9c: Indicator computation endpoint**
     - `POST /api/indicators/compute`:
         ```json
         {"function": "RSI", "params": {"timeperiod": 14}, "symbol": "BTC/USDT", "timeframe": "1h", "bars": 100}
