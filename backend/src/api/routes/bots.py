@@ -3,6 +3,7 @@ from fastapi import APIRouter, Depends, Request, HTTPException
 from pydantic import BaseModel
 
 from src.api.auth import verify_api_key
+from src.api.schemas import ConfigUpdate
 
 router = APIRouter(prefix="/bots", tags=["bots"])
 
@@ -53,11 +54,12 @@ async def get_bot(request: Request, bot_id: str):
     }
 
 @router.put("/{bot_id}", dependencies=[Depends(verify_api_key)])
-async def update_bot(request: Request, bot_id: str, body: BotUpdateRequest):
+async def update_bot(request: Request, bot_id: str, body: ConfigUpdate):
     """Update a specific bot's configuration."""
     manager = request.app.state.bot_manager
     try:
-        updated = await manager.update_bot(bot_id, body.config)
+        # Pass the validated model payload as dictionary
+        updated = await manager.update_bot(bot_id, body.model_dump(exclude_unset=True))
         if not updated:
             raise HTTPException(status_code=404, detail="Bot not found")
         return {"ok": True, "message": "Bot updated"}

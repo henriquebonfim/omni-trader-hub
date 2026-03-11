@@ -44,6 +44,7 @@ class BreakoutConfig(BaseModel):
 
 class StrategyConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
+    mode: Optional[Literal["auto", "manual"]] = None
     name: Optional[
         Literal["ema_volume", "adx_trend", "z_score", "bollinger_bands", "breakout"]
     ] = None
