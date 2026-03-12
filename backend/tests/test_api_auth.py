@@ -30,8 +30,8 @@ def mock_bot():
 
     mock_position = MagicMock()
     mock_position.is_open = False
-    bot.exchange.fetch_position = AsyncMock(return_value=mock_position)
-    bot.exchange.fetch_balance = AsyncMock(return_value=1000)
+    bot.exchange.get_position = AsyncMock(return_value=mock_position)
+    bot.exchange.get_balance = AsyncMock(return_value=1000)
 
     bot.notifier = MagicMock()
     bot.notifier.send = AsyncMock(return_value=True)
@@ -44,9 +44,10 @@ def mock_bot():
 def test_trades_protected_when_no_key_set_uses_generated_key(mock_bot, monkeypatch):
     # Ensure OMNITRADER_API_KEY is NOT set
     monkeypatch.delenv("OMNITRADER_API_KEY", raising=False)
-    
+
     # Reset the singleton in auth.py for testing
     import src.api.auth as auth
+
     auth._API_KEY = None
     auth._AUTH_DEV_MODE = False
 
@@ -59,15 +60,19 @@ def test_trades_protected_when_no_key_set_uses_generated_key(mock_bot, monkeypat
 
     # Using the generated key should succeed
     generated_key = auth.get_api_key()
-    response = client.get("/api/trades", headers={"Authorization": f"Bearer {generated_key}"})
+    response = client.get(
+        "/api/trades", headers={"Authorization": f"Bearer {generated_key}"}
+    )
     assert response.status_code == 200
+
 
 def test_trades_protected_when_key_set(mock_bot, monkeypatch):
     # Set the API key
     monkeypatch.setenv("OMNITRADER_API_KEY", "test-secret")
-    
+
     # Reset the singleton in auth.py for testing
     import src.api.auth as auth
+
     auth._API_KEY = None
     auth._AUTH_DEV_MODE = False
 
@@ -92,9 +97,10 @@ def test_trades_protected_when_key_set(mock_bot, monkeypatch):
 def test_other_routes_unprotected(mock_bot, monkeypatch):
     # Set the API key
     monkeypatch.setenv("OMNITRADER_API_KEY", "test-secret")
-    
+
     # Reset the singleton in auth.py for testing
     import src.api.auth as auth
+
     auth._API_KEY = None
     auth._AUTH_DEV_MODE = False
 
@@ -117,12 +123,17 @@ def test_other_routes_unprotected(mock_bot, monkeypatch):
     response = client.get("/api/notifications/discord")
     assert response.status_code == 200
 
+    # GET /api/notifications/rules should be unprotected
+    response = client.get("/api/notifications/rules")
+    assert response.status_code == 200
+
 
 def test_mutation_routes_protected_when_key_set(mock_bot, monkeypatch):
     monkeypatch.setenv("OMNITRADER_API_KEY", "test-secret")
-    
+
     # Reset the singleton in auth.py for testing
     import src.api.auth as auth
+
     auth._API_KEY = None
     auth._AUTH_DEV_MODE = False
 
@@ -137,6 +148,18 @@ def test_mutation_routes_protected_when_key_set(mock_bot, monkeypatch):
         ("POST", "/api/bot/trade/close", {}),
         ("PUT", "/api/config", {"strategy": {"name": "ema_volume"}}),
         ("PUT", "/api/notifications/discord", {"enabled": True}),
+        (
+            "PUT",
+            "/api/notifications/rules",
+            {
+                "circuit_breaker": True,
+                "strategy_rotation": True,
+                "regime_change": True,
+                "pnl_thresholds": True,
+                "pnl_warning_pct": 3.0,
+                "pnl_critical_pct": 5.0,
+            },
+        ),
         ("POST", "/api/notifications/discord/test", {}),
     ]
 
@@ -146,9 +169,9 @@ def test_mutation_routes_protected_when_key_set(mock_bot, monkeypatch):
             response = client.post(endpoint, json=payload)
         else:
             response = client.put(endpoint, json=payload)
-        assert response.status_code == 401, (
-            f"{method} {endpoint} should be 401 without token"
-        )
+        assert (
+            response.status_code == 401
+        ), f"{method} {endpoint} should be 401 without token"
 
         # Request with invalid token
         headers = {"Authorization": "Bearer wrong-token"}
@@ -156,9 +179,9 @@ def test_mutation_routes_protected_when_key_set(mock_bot, monkeypatch):
             response = client.post(endpoint, json=payload, headers=headers)
         else:
             response = client.put(endpoint, json=payload, headers=headers)
-        assert response.status_code == 401, (
-            f"{method} {endpoint} should be 401 with invalid token"
-        )
+        assert (
+            response.status_code == 401
+        ), f"{method} {endpoint} should be 401 with invalid token"
 
         # Request with valid token (we just expect it NOT to be 401, could be 200 or 500/400 depending on mock)
         headers = {"Authorization": "Bearer test-secret"}
@@ -166,6 +189,6 @@ def test_mutation_routes_protected_when_key_set(mock_bot, monkeypatch):
             response = client.post(endpoint, json=payload, headers=headers)
         else:
             response = client.put(endpoint, json=payload, headers=headers)
-        assert response.status_code != 401, (
-            f"{method} {endpoint} should not be 401 with valid token"
-        )
+        assert (
+            response.status_code != 401
+        ), f"{method} {endpoint} should not be 401 with valid token"

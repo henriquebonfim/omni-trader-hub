@@ -44,12 +44,12 @@ RUN apt-get update && apt-get install -y \
 COPY --from=builder /usr/lib/libta-lib* /usr/lib/
 COPY --from=builder /install /usr/local
 
+COPY src/ ./src/
+COPY config/ ./config/
+
 RUN mkdir -p data && \
     useradd -m appuser && \
     chown -R appuser /app
-
-COPY src/ ./src/
-COPY config/ ./config/
 
 USER appuser
 

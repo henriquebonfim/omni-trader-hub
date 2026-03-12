@@ -1,17 +1,39 @@
+import { useAppStore } from '@/app/store/app-store';
+import { cn } from '@/core/utils';
+import { fetchCorrelationMatrix } from '@/domains/market/api';
+import type { CorrelationMatrixData } from '@/domains/market/types';
+import { mockCircuitBreakers } from '@/domains/risk/mocks';
+import { CorrelationHeatmap } from '@/shared/components/CorrelationHeatmap';
 import { Panel } from '@/shared/components/Panel';
 import { StatCard } from '@/shared/components/StatCard';
 import { StatusBadge } from '@/shared/components/StatusBadge';
-import { useAppStore } from '@/app/store/app-store';
-import { mockCircuitBreakers } from '@/domains/risk/mocks';
-import { cn } from '@/core/utils';
-import { Shield, AlertTriangle } from 'lucide-react';
+import { AlertCircle, Loader2 } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
 
 export default function RiskMonitor() {
   const bots = useAppStore(s => s.bots);
-  const activeBots = bots.filter(b => b.status === 'running');
+  const activeBots = useMemo(() => bots.filter(b => b.status === 'running'), [bots]);
+  const activeSymbols = useMemo(() => activeBots.map((b) => b.symbol), [activeBots]);
   const totalExposure = activeBots.reduce((s, b) => s + b.balance_allocated * b.leverage, 0);
   const totalAllocated = bots.reduce((s, b) => s + b.balance_allocated, 0);
   const openPositions = bots.filter(b => b.position).length;
+
+  const [correlationData, setCorrelationData] = useState<CorrelationMatrixData | null>(null);
+  const [loadingCorrelation, setLoadingCorrelation] = useState(true);
+  const [errorCorrelation, setErrorCorrelation] = useState(false);
+
+  useEffect(() => {
+    fetchCorrelationMatrix({ timeframe: '1h', limit: 120, symbols: activeSymbols })
+      .then((res) => {
+        setCorrelationData(res);
+        setErrorCorrelation(false);
+      })
+      .catch((e) => {
+        console.error(e);
+        setErrorCorrelation(true);
+      })
+      .finally(() => setLoadingCorrelation(false));
+  }, [activeSymbols]);
 
   return (
     <div className="space-y-4 animate-fade-in">
@@ -135,6 +157,21 @@ export default function RiskMonitor() {
           </div>
         </Panel>
       </div>
+
+      <Panel title="Asset Correlation Matrix" subtitle="Rolling return correlation (active bots)">
+        {loadingCorrelation ? (
+          <div className="flex items-center justify-center py-10">
+            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+          </div>
+        ) : errorCorrelation || !correlationData ? (
+          <div className="flex items-center gap-2 text-xs text-muted-foreground py-2">
+            <AlertCircle className="h-4 w-4 text-warning" />
+            <span>Correlation matrix unavailable.</span>
+          </div>
+        ) : (
+          <CorrelationHeatmap data={correlationData} />
+        )}
+      </Panel>
     </div>
   );
 }

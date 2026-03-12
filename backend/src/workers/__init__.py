@@ -13,6 +13,7 @@ Usage::
 """
 
 import os
+from datetime import timedelta
 
 from celery import Celery
 
@@ -46,4 +47,11 @@ celery_app.conf.update(
     # Timezone
     timezone="UTC",
     enable_utc=True,
+    # Periodic scheduling
+    beat_schedule={
+        "ingest-news-hourly": {
+            "task": "omnitrader.ingest_news_cycle",
+            "schedule": timedelta(hours=1),
+        }
+    },
 )

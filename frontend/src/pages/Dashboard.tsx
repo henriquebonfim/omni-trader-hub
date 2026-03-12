@@ -1,17 +1,17 @@
-import { StatCard } from '@/shared/components/StatCard';
-import { StatusBadge } from '@/shared/components/StatusBadge';
-import { Panel } from '@/shared/components/Panel';
 import { useAppStore } from '@/app/store/app-store';
+import { cn } from '@/core/utils';
+import { fetchBots } from '@/domains/bot/api';
 import { mockPrices } from '@/domains/market/mocks';
 import { mockAlerts } from '@/domains/system/mocks';
-import { cn } from '@/core/utils';
-import { XAxis, YAxis, Tooltip, ResponsiveContainer, Area, AreaChart } from 'recharts';
+import { fetchEquitySnapshots, fetchTradeHistory } from '@/domains/trade/api';
+import type { EquitySnapshot, Trade } from '@/domains/trade/types';
+import { Panel } from '@/shared/components/Panel';
+import { StatCard } from '@/shared/components/StatCard';
+import { StatusBadge } from '@/shared/components/StatusBadge';
+import { ArrowRight, ArrowUpDown, Pause, Play, Square, TrendingUp, Zap } from 'lucide-react';
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Play, Pause, Square, ArrowRight, TrendingUp, Minus, Zap, ArrowUpDown } from 'lucide-react';
-import { useState, useEffect } from 'react';
-import { fetchBots } from '@/domains/bot/api';
-import { fetchTradeHistory, fetchEquitySnapshots } from '@/domains/trade/api';
-import type { Trade, EquitySnapshot } from '@/domains/trade/types';
+import { Area, AreaChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 
 const regimeIcons: Record<string, React.ReactNode> = {
   trending: <TrendingUp className="h-3 w-3" />,
@@ -30,7 +30,9 @@ export default function Dashboard() {
   const setBots = useAppStore(s => s.setBots);
   const prices = useAppStore(s => s.livePrices);
   const bots = storeBots;
+  const liveAlerts = useAppStore(s => s.alerts);
   const liveP = Object.keys(prices).length > 0 ? prices : mockPrices;
+  const alerts = liveAlerts.length > 0 ? liveAlerts : mockAlerts;
 
   const [trades, setTrades] = useState<Trade[]>([]);
   const [equityDataAll, setEquityDataAll] = useState<EquitySnapshot[]>([]);
@@ -214,7 +216,7 @@ export default function Dashboard() {
 
         <Panel title="Live Alerts" actions={<Link to="/intelligence" className="text-[11px] text-accent hover:underline">View All</Link>}>
           <div className="space-y-2 max-h-[300px] overflow-y-auto">
-            {mockAlerts.map((alert, i) => (
+            {alerts.map((alert, i) => (
               <div key={i} className={cn(
                 'rounded-md border p-2.5',
                 alert.level === 'critical' ? 'border-danger/30 bg-danger/5' :

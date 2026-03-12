@@ -23,3 +23,11 @@ export interface MarketPair {
   volume_24h: number;
   last_price: number;
 }
+
+export interface CorrelationMatrixData {
+  symbols: string[];
+  timeframe: string;
+  window: number;
+  matrix: number[][];
+  as_of: number;
+}

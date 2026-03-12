@@ -1,19 +1,20 @@
 import { cn } from '@/core/utils';
+import { fetchCorrelationMatrix, fetchCrisisStatus, fetchNews, fetchSentiment } from '@/domains/market/api';
+import type { CorrelationMatrixData, NewsItem, SentimentData } from '@/domains/market/types';
+import type { CrisisStatus } from '@/domains/system/types';
+import { CorrelationHeatmap } from '@/shared/components/CorrelationHeatmap';
 import { EmptyState } from '@/shared/components/EmptyState';
 import { Panel } from '@/shared/components/Panel';
 import { StatusBadge } from '@/shared/components/StatusBadge';
 import { AlertCircle, AlertTriangle, Loader2, Newspaper, TrendingDown, TrendingUp } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
-import { fetchCrisisStatus, fetchNews, fetchSentiment } from '@/domains/market/api';
-import type { NewsItem, SentimentData } from '@/domains/market/types';
-import type { CrisisStatus } from '@/domains/system/types';
-
 export default function Intelligence() {
   const [newsFilter, setNewsFilter] = useState<'all' | 'high' | 'asset'>('all');
   const [sentimentData, setSentimentData] = useState<SentimentData | null>(null);
   const [crisisStatus, setCrisisStatus] = useState<CrisisStatus | null>(null);
   const [news, setNews] = useState<NewsItem[]>([]);
+  const [correlationData, setCorrelationData] = useState<CorrelationMatrixData | null>(null);
 
   const [loadingSentiment, setLoadingSentiment] = useState(true);
   const [errorSentiment, setErrorSentiment] = useState(false);
@@ -23,6 +24,9 @@ export default function Intelligence() {
 
   const [loadingNews, setLoadingNews] = useState(true);
   const [errorNews, setErrorNews] = useState(false);
+
+  const [loadingCorrelation, setLoadingCorrelation] = useState(true);
+  const [errorCorrelation, setErrorCorrelation] = useState(false);
 
   useEffect(() => {
     fetchSentiment('BTC/USDT')
@@ -39,6 +43,11 @@ export default function Intelligence() {
       .then(res => { if (res) setNews(res); setErrorNews(false); })
       .catch(e => { console.error(e); setErrorNews(true); })
       .finally(() => setLoadingNews(false));
+
+    fetchCorrelationMatrix({ timeframe: '1h', limit: 120 })
+      .then(res => { setCorrelationData(res); setErrorCorrelation(false); })
+      .catch(e => { console.error(e); setErrorCorrelation(true); })
+      .finally(() => setLoadingCorrelation(false));
   }, []);
 
   const sentiment = sentimentData?.score || 0;
@@ -147,6 +156,21 @@ export default function Intelligence() {
           <p className="text-[11px] text-muted-foreground">Price action diverging from sentiment on BTC/USDT. Monitor closely.</p>
         </div>
       </div>
+
+      <Panel title="Cross-Asset Correlation" subtitle="Rolling return relationships across active symbols">
+        {loadingCorrelation ? (
+          <div className="flex items-center justify-center py-10">
+            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+          </div>
+        ) : errorCorrelation || !correlationData ? (
+          <div className="flex items-center gap-2 text-xs text-muted-foreground py-1">
+            <AlertCircle className="h-4 w-4 text-warning" />
+            <span>Correlation matrix unavailable right now.</span>
+          </div>
+        ) : (
+          <CorrelationHeatmap data={correlationData} compact />
+        )}
+      </Panel>
 
       {/* News Feed */}
       <Panel

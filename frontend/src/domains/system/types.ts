@@ -87,3 +87,12 @@ export interface TradeMessage {
   strategy: string;
   timestamp: number;
 }
+
+export interface NotificationRules {
+  circuit_breaker: boolean;
+  strategy_rotation: boolean;
+  regime_change: boolean;
+  pnl_thresholds: boolean;
+  pnl_warning_pct: number;
+  pnl_critical_pct: number;
+}

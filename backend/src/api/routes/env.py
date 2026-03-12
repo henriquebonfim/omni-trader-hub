@@ -13,14 +13,10 @@ logger = structlog.get_logger()
 
 router = APIRouter(prefix="/env", tags=["system", "env"])
 
-# We locate the root directory where .env usually is.
-# __file__ = backend/src/api/routes/env.py
-# parents[0] = routes
-# parents[1] = api
-# parents[2] = src
-# parents[3] = backend
-# parents[4] = root dir
-ROOT_DIR = Path(__file__).resolve().parents[4]
+# We locate the application root where .env usually is.
+# In container runtime this file is /app/src/api/routes/env.py => parents[3] = /app.
+# In local backend layout this resolves to the backend directory.
+ROOT_DIR = Path(__file__).resolve().parents[3]
 ENV_FILE = ROOT_DIR / ".env"
 
 # Whitelisted keys that can be viewed/modified
@@ -92,7 +88,7 @@ def write_env_file(updates: Dict[str, str]):
     """
     lines = []
     updated_keys = set()
-    
+
     if ENV_FILE.exists():
         with open(ENV_FILE, "r", encoding="utf-8") as f:
             for line in f:
@@ -100,7 +96,7 @@ def write_env_file(updates: Dict[str, str]):
                 if not stripped or stripped.startswith("#"):
                     lines.append(line)
                     continue
-                
+
                 if "=" in stripped:
                     k, v = stripped.split("=", 1)
                     k = k.strip()
@@ -111,7 +107,7 @@ def write_env_file(updates: Dict[str, str]):
                         lines.append(line)
                 else:
                     lines.append(line)
-    
+
     # Add any new keys that weren't in the file
     for k, v in updates.items():
         if k not in updated_keys:
@@ -139,7 +135,7 @@ async def get_env():
     Only whitelisted variables are exposed.
     """
     raw_env = read_env_file()
-    
+
     response_data = {}
     for group, keys in ENV_WHITELIST.items():
         group_data = {}
@@ -147,7 +143,7 @@ async def get_env():
             val = raw_env.get(key, "")
             group_data[key] = mask_value(key, val)
         response_data[group] = group_data
-        
+
     return response_data
 
 
@@ -158,26 +154,40 @@ async def update_env(payload: EnvUpdate, request: Request):
     Validates against whitelist and emits an audit signal.
     """
     updates = payload.updates
-    
+
     # Flatten whitelist for quick lookup
     allowed_keys = {key for keys in ENV_WHITELIST.values() for key in keys}
-    
+
     validated_updates = {}
     for k, v in updates.items():
         if k not in allowed_keys:
-            raise HTTPException(status_code=400, detail=f"Key {k} is not allowed to be modified.")
-        
+            raise HTTPException(
+                status_code=400, detail=f"Key {k} is not allowed to be modified."
+            )
+
         # Basic validation: Binance API keys shouldn't be empty if provided as part of updates,
         # unless they are explicitly being cleared. We'll just ensure they're strings.
         if not isinstance(v, str):
-             raise HTTPException(status_code=400, detail=f"Value for {k} must be a string.")
-             
+            raise HTTPException(
+                status_code=400, detail=f"Value for {k} must be a string."
+            )
+
         # Strip newlines to prevent injection
         validated_updates[k] = v.replace("\n", "").replace("\r", "")
-        
+
     # Emit audit signal before writing
-    logger.info("env_update_audit", keys=list(validated_updates.keys()), ip=request.client.host if request.client else "unknown")
-    
-    write_env_file(validated_updates)
-    
+    logger.info(
+        "env_update_audit",
+        keys=list(validated_updates.keys()),
+        ip=request.client.host if request.client else "unknown",
+    )
+
+    try:
+        write_env_file(validated_updates)
+    except PermissionError as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Permission denied while writing {ENV_FILE}",
+        ) from e
+
     return {"ok": True, "message": "Environment variables updated successfully"}

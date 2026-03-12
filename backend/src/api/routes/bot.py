@@ -4,12 +4,21 @@ Bot lifecycle control routes.
 
 import asyncio
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
 
 from src.api.auth import verify_api_key
 
 router = APIRouter(prefix="/bot", tags=["bot"])
+
+
+class TradeRequest(BaseModel):
+    side: str
+
+
+class RestartRequest(BaseModel):
+    confirm: bool = False
+    force: bool = False
 
 
 @router.post("/start", dependencies=[Depends(verify_api_key)])
@@ -23,8 +32,13 @@ async def start_bot(request: Request):
 
 
 @router.post("/stop", dependencies=[Depends(verify_api_key)])
-async def stop_bot(request: Request):
+async def stop_bot(request: Request, confirm: bool = False):
     """Gracefully stop the trading bot."""
+    if not confirm:
+        raise HTTPException(
+            status_code=400,
+            detail="This endpoint is destructive. Pass confirm=true to proceed.",
+        )
     bot = request.app.state.bot
     if not bot._running:
         return {"ok": False, "message": "Bot is not running"}
@@ -33,10 +47,22 @@ async def stop_bot(request: Request):
 
 
 @router.post("/restart", dependencies=[Depends(verify_api_key)])
-async def restart_bot(request: Request):
+async def restart_bot(request: Request, body: RestartRequest):
     """Stop then start the trading bot."""
+    if not body.confirm:
+        raise HTTPException(
+            status_code=400,
+            detail="This endpoint is destructive. Pass confirm=true to proceed.",
+        )
+
     bot = request.app.state.bot
     if bot._running:
+        position = await bot.exchange.get_position(bot.config.trading.symbol)
+        if position.is_open and not body.force:
+            raise HTTPException(
+                status_code=400,
+                detail="Cannot restart bot with open positions. Pass force=true to override.",
+            )
         await bot.stop("API restart request")
         # Give the loop a moment to clean up
         await asyncio.sleep(1)
@@ -59,17 +85,13 @@ async def get_state(request: Request):
     }
 
 
-class TradeRequest(BaseModel):
-    side: str
-
-
 @router.post("/trade/open", dependencies=[Depends(verify_api_key)])
 async def manual_open_trade(request: Request, body: TradeRequest):
     bot = request.app.state.bot
     if not bot._running:
         return {"ok": False, "message": "Bot is not running"}
 
-    position = await bot.exchange.fetch_position(bot.config.trading.symbol)
+    position = await bot.exchange.get_position(bot.config.trading.symbol)
     if position.is_open:
         return {"ok": False, "message": "Position already open"}
 
@@ -78,7 +100,7 @@ async def manual_open_trade(request: Request, body: TradeRequest):
         return {"ok": False, "message": "No price data"}
 
     current_price = float(ticker.get("last", 0))
-    balance = await bot.exchange.fetch_balance()
+    balance = await bot.exchange.get_balance()
 
     # We call _open_position using create_task so it runs in background
     asyncio.create_task(
@@ -94,7 +116,7 @@ async def manual_close_trade(request: Request):
     if not bot._running:
         return {"ok": False, "message": "Bot is not running"}
 
-    position = await bot.exchange.fetch_position(bot.config.trading.symbol)
+    position = await bot.exchange.get_position(bot.config.trading.symbol)
     if not position.is_open:
         return {"ok": False, "message": "No open position"}
 

@@ -8,14 +8,18 @@ from src.api.schemas import ConfigUpdate
 
 router = APIRouter(prefix="/bots", tags=["bots"])
 
+
 class BotCreateRequest(BaseModel):
     config: dict
+
 
 class BotUpdateRequest(BaseModel):
     config: dict
 
+
 class TradeRequest(BaseModel):
     side: str
+
 
 @router.get("")
 async def list_bots(request: Request):
@@ -24,6 +28,7 @@ async def list_bots(request: Request):
     if not manager:
         return []
     return manager.list_bots()
+
 
 @router.post("", dependencies=[Depends(verify_api_key)])
 async def create_bot(request: Request, body: BotCreateRequest):
@@ -34,6 +39,7 @@ async def create_bot(request: Request, body: BotCreateRequest):
     bot_id = await manager.create_bot(body.config)
     return {"ok": True, "bot_id": bot_id}
 
+
 @router.get("/{bot_id}")
 async def get_bot(request: Request, bot_id: str):
     """Get details for a specific bot."""
@@ -41,7 +47,7 @@ async def get_bot(request: Request, bot_id: str):
     bot = manager.get_bot(bot_id)
     if not bot:
         raise HTTPException(status_code=404, detail="Bot not found")
-        
+
     return {
         "id": bot_id,
         "config": bot.config.to_dict(),
@@ -53,6 +59,7 @@ async def get_bot(request: Request, bot_id: str):
         "wins": bot.risk.daily_stats.wins,
         "losses": bot.risk.daily_stats.losses,
     }
+
 
 @router.put("/{bot_id}", dependencies=[Depends(verify_api_key)])
 async def update_bot(request: Request, bot_id: str, body: ConfigUpdate):
@@ -67,6 +74,7 @@ async def update_bot(request: Request, bot_id: str, body: ConfigUpdate):
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
 
+
 @router.delete("/{bot_id}", dependencies=[Depends(verify_api_key)])
 async def delete_bot(request: Request, bot_id: str):
     """Delete a bot instance."""
@@ -76,6 +84,7 @@ async def delete_bot(request: Request, bot_id: str):
         raise HTTPException(status_code=404, detail="Bot not found")
     return {"ok": True, "message": "Bot deleted"}
 
+
 @router.post("/{bot_id}/start", dependencies=[Depends(verify_api_key)])
 async def start_bot(request: Request, bot_id: str):
     """Start a specific bot."""
@@ -83,24 +92,35 @@ async def start_bot(request: Request, bot_id: str):
     bot = manager.get_bot(bot_id)
     if not bot:
         raise HTTPException(status_code=404, detail="Bot not found")
-        
+
     success = await manager.start_bot(bot_id)
     if not success:
-        return {"ok": False, "message": "Bot is already running or could not be started"}
+        return {
+            "ok": False,
+            "message": "Bot is already running or could not be started",
+        }
     return {"ok": True, "message": "Bot started"}
 
+
 @router.post("/{bot_id}/stop", dependencies=[Depends(verify_api_key)])
-async def stop_bot(request: Request, bot_id: str):
+async def stop_bot(request: Request, bot_id: str, confirm: bool = False):
     """Stop a specific bot."""
+    if not confirm:
+        raise HTTPException(
+            status_code=400,
+            detail="This endpoint is destructive. Pass confirm=true to proceed.",
+        )
+
     manager = request.app.state.bot_manager
     bot = manager.get_bot(bot_id)
     if not bot:
         raise HTTPException(status_code=404, detail="Bot not found")
-        
+
     success = await manager.stop_bot(bot_id)
     if not success:
         return {"ok": False, "message": "Bot is not running or could not be stopped"}
     return {"ok": True, "message": "Bot stopped"}
+
 
 @router.post("/{bot_id}/trade/open", dependencies=[Depends(verify_api_key)])
 async def manual_open_trade(request: Request, bot_id: str, body: TradeRequest):
@@ -109,11 +129,11 @@ async def manual_open_trade(request: Request, bot_id: str, body: TradeRequest):
     bot = manager.get_bot(bot_id)
     if not bot:
         raise HTTPException(status_code=404, detail="Bot not found")
-        
+
     if not bot._running:
         return {"ok": False, "message": "Bot is not running"}
 
-    position = await bot.exchange.fetch_position(bot.config.trading.symbol)
+    position = await bot.exchange.get_position(bot.config.trading.symbol)
     if position.is_open:
         return {"ok": False, "message": "Position already open"}
 
@@ -122,13 +142,14 @@ async def manual_open_trade(request: Request, bot_id: str, body: TradeRequest):
         return {"ok": False, "message": "No price data"}
 
     current_price = float(ticker.get("last", 0))
-    balance = await bot.exchange.fetch_balance()
+    balance = await bot.exchange.get_balance()
 
     asyncio.create_task(
         bot._open_position(body.side, current_price, balance, reason="manual_trade")
     )
 
     return {"ok": True, "message": f"Manual {body.side} order initiated"}
+
 
 @router.post("/{bot_id}/trade/close", dependencies=[Depends(verify_api_key)])
 async def manual_close_trade(request: Request, bot_id: str):
@@ -137,11 +158,11 @@ async def manual_close_trade(request: Request, bot_id: str):
     bot = manager.get_bot(bot_id)
     if not bot:
         raise HTTPException(status_code=404, detail="Bot not found")
-        
+
     if not bot._running:
         return {"ok": False, "message": "Bot is not running"}
 
-    position = await bot.exchange.fetch_position(bot.config.trading.symbol)
+    position = await bot.exchange.get_position(bot.config.trading.symbol)
     if not position.is_open:
         return {"ok": False, "message": "No open position"}
 

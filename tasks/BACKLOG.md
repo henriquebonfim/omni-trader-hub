@@ -2,18 +2,19 @@
 
 Items requiring design decisions, external dependencies, or are lower-priority long-term investments. Reviewed each sprint — promote to TODO when scoped and ready.
 
-> Last updated: 2026-03-09 | **MULTI-ASSET PLATFORM EXPANSION (2026-03-09)**: B6→T37 (Bot Management), new T38-T42 added. T43 (Frontend Integration Bridge) added. Added B16-B20 for frontend nice-to-haves.
+> Last updated: 2026-03-11 | **MULTI-ASSET PLATFORM EXPANSION (2026-03-09)**: B6→T37 (Bot Management), new T38-T42 added. T43 (Frontend Integration Bridge) added. Added B16-B20 for frontend nice-to-haves.
 > Previous: 2026-03-05 — Memgraph consolidation: B1→T35, B4→T34, B11/B12→Memgraph, B13→T33, B14→absorbed. Completed: B8, B9
 
 ---
 
 ## Local Triage (No Open GitHub Issues) - 2026-03-11
 
-Fallback planning pass completed:
+Triage sync complete:
 
-- Promoted to `TASKS.md`: T45 (Intelligence real-data integration), T46 (SMC confirmation layer), T47 (frontend lint hardening).
-- Promoted to `TODO.md`: T48 (Alert/Notification Center), T49 (Correlation Matrix dashboard).
-- Remaining here as backlog candidates: B16 (Visual strategy builder), B18 (Trade journal), B20 (Theme toggle), and post-T35 research expansions.
+- Promoted items `T45-T54` are now completed and archived in `DONE.md`.
+- Active execution queue has been cleared in `TASKS.md`.
+- Promoted to `TODO.md` with labels/dependencies: `B2/B3/B5/B7/B15/B16/B18/B20` as `T55-T62`.
+- Remaining backlog candidates stay here only if deferred again in future triage.
 
 ---
 
@@ -27,15 +28,15 @@ Fallback planning pass completed:
 
 ### B2. Walk-Forward Validation Framework
 - **Priority**: CRITICAL
-- **Depends on**: T29 (backtesting engine)
+- **Depends on**: T35 (backtesting engine)
 - **Design needed**: Rolling train/test splits. Parameter stability analysis across windows. Detect overfitting via in-sample vs. out-of-sample performance decay.
-- **Status**: Waiting on T29 completion
+- **Status**: ✅ **PROMOTED to TODO.md T55** (2026-03-11) — labeled `[RESEARCH]`
 
 ### B3. Monte Carlo Stress Testing
 - **Priority**: HIGH
-- **Depends on**: T29 (backtesting engine)
+- **Depends on**: T35 (backtesting engine)
 - **Design needed**: Bootstrap trade sequences. Randomize entry timing ±N bars. Simulate 10,000 equity paths. Report: probability of >15% drawdown, >25% drawdown, risk of ruin.
-- **Status**: Waiting on T29 completion
+- **Status**: ✅ **PROMOTED to TODO.md T56** (2026-03-11) — labeled `[RESEARCH]`
 
 ### B4. Geopolitical & Macro Risk Module
 - **Priority**: HIGH — **active crisis (I4 (Graph Analytics)** (2026-03-05) — consolidated into graph layer
@@ -51,6 +52,7 @@ Fallback planning pass completed:
     - C) Use as entry refinement — sniper entries at order block zones after strategy signal
 - **Missing SMC features**: Order block detection, fair value gap identification, liquidity sweep detection. Current implementation only detects structure (BOS/CHoCH).
 - **Depends on**: Multi-timeframe data pipeline (currently only primary TF analyzed)
+- **Status**: ✅ **PROMOTED to TODO.md T57** (2026-03-11) — labeled `[RESEARCH]`
 
 ### B6. Portfolio Construction / Multi-Asset
 - **Status**: ✅ **PROMOTED to T37** (2026-03-09) — Multi-Asset Bot Management API
@@ -67,6 +69,7 @@ Fallback planning pass completed:
     - TWAP/VWAP for larger positions (relevant only at >$50k notional)
     - Adaptive execution: market orders for urgency, limit for patience
     - Stop-limit vs. stop-market tradeoff (stop-limit avoids bad fills but risks no fill)
+- **Status**: ✅ **PROMOTED to TODO.md T58** (2026-03-11) — labeled `[RESEARCH]`
 ELIMINATED** (2026-03-05) — Memgraph is schemaless; no migrations needed
 - **Note**: Alembic directory deleted, replaced by Memgraph index creation on startup
 
@@ -101,6 +104,7 @@ ELIMINATED** (2026-03-05) — Memgraph is schemaless; no migrations needed
     - Beta hedging mechanism (if correlated to BTC spot, hedge with inverse position)
     - Data sources: BTC dominance, sector indices, funding rate history
 - **Deferred**: Post-backtesting validation (after T35)
+- **Status**: ✅ **PROMOTED to TODO.md T59** (2026-03-11) — labeled `[RESEARCH]`
 
 ---
 
@@ -125,6 +129,7 @@ ELIMINATED** (2026-03-05) — Memgraph is schemaless; no migrations needed
 - **Depends on**: T40 (Custom Strategy System must work first)
 - **Frontend**: Would replace `StrategyConditionBuilder` component with a canvas-based node editor
 - **Backend**: No new backend work — same Custom Strategy JSON format
+- **Status**: ✅ **PROMOTED to TODO.md T60** (2026-03-11) — labeled `[IMPLEMENTATION]`
 
 ### B17. Correlation Matrix Dashboard
 - **Priority**: LOW (nice-to-have)
@@ -141,6 +146,7 @@ ELIMINATED** (2026-03-05) — Memgraph is schemaless; no migrations needed
 - Store as properties on `:Trade` nodes or separate `:Annotation` nodes
 - Frontend: expandable row in Trade History table with text editor
 - Ollama integration (T33): auto-generate trade post-mortem summary
+- **Status**: ✅ **PROMOTED to TODO.md T61** (2026-03-11) — labeled `[IMPLEMENTATION]`
 
 ### B19. Alert / Notification Center
 - **Priority**: MEDIUM
@@ -155,3 +161,4 @@ ELIMINATED** (2026-03-05) — Memgraph is schemaless; no migrations needed
 - **Design needed**: CSS variable-based theme system
 - Currently all PROMPT.md designs assume dark theme (zinc-950 background)
 - Frontend-only change — no backend work needed
+- **Status**: ✅ **PROMOTED to TODO.md T62** (2026-03-11) — labeled `[IMPLEMENTATION]`

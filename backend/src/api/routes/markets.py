@@ -9,6 +9,7 @@ logger = structlog.get_logger()
 
 router = APIRouter(tags=["markets"])
 
+
 class MarketInfo(BaseModel):
     symbol: str
     base: str
@@ -19,12 +20,17 @@ class MarketInfo(BaseModel):
     last_price: float
     status: str
 
+
 @router.get("/markets", response_model=List[MarketInfo])
 async def get_markets(
     request: Request,
     search: Optional[str] = Query(None, description="Filter by symbol, base or quote"),
-    quote: Optional[str] = Query(None, description="Filter by quote currency (e.g., USDT)"),
-    min_volume: Optional[float] = Query(None, description="Minimum 24h volume in quote currency"),
+    quote: Optional[str] = Query(
+        None, description="Filter by quote currency (e.g., USDT)"
+    ),
+    min_volume: Optional[float] = Query(
+        None, description="Minimum 24h volume in quote currency"
+    ),
 ):
     """
     Fetch active Binance Futures perpetual pairs.
@@ -39,7 +45,7 @@ async def get_markets(
     markets_data = []
 
     # Try to get from cache
-    redis_store = bot.redis
+    redis_store = getattr(bot, "redis", None)
     if redis_store:
         try:
             cached = await redis_store.get(cache_key)
@@ -70,11 +76,13 @@ async def get_markets(
         # Search filter
         if search:
             search_lower = search.lower()
-            if (search_lower not in m.get("symbol", "").lower() and
-                search_lower not in m.get("base", "").lower() and
-                search_lower not in m.get("quote", "").lower()):
+            if (
+                search_lower not in m.get("symbol", "").lower()
+                and search_lower not in m.get("base", "").lower()
+                and search_lower not in m.get("quote", "").lower()
+            ):
                 continue
-        
+
         # Quote filter
         if quote:
             if quote.lower() != m.get("quote", "").lower():
@@ -92,4 +100,3 @@ async def get_markets(
 
     # Return top 100
     return filtered_markets[:100]
-

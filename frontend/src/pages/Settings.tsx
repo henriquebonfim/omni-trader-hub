@@ -1,11 +1,17 @@
-import { useState, useEffect } from 'react';
+import { useAppStore } from '@/app/store/app-store';
+import { cn } from '@/core/utils';
+import {
+    fetchConfig,
+    fetchEnvVars,
+    fetchNotificationRules,
+    updateConfig,
+    updateNotificationRules,
+} from '@/domains/system/api';
+import type { EnvVariable, NotificationRules } from '@/domains/system/types';
 import { Panel } from '@/shared/components/Panel';
 import { StatusBadge } from '@/shared/components/StatusBadge';
-import { cn } from '@/core/utils';
-import { Eye, EyeOff, Save, RotateCcw, AlertTriangle, Send, CheckCircle, XCircle } from 'lucide-react';
-import { useAppStore } from '@/app/store/app-store';
-import { fetchConfig, updateConfig, fetchEnvVars } from '@/domains/system/api';
-import type { EnvVariable } from '@/domains/system/types';
+import { AlertTriangle, Eye, EyeOff, RotateCcw, Save, Send } from 'lucide-react';
+import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 
 type SettingsTab = 'general' | 'environment' | 'risk' | 'notifications' | 'exchange' | 'system';
@@ -240,23 +246,46 @@ function RiskTab({ config }: { config: AppConfig }) {
 }
 
 function NotificationsTab({ config }: { config: AppConfig }) {
-  const [checks, setChecks] = useState({
-    trades: config.notify_trades,
-    cb: config.notify_circuit_breakers,
-    daily: config.notify_daily_summary,
-    errors: config.notify_errors,
-    rotations: config.notify_strategy_rotations
+  const [rules, setRules] = useState<NotificationRules>({
+    circuit_breaker: true,
+    strategy_rotation: true,
+    regime_change: true,
+    pnl_thresholds: true,
+    pnl_warning_pct: 3.0,
+    pnl_critical_pct: 5.0,
   });
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    setChecks({
-      trades: config.notify_trades,
-      cb: config.notify_circuit_breakers,
-      daily: config.notify_daily_summary,
-      errors: config.notify_errors,
-      rotations: config.notify_strategy_rotations
-    });
+    fetchNotificationRules()
+      .then(setRules)
+      .catch(() => {
+        // Keep fallback defaults in local state if API is temporarily unavailable.
+      });
   }, [config]);
+
+  const toggleRule = (key: keyof NotificationRules) => {
+    if (typeof rules[key] !== 'boolean') return;
+    setRules((prev) => ({ ...prev, [key]: !(prev[key] as boolean) }));
+  };
+
+  const handleSaveRules = async () => {
+    setSaving(true);
+    try {
+      const normalized: NotificationRules = {
+        ...rules,
+        pnl_warning_pct: Number(rules.pnl_warning_pct),
+        pnl_critical_pct: Math.max(Number(rules.pnl_critical_pct), Number(rules.pnl_warning_pct)),
+      };
+      await updateNotificationRules(normalized);
+      setRules(normalized);
+      toast.success('Notification rules saved');
+    } catch {
+      toast.error('Failed to save notification rules');
+    } finally {
+      setSaving(false);
+    }
+  };
 
   return (
     <Panel title="Notification Settings">
@@ -270,18 +299,49 @@ function NotificationsTab({ config }: { config: AppConfig }) {
           </div>
         </SettingRow>
 
-        {Object.entries({ trades: 'Trade Executions', cb: 'Circuit Breakers', daily: 'Daily Summaries', errors: 'Errors', rotations: 'Strategy Rotations' }).map(([key, label]) => (
+        {Object.entries({
+          circuit_breaker: 'Circuit Breaker Alerts',
+          strategy_rotation: 'Strategy Rotation Alerts',
+          regime_change: 'Regime Change Alerts',
+          pnl_thresholds: 'PnL Threshold Alerts',
+        }).map(([key, label]) => (
           <SettingRow key={key} label={label}>
             <button
-              onClick={() => setChecks({ ...checks, [key]: !checks[key as keyof typeof checks] })}
-              className={cn('w-10 h-5 rounded-full relative transition-colors', checks[key as keyof typeof checks] ? 'bg-accent' : 'bg-secondary')}
+              onClick={() => toggleRule(key as keyof NotificationRules)}
+              className={cn('w-10 h-5 rounded-full relative transition-colors', rules[key as keyof NotificationRules] ? 'bg-accent' : 'bg-secondary')}
             >
-              <span className={cn('absolute top-0.5 w-4 h-4 rounded-full bg-foreground transition-transform', checks[key as keyof typeof checks] ? 'left-5' : 'left-0.5')} />
+              <span className={cn('absolute top-0.5 w-4 h-4 rounded-full bg-foreground transition-transform', rules[key as keyof NotificationRules] ? 'left-5' : 'left-0.5')} />
             </button>
           </SettingRow>
         ))}
 
-        <button className="flex items-center gap-2 px-4 py-2 rounded-md bg-accent text-primary-foreground text-xs font-semibold">
+        <SettingRow label="PnL Warning Threshold (%)">
+          <input
+            type="number"
+            min={0.1}
+            step={0.1}
+            value={rules.pnl_warning_pct}
+            onChange={(e) => setRules((prev) => ({ ...prev, pnl_warning_pct: Number(e.target.value) || 0.1 }))}
+            className="w-28 px-3 py-1.5 rounded-md border border-border bg-secondary/30 text-xs font-mono focus:outline-none focus:ring-1 focus:ring-accent"
+          />
+        </SettingRow>
+
+        <SettingRow label="PnL Critical Threshold (%)">
+          <input
+            type="number"
+            min={0.1}
+            step={0.1}
+            value={rules.pnl_critical_pct}
+            onChange={(e) => setRules((prev) => ({ ...prev, pnl_critical_pct: Number(e.target.value) || 0.1 }))}
+            className="w-28 px-3 py-1.5 rounded-md border border-border bg-secondary/30 text-xs font-mono focus:outline-none focus:ring-1 focus:ring-accent"
+          />
+        </SettingRow>
+
+        <button
+          onClick={handleSaveRules}
+          disabled={saving}
+          className="flex items-center gap-2 px-4 py-2 rounded-md bg-accent text-primary-foreground text-xs font-semibold disabled:opacity-60"
+        >
           <Save className="h-3.5 w-3.5" /> Save
         </button>
       </div>

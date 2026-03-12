@@ -57,8 +57,14 @@ async def update_config(updates: ConfigUpdate, request: Request):
     # Validate and convert to dict, excluding unset fields
     updates_dict = updates.model_dump(exclude_unset=True)
 
-    with open(_CONFIG_PATH) as f:
-        current = yaml.safe_load(f) or {}
+    try:
+        with open(_CONFIG_PATH) as f:
+            current = yaml.safe_load(f) or {}
+    except PermissionError as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Permission denied while reading {_CONFIG_PATH}",
+        ) from e
 
     # Deep-merge: only update keys provided
     def _merge(base: dict, patch: dict) -> dict:
@@ -71,8 +77,14 @@ async def update_config(updates: ConfigUpdate, request: Request):
 
     merged = _merge(current, updates_dict)
 
-    with open(_CONFIG_PATH, "w") as f:
-        yaml.dump(merged, f, default_flow_style=False, allow_unicode=True)
+    try:
+        with open(_CONFIG_PATH, "w") as f:
+            yaml.dump(merged, f, default_flow_style=False, allow_unicode=True)
+    except PermissionError as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Permission denied while writing {_CONFIG_PATH}",
+        ) from e
 
     # Reload bot configuration
     await bot.reload_config()

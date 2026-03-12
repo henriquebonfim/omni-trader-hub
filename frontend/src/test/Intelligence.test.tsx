@@ -6,7 +6,7 @@ mock.module('@/core/api', () => ({ request: mockRequest }));
 mock.module('@/lib/stubs', () => ({ stubMarkets: mock(() => []) }));
 
 // Import after mocking
-const { fetchSentiment, fetchCrisisStatus, fetchNews, fetchMarkets } = await import(
+const { fetchSentiment, fetchCrisisStatus, fetchNews, fetchMarkets, fetchCorrelationMatrix } = await import(
   '@/domains/market/api'
 );
 
@@ -46,6 +46,14 @@ describe('market api (real endpoints, no stubs)', () => {
   it('fetchNews propagates errors (no stub fallback)', async () => {
     mockRequest.mockRejectedValueOnce(new Error('network error'));
     await expect(fetchNews()).rejects.toThrow('network error');
+  });
+
+  it('fetchCorrelationMatrix calls /api/graph/correlation-matrix with query params', async () => {
+    mockRequest.mockResolvedValueOnce({ symbols: [], matrix: [] });
+    await fetchCorrelationMatrix({ timeframe: '4h', limit: 240, symbols: ['BTC/USDT', 'ETH/USDT'] });
+    expect(mockRequest).toHaveBeenCalledWith(
+      '/api/graph/correlation-matrix?timeframe=4h&limit=240&symbols=BTC%2FUSDT%2CETH%2FUSDT'
+    );
   });
 
   it('fetchMarkets falls back to stub on error', async () => {

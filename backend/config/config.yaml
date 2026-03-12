@@ -22,6 +22,13 @@ graph:
   rss_polling_interval: 300
   sentiment_aggregation_days: 30
 notifications:
+  alert_rules:
+    circuit_breaker: true
+    pnl_critical_pct: 5.0
+    pnl_thresholds: true
+    pnl_warning_pct: 3.0
+    regime_change: true
+    strategy_rotation: true
   discord_webhook: ${DISCORD_WEBHOOK_URL}
   enabled: true
 redis:

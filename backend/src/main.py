@@ -97,8 +97,11 @@ class OmniTrader:
         self.bot_id = bot_id
         self.config = config if config else get_config()
         self.exchange = ExchangeFactory.create_exchange()
+        self.redis = None
         self.database = DatabaseFactory.get_database(self.config)
-        self.risk = RiskManager(database=self.database, bot_id=bot_id, config=self.config)
+        self.risk = RiskManager(
+            database=self.database, bot_id=bot_id, config=self.config
+        )
         self.notifier = Notifier()
         self.regime_classifier = RegimeClassifier()
         self.crisis_manager = CrisisManager(database=self.database)
@@ -108,8 +111,9 @@ class OmniTrader:
 
         # Setup event handlers (domain events → notifier side effects)
         self._setup_event_handlers()
-        
+
         from src.strategy.selector import StrategySelector
+
         self.strategy_selector = StrategySelector(database=self.database)
         self.last_strategy_rotation = datetime.min.replace(tzinfo=timezone.utc)
 
@@ -118,7 +122,7 @@ class OmniTrader:
         logger.info("loading_strategy", name=strategy_name)
 
         # To support async database operations inside __init__ logic
-        # We define a helper that gets called inside start() instead, 
+        # We define a helper that gets called inside start() instead,
         # but for initial load we assume it might be a built-in strategy.
         try:
             strategy_class = get_strategy(strategy_name)
@@ -126,7 +130,9 @@ class OmniTrader:
             logger.info("strategy_loaded", metadata=self.strategy.metadata)
         except ValueError:
             # If it's custom, we load it dynamically later in start() or assume ema_volume for now
-            logger.warning("strategy_not_found_in_registry_deferring_load", name=strategy_name)
+            logger.warning(
+                "strategy_not_found_in_registry_deferring_load", name=strategy_name
+            )
             strategy_class = get_strategy("ema_volume")
             self.strategy = strategy_class(self.config)
         except Exception as e:
@@ -162,6 +168,87 @@ class OmniTrader:
         # Initialize to 60 so it runs immediately on first cycle
         self._weekly_check_counter = 60
         self._funding_check_counter = 0
+        self._last_regime = None
+
+    def _get_notification_rules(self) -> dict[str, float | bool]:
+        """Read alert rules from config with safe defaults."""
+        defaults: dict[str, float | bool] = {
+            "circuit_breaker": True,
+            "strategy_rotation": True,
+            "regime_change": True,
+            "pnl_thresholds": True,
+            "pnl_warning_pct": 3.0,
+            "pnl_critical_pct": 5.0,
+        }
+
+        notifications = getattr(self.config, "notifications", None)
+        raw_rules = getattr(notifications, "alert_rules", None)
+        if hasattr(raw_rules, "to_dict"):
+            raw_rules = raw_rules.to_dict()
+        if not isinstance(raw_rules, dict):
+            return defaults
+
+        merged = {**defaults, **raw_rules}
+        if float(merged["pnl_critical_pct"]) < float(merged["pnl_warning_pct"]):
+            merged["pnl_critical_pct"] = merged["pnl_warning_pct"]
+        return merged
+
+    def _alert_rule_enabled(self, rule_key: str) -> bool:
+        return bool(self._get_notification_rules().get(rule_key, True))
+
+    async def _emit_ws_alert(
+        self,
+        level: str,
+        title: str,
+        body: str,
+        *,
+        rule_key: str | None = None,
+    ) -> None:
+        """Broadcast a frontend alert message if WebSocket clients are connected."""
+        if not self.ws_manager:
+            return
+        if rule_key and not self._alert_rule_enabled(rule_key):
+            return
+
+        await self.ws_manager.broadcast(
+            {
+                "type": "alert",
+                "level": level,
+                "title": title,
+                "body": body,
+                "timestamp": int(datetime.now(timezone.utc).timestamp() * 1000),
+            }
+        )
+
+    async def _emit_ws_trade(self, action: str, payload: dict) -> None:
+        """Broadcast a frontend trade event message."""
+        if not self.ws_manager:
+            return
+
+        await self.ws_manager.broadcast(
+            {
+                "type": "trade",
+                "bot_id": "default",
+                "symbol": payload["symbol"],
+                "action": action,
+                "side": payload["side"],
+                "price": (
+                    payload.get("entry_price")
+                    if action == "OPEN"
+                    else payload.get("exit_price")
+                ),
+                "size": payload.get("size", 0.0),
+                "pnl": payload.get("pnl"),
+                "strategy": (
+                    getattr(self.strategy.metadata, "get", lambda *_: "unknown")(
+                        "name", "unknown"
+                    )
+                    if isinstance(self.strategy.metadata, dict)
+                    else "unknown"
+                ),
+                "timestamp": int(datetime.now(timezone.utc).timestamp() * 1000),
+            }
+        )
 
     def _setup_event_handlers(self) -> None:
         """Wire domain events to notifier side effects."""
@@ -179,6 +266,12 @@ class OmniTrader:
                 take_profit=payload["take_profit"],
                 leverage=payload.get("leverage", self.config.exchange.leverage),
             )
+            await self._emit_ws_trade("OPEN", payload)
+            await self._emit_ws_alert(
+                "info",
+                "Trade Opened",
+                f"{payload['symbol']} {payload['side'].upper()} opened at ${payload['entry_price']:,.2f}",
+            )
 
         async def on_position_closed(event) -> None:
             """Handle PositionClosed domain event."""
@@ -192,6 +285,27 @@ class OmniTrader:
                 pnl_pct=payload["pnl_pct"],
                 reason=payload["reason"],
             )
+            await self._emit_ws_trade("CLOSE", payload)
+
+            if self._alert_rule_enabled("pnl_thresholds"):
+                rules = self._get_notification_rules()
+                abs_pnl_pct = abs(float(payload["pnl_pct"]))
+                warning_pct = float(rules["pnl_warning_pct"])
+                critical_pct = float(rules["pnl_critical_pct"])
+                if abs_pnl_pct >= critical_pct:
+                    await self._emit_ws_alert(
+                        "critical",
+                        "PnL Threshold Hit",
+                        f"{payload['symbol']} closed at {payload['pnl_pct']:+.2f}% (critical >= {critical_pct:.2f}%).",
+                        rule_key="pnl_thresholds",
+                    )
+                elif abs_pnl_pct >= warning_pct:
+                    await self._emit_ws_alert(
+                        "warning",
+                        "PnL Threshold Warning",
+                        f"{payload['symbol']} closed at {payload['pnl_pct']:+.2f}% (warning >= {warning_pct:.2f}%).",
+                        rule_key="pnl_thresholds",
+                    )
 
         async def on_circuit_breaker_triggered(event) -> None:
             """Handle CircuitBreakerTriggered domain event."""
@@ -200,6 +314,12 @@ class OmniTrader:
                 daily_pnl=payload["daily_pnl"],
                 daily_pnl_pct=payload["daily_pnl_pct"],
                 limit_pct=payload["limit_pct"],
+            )
+            await self._emit_ws_alert(
+                "critical",
+                "Circuit Breaker Triggered",
+                f"Daily PnL {payload['daily_pnl_pct']:.2f}% breached limit -{payload['limit_pct']:.2f}%.",
+                rule_key="circuit_breaker",
             )
 
         async def on_emergency_close(event) -> None:
@@ -316,11 +436,14 @@ class OmniTrader:
                     self.strategy = strategy_class(self.config)
                 except ValueError:
                     from src.strategy.custom_executor import CustomStrategyExecutor
+
                     cs_data = await self.database.get_custom_strategy(new_strategy_name)
                     if cs_data:
                         self.strategy = CustomStrategyExecutor(self.config, cs_data)
                     else:
-                        raise ValueError(f"Strategy {new_strategy_name} not found") from None
+                        raise ValueError(
+                            f"Strategy {new_strategy_name} not found"
+                        ) from None
                 logger.info("strategy_switched", metadata=self.strategy.metadata)
             else:
                 self.strategy.update_config(self.config)
@@ -369,6 +492,7 @@ class OmniTrader:
         strategy_name = getattr(self.config.strategy, "name", "ema_volume")
         if self.strategy.metadata.get("name") != strategy_name:
             from src.strategy.custom_executor import CustomStrategyExecutor
+
             cs_data = await self.database.get_custom_strategy(strategy_name)
             if cs_data:
                 self.strategy = CustomStrategyExecutor(self.config, cs_data)
@@ -715,7 +839,7 @@ class OmniTrader:
     ):
         """Analyze strategy/regime/graph and apply gating rules."""
         strategy_mode = getattr(self.config.strategy, "mode", "manual")
-        
+
         # Determine regime first if in auto mode
         regime_value = MarketRegime.TRENDING.value
         primary_ohlcv_json = df_to_json(primary_ohlcv)
@@ -731,16 +855,36 @@ class OmniTrader:
             logger.warning("regime_analysis_failed_fallback_to_trending", error=str(e))
             current_regime_fallback = self.regime_classifier.analyze(primary_ohlcv)
             regime_value = current_regime_fallback.value
-            
+
         current_regime = MarketRegime(regime_value)
+
+        if self._last_regime and self._last_regime != current_regime.value:
+            await self._emit_ws_alert(
+                "info",
+                "Regime Change",
+                f"{symbol} shifted from {self._last_regime.upper()} to {current_regime.value.upper()}.",
+                rule_key="regime_change",
+            )
+        self._last_regime = current_regime.value
 
         # Handle strategy auto-selection
         if strategy_mode == "auto":
             now = datetime.now(timezone.utc)
-            if not current_side and (now - self.last_strategy_rotation).total_seconds() >= 14400: # 4 hours cooldown
-                best_strategy = await self.strategy_selector.get_best_strategy(current_regime)
+            if (
+                not current_side
+                and (now - self.last_strategy_rotation).total_seconds() >= 14400
+            ):  # 4 hours cooldown
+                best_strategy = await self.strategy_selector.get_best_strategy(
+                    current_regime
+                )
                 if best_strategy != getattr(self.config.strategy, "name", "ema_volume"):
-                    logger.info("strategy_rotated", old=getattr(self.config.strategy, "name", "ema_volume"), new=best_strategy, regime=current_regime.value)
+                    logger.info(
+                        "strategy_rotated",
+                        old=getattr(self.config.strategy, "name", "ema_volume"),
+                        new=best_strategy,
+                        regime=current_regime.value,
+                    )
+                    old_strategy = getattr(self.config.strategy, "name", "ema_volume")
                     self.config.strategy.name = best_strategy
                     try:
                         try:
@@ -750,13 +894,27 @@ class OmniTrader:
                             from src.strategy.custom_executor import (
                                 CustomStrategyExecutor,
                             )
-                            cs_data = await self.database.get_custom_strategy(best_strategy)
+
+                            cs_data = await self.database.get_custom_strategy(
+                                best_strategy
+                            )
                             if cs_data:
-                                self.strategy = CustomStrategyExecutor(self.config, cs_data)
+                                self.strategy = CustomStrategyExecutor(
+                                    self.config, cs_data
+                                )
                             else:
-                                raise ValueError(f"Strategy {best_strategy} not found") from None
+                                raise ValueError(
+                                    f"Strategy {best_strategy} not found"
+                                ) from None
                     except Exception as e:
                         logger.error("strategy_rotation_failed", error=str(e))
+                    else:
+                        await self._emit_ws_alert(
+                            "info",
+                            "Strategy Rotation",
+                            f"{symbol} switched from {old_strategy} to {best_strategy} ({current_regime.value.upper()}).",
+                            rule_key="strategy_rotation",
+                        )
                 self.last_strategy_rotation = now
 
         strategy_name = getattr(self.config.strategy, "name", "ema_volume")
@@ -764,26 +922,24 @@ class OmniTrader:
         market_data_json = market_data_to_json(market_data)
 
         try:
-            strategy_result_dict, graph_analytics_dict = (
-                await asyncio.gather(
-                    dispatch(
-                        analyze_strategy,
-                        strategy_name,
-                        config_dict,
-                        market_data_json,
-                        current_side,
-                        market_trend,
-                        timeout=25.0,
-                    ),
-                    dispatch(
-                        analyze_knowledge_graph,
-                        symbol,
-                        current_price,
-                        config_dict,
-                        timeout=25.0,
-                    ),
-                    return_exceptions=True,
-                )
+            strategy_result_dict, graph_analytics_dict = await asyncio.gather(
+                dispatch(
+                    analyze_strategy,
+                    strategy_name,
+                    config_dict,
+                    market_data_json,
+                    current_side,
+                    market_trend,
+                    timeout=25.0,
+                ),
+                dispatch(
+                    analyze_knowledge_graph,
+                    symbol,
+                    current_price,
+                    config_dict,
+                    timeout=25.0,
+                ),
+                return_exceptions=True,
             )
 
             if isinstance(strategy_result_dict, Exception):
@@ -877,6 +1033,7 @@ class OmniTrader:
             signal=result.signal.value,
             regime=current_regime.value,
             reason=result.reason,
+            strategy_name=getattr(self.config.strategy, "name", ""),
             indicators=sanitized_indicators,
         )
 
@@ -896,7 +1053,8 @@ class OmniTrader:
         if self.ws_manager:
             await self.ws_manager.broadcast(
                 {
-                    "type": "cycle",
+                    "type": "cycle_update",
+                    "bot_id": "default",
                     "timestamp": datetime.utcnow().isoformat(),
                     "symbol": symbol,
                     "price": current_price,
@@ -1200,7 +1358,7 @@ async def main():
     # Initialize BotManager and load bots
     bot_manager = BotManager()
     await bot_manager.load_bots()
-    
+
     # Pre-configure all loaded bots with the WebSocket manager
     for bot in bot_manager.bots.values():
         bot.ws_manager = _ws_manager
@@ -1219,14 +1377,14 @@ async def main():
 
     # Setup signal handlers for graceful shutdown
     loop = asyncio.get_event_loop()
-    
+
     def handle_shutdown(signum):
         sig_name = signal.Signals(signum).name
         logger.info("shutdown_signal_received", signal=sig_name)
-        
+
         # Stop all bots concurrently
         asyncio.create_task(bot_manager.stop_all())
-        
+
         # Stop uvicorn server
         server.should_exit = True
 
@@ -1238,10 +1396,9 @@ async def main():
     # Start all bots concurrently
     for bot_id in bot_manager.bots.keys():
         await bot_manager.start_bot(bot_id)
-    
+
     # Run the API server
     await server.serve()
-
 
 
 if __name__ == "__main__":

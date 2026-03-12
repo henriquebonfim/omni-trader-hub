@@ -1,7 +1,7 @@
 import { request } from '@/core/api';
 import { adaptConfig, reverseAdaptConfig } from '@/lib/adapters';
 import { stubEnvVars } from '@/lib/stubs';
-import type { AppConfig, EnvVariable } from './types';
+import type { AppConfig, EnvVariable, NotificationRules } from './types';
 
 export const fetchConfig = async () => {
   try {
@@ -37,5 +37,26 @@ export const updateEnvVars = async (vars: EnvVariable[]) => {
   } catch (e) {
     console.warn('updateEnvVars stubbed', e);
     return { requires_restart: true };
+  }
+};
+
+export const fetchNotificationRules = async () => {
+  try {
+    return await request<NotificationRules>('/api/notifications/rules');
+  } catch (e) {
+    console.error('fetchNotificationRules error', e);
+    throw e;
+  }
+};
+
+export const updateNotificationRules = async (rules: NotificationRules) => {
+  try {
+    return await request<{ ok: boolean; rules: NotificationRules }>('/api/notifications/rules', {
+      method: 'PUT',
+      body: JSON.stringify(rules),
+    });
+  } catch (e) {
+    console.error('updateNotificationRules error', e);
+    throw e;
   }
 };

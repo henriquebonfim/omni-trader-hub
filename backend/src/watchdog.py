@@ -28,10 +28,20 @@ structlog.configure(
 )
 logger = structlog.get_logger()
 
-HEALTH_URL = os.getenv("WATCHDOG_HEALTH_URL", "http://localhost:8000/api/health")
+HEALTH_URL = os.getenv("WATCHDOG_HEALTH_URL", "http://backend:8000/api/health")
 DISCORD_WEBHOOK_URL = os.getenv("DISCORD_WEBHOOK_URL")
 CHECK_INTERVAL = int(os.getenv("WATCHDOG_INTERVAL", "30"))
 MAX_FAILURES = int(os.getenv("WATCHDOG_RETRIES", "3"))
+STARTUP_RETRIES = int(os.getenv("WATCHDOG_STARTUP_RETRIES", "6"))
+STARTUP_RETRY_DELAY = int(os.getenv("WATCHDOG_STARTUP_RETRY_DELAY", "10"))
+
+
+def _check_health() -> bool:
+    try:
+        response = httpx.get(HEALTH_URL, timeout=5)
+        return response.status_code == 200
+    except Exception:
+        return False
 
 
 def send_alert(message: str):
@@ -56,6 +66,18 @@ def main():
     logger.info("watchdog_started", url=HEALTH_URL, interval=CHECK_INTERVAL)
     failures = 0
     alert_sent = False
+
+    # Avoid false-positive critical alerts while backend services are still starting.
+    for attempt in range(1, STARTUP_RETRIES + 1):
+        if _check_health():
+            logger.info("watchdog_startup_health_ok", attempt=attempt)
+            break
+        logger.warning(
+            "watchdog_startup_waiting_for_health",
+            attempt=attempt,
+            max_attempts=STARTUP_RETRIES,
+        )
+        time.sleep(STARTUP_RETRY_DELAY)
 
     while True:
         try:

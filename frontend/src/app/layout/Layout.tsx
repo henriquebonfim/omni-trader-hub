@@ -1,7 +1,10 @@
-import { Topbar } from './Topbar';
+import { useLiveFeed } from '@/core/ws';
 import { AppSidebar } from './AppSidebar';
+import { Topbar } from './Topbar';
 
 export function Layout({ children }: { children: React.ReactNode }) {
+  useLiveFeed();
+
   return (
     <div className="h-screen flex flex-col bg-background overflow-hidden">
       <Topbar />

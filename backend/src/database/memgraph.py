@@ -568,6 +568,7 @@ class MemgraphDatabase(BaseDatabase):
         signal: str,
         regime: str,
         reason: str,
+        strategy_name: str,
         indicators: dict,
     ) -> None:
         """Log a strategy signal with indicator snapshot."""
@@ -581,6 +582,7 @@ class MemgraphDatabase(BaseDatabase):
             signal: $signal,
             regime: $regime,
             reason: $reason,
+            strategy_name: $strategy_name,
             indicators: $indicators
         })
         """
@@ -594,6 +596,7 @@ class MemgraphDatabase(BaseDatabase):
                 signal=signal,
                 regime=regime,
                 reason=reason,
+                strategy_name=strategy_name,
                 indicators=json.dumps(indicators),
             )
             logger.info(
@@ -785,17 +788,19 @@ class MemgraphDatabase(BaseDatabase):
                 end_time=end_time,
             )
             records = await result.fetch(1000000)  # arbitrary large number
-            
+
             candles = []
             for record in records:
-                candles.append({
-                    "timestamp": record["timestamp"],
-                    "open": record["open"],
-                    "high": record["high"],
-                    "low": record["low"],
-                    "close": record["close"],
-                    "volume": record["volume"],
-                })
+                candles.append(
+                    {
+                        "timestamp": record["timestamp"],
+                        "open": record["open"],
+                        "high": record["high"],
+                        "low": record["low"],
+                        "close": record["close"],
+                        "volume": record["volume"],
+                    }
+                )
 
             return candles
 
@@ -922,21 +927,33 @@ class MemgraphDatabase(BaseDatabase):
 
             strategies = []
             for record in records:
-                strategies.append({
-                    "name": record["name"],
-                    "description": record["description"],
-                    "regime_affinity": json.loads(record["regime_affinity"] or "[]"),
-                    "entry_long_json": json.loads(record["entry_long_json"] or "[]"),
-                    "entry_short_json": json.loads(record["entry_short_json"] or "[]"),
-                    "exit_long_json": json.loads(record["exit_long_json"] or "[]"),
-                    "exit_short_json": json.loads(record["exit_short_json"] or "[]"),
-                    "indicators_json": json.loads(record["indicators_json"] or "[]"),
-                    "stop_loss_atr_mult": record["stop_loss_atr_mult"],
-                    "take_profit_atr_mult": record["take_profit_atr_mult"],
-                    "min_bars_between_entries": record["min_bars_between_entries"],
-                    "created_at": record["created_at"],
-                    "updated_at": record["updated_at"],
-                })
+                strategies.append(
+                    {
+                        "name": record["name"],
+                        "description": record["description"],
+                        "regime_affinity": json.loads(
+                            record["regime_affinity"] or "[]"
+                        ),
+                        "entry_long_json": json.loads(
+                            record["entry_long_json"] or "[]"
+                        ),
+                        "entry_short_json": json.loads(
+                            record["entry_short_json"] or "[]"
+                        ),
+                        "exit_long_json": json.loads(record["exit_long_json"] or "[]"),
+                        "exit_short_json": json.loads(
+                            record["exit_short_json"] or "[]"
+                        ),
+                        "indicators_json": json.loads(
+                            record["indicators_json"] or "[]"
+                        ),
+                        "stop_loss_atr_mult": record["stop_loss_atr_mult"],
+                        "take_profit_atr_mult": record["take_profit_atr_mult"],
+                        "min_bars_between_entries": record["min_bars_between_entries"],
+                        "created_at": record["created_at"],
+                        "updated_at": record["updated_at"],
+                    }
+                )
 
             return strategies
 

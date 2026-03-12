@@ -338,27 +338,7 @@
 
 ---
 
-### T39. TA-Lib Migration (Phase 9a) ✅ **COMPLETED 2026-03-09**
-- [x] **Phase 9a: Replace pandas-ta with TA-Lib in all strategies**
-    - Migrated all 5 strategies to TA-Lib:
-        - `adx_trend.py`: Uses `talib.ADX()`, `talib.EMA()`
-        - `bollinger_bands.py`: Uses `talib.BBANDS()`, `talib.RSI()`
-        - `breakout.py`: Uses `talib.MAX()`, `talib.MIN()` for Donchian channels
-        - `ema_volume.py`: Uses `talib.EMA()`, `talib.SMA()`
-        - `z_score.py`: Uses `talib.SMA()`, `talib.STDDEV()`
-    - Created `backend/src/indicators.py` adapter layer:
-        - `_as_float64()` helper for type safety (TA-Lib requires double precision)
-        - Maintains pandas-ta API compatibility (accepts/returns pandas Series)
-        - All TA-Lib calls wrapped with float64 conversion
-    - Removed `pandas-ta` from `requirements.txt`
-    - TA-Lib version: `TA-Lib==0.6.8` (compiled from source in Docker)
-    - All 134 tests passing with identical signal behavior
-    - **Completed**: 2026-03-09 | PR #66
-    - **Note**: Phases 9b (Indicator catalog API) and 9c (Compute endpoint) remain pending
-
----
-
-### T43. Frontend-Backend Integration Migration
+### T43. Frontend-Backend Integration Migration ✅ **COMPLETED 2026-03-11**
 - [x] **Phase 13a: Infrastructure — Vite proxy + Nginx upstream + auth**
     - `frontend/vite.config.ts`: dev proxy `/api/*` → `http://localhost:8000`, `/ws` → `ws://localhost:8000` (handles `/ws/live`)
     - `frontend/nginx.conf`: `upstream backend { server omnitrader:8000; }` + `proxy_pass` for `/api/` and `/ws/` (production)
@@ -535,5 +515,101 @@
     - Query params: `?search=SOL&quote=USDT&min_volume=1000000`; max 100 results
     - Used by frontend "Add Bot" drawer searchable symbol picker
 - **Completed**: 2026-03-10 | PR #74
+
+---
+
+### T45. Intelligence Frontend Real-Data Integration ✅ **COMPLETED 2026-03-11**
+- [x] Wired `frontend/src/pages/Intelligence.tsx` to live graph endpoints for sentiment, news, and crisis state
+- [x] Added loading and error handling for each intelligence surface
+- [x] Removed mock-only dependencies from the page path and added focused frontend tests
+- **Completed**: 2026-03-11 | PR #76
+
+---
+
+### T46. SMC Confirmation Layer Integration ✅ **COMPLETED 2026-03-11**
+- [x] Added SMC confirmation config flags to strategy settings
+- [x] Integrated BOS/CHoCH bias confirmation as a filter layer in base strategy signal flow
+- [x] Added backend coverage for enabled, disabled, and missing-data paths
+- **Completed**: 2026-03-11 | PR #77
+
+---
+
+### T47. T43 Frontend Lint Hardening Follow-up ✅ **COMPLETED 2026-03-11**
+- [x] Verified frontend source was already free of explicit `any` usage
+- [x] Enabled `@typescript-eslint/no-explicit-any` as an error-level lint rule
+- [x] Confirmed frontend lint remains clean with the stricter rule enabled
+- **Completed**: 2026-03-11 | PR #78
+
+---
+
+### T48. Alert and Notification Center (B19 Promotion) ✅ **COMPLETED 2026-03-11**
+- [x] Added persisted notification rule API endpoints: `GET/PUT /api/notifications/rules`
+- [x] Added notification alert rule defaults to backend config (`circuit_breaker`, `strategy_rotation`, `regime_change`, `pnl_thresholds`, warning/critical thresholds)
+- [x] Emitted real WebSocket `alert` and `trade` messages from domain events and cycle analysis transitions
+- [x] Fixed cycle broadcast payload type to `cycle_update` for frontend compatibility
+- [x] Connected frontend live feed globally and wired dashboard/topbar alert rendering to store-backed live alerts
+- [x] Wired Settings notification tab to load/save persisted alert rules
+- **Validation**:
+    - `pytest -q tests/test_api_notifications.py tests/test_api_auth.py` → 6 passed
+    - `ruff check src tests/test_api_auth.py tests/test_api_notifications.py` → clean
+    - `bun run lint` → 0 errors (7 pre-existing warnings)
+    - `bun run build` → success
+
+---
+
+### T49. Correlation Matrix Analytics API + Dashboard (B17 Promotion) ✅ **COMPLETED 2026-03-11**
+- [x] Added backend endpoint `GET /api/graph/correlation-matrix` for rolling return correlation on active/selected symbols
+- [x] Added frontend market-domain correlation API + types
+- [x] Added reusable `CorrelationHeatmap` component and integrated it into `RiskMonitor` and `Intelligence`
+- [x] Added backend API test coverage in `backend/tests/test_api_graph.py`
+- [x] Added frontend API unit test coverage for correlation query wiring
+- **Validation**:
+    - `ruff check src/api/routes/graph.py tests/test_api_graph.py` → clean
+    - `bun test src/test/Intelligence.test.tsx` → 8 passed
+    - `bun run lint` → 0 errors (7 pre-existing warnings)
+    - `pytest ...` blocked in local env: `ImportError: cannot import name 'abstract' from 'talib'`
+    - `bun run build` blocked in local env: `EACCES` unlink in `frontend/dist/assets/*`
+
+---
+
+### T50. Runtime Startup Crash: BotManager Memgraph Driver Not Connected ✅ **COMPLETED 2026-03-11**
+- [x] Added BotManager startup guard to ensure Memgraph connection is established before persisted bot-state lookup
+- [x] Verified `omnitrader` startup no longer crashes with `_driver is None` path
+- **Validation**:
+    - Docker runtime health check reaches `healthy`
+    - Targeted backend tests pass in container
+
+---
+
+### T51. Graph News Endpoint Contract Drift (Frontend vs Backend) ✅ **COMPLETED 2026-03-11**
+- [x] Added `GET /api/graph/news` list endpoint aligned with frontend intelligence feed contract
+- [x] Removed obsolete/conflicting graph stubs so real graph route path is authoritative
+- [x] Added/updated graph API regression coverage for news feed response shape
+- **Validation**:
+    - In-container probe: `/api/graph/news` returns `200` with list payload
+    - Graph API test suite passes
+
+---
+
+### T52. Crisis Toggle API Contract Drift (JSON Body vs Query Param) ✅ **COMPLETED 2026-03-11**
+- [x] Updated `PUT /api/graph/crisis` to support JSON body payload (`{"active": ...}`) while remaining backward-compatible with query params
+- [x] Added focused API test coverage for JSON payload update path
+- **Validation**:
+    - In-container probe: `PUT /api/graph/crisis` with JSON body returns `200`
+    - Graph API test suite passes
+
+---
+
+### T53. Task Ledger Hygiene: Deduplicate and Normalize DONE Entries ✅ **COMPLETED 2026-03-11**
+- [x] Removed duplicate `T39` entry
+- [x] Normalized `T43` heading to match completion format used throughout DONE ledger
+- [x] Added archival entries for completed post-T49 remediation tasks (`T50-T52`)
+
+---
+
+### T54. Queue Metadata Consistency Across TASKS/TODO/BACKLOG ✅ **COMPLETED 2026-03-11**
+- [x] Updated `TASKS.md` to active-queue state after post-T49 remediation completion
+- [x] Updated `TODO.md` and `BACKLOG.md` local triage notes to remove stale promotion state
+- [x] Aligned queue narrative so active work, forward queue, and backlog candidates are non-conflicting
 
 ---

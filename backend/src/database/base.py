@@ -122,6 +122,7 @@ class BaseDatabase(ABC):
         signal: str,
         regime: str,
         reason: str,
+        strategy_name: str,
         indicators: dict,
     ) -> None:
         """Log a strategy signal with indicator snapshot."""

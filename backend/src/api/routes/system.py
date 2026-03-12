@@ -14,6 +14,7 @@ router = APIRouter(prefix="/system", tags=["system"])
 
 
 class RestartRequest(BaseModel):
+    confirm: bool = False
     force: bool = False
 
 
@@ -25,10 +26,16 @@ async def restart_system(request: Request, body: RestartRequest):
     """
     bot = request.app.state.bot
 
+    if not body.confirm:
+        raise HTTPException(
+            status_code=400,
+            detail="This endpoint is destructive. Pass confirm=true to proceed.",
+        )
+
     if bot and bot._running:
         # Check for open positions
         try:
-            position = await bot.exchange.fetch_position(bot.config.trading.symbol)
+            position = await bot.exchange.get_position(bot.config.trading.symbol)
             if position.is_open and not body.force:
                 raise HTTPException(
                     status_code=400,
@@ -39,7 +46,7 @@ async def restart_system(request: Request, body: RestartRequest):
         except Exception as e:
             logger.error("restart_position_check_failed", error=str(e))
             if not body.force:
-                 raise HTTPException(
+                raise HTTPException(
                     status_code=500,
                     detail="Failed to check open positions. Pass force=True to override.",
                 ) from e
@@ -47,7 +54,7 @@ async def restart_system(request: Request, body: RestartRequest):
         # Gracefully stop the bot before restarting
         logger.info("system_restart_requested", force=body.force)
         await bot.stop("System restart requested via API")
-        await asyncio.sleep(1) # Give it a moment to cleanup
+        await asyncio.sleep(1)  # Give it a moment to cleanup
 
     # Terminate the current python process
     # Docker/watchdog is expected to restart the container

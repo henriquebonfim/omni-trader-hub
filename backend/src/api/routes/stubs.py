@@ -49,26 +49,6 @@ async def close_trade(bot_id: str):
     return stub_response("T37")
 
 
-@router.get("/graph/sentiment/{symbol}")
-async def get_sentiment(symbol: str):
-    return stub_response("T33")
-
-
-@router.get("/graph/crisis")
-async def get_crisis():
-    return stub_response("T34")
-
-
-@router.put("/graph/crisis")
-async def toggle_crisis():
-    return stub_response("T34")
-
-
-@router.get("/graph/news")
-async def get_news():
-    return stub_response("T33")
-
-
 @router.post("/backtest/run")
 async def run_backtest():
     return stub_response("T35")
