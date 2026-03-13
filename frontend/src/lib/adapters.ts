@@ -5,6 +5,22 @@ import type { EquitySnapshot, Trade } from '@/domains/trade/types';
 
 type JsonObject = Record<string, unknown>;
 
+function normalizeRegimeAffinity(value: unknown): Strategy['regime_affinity'] {
+  const valid: Strategy['regime_affinity'][] = ['trending', 'ranging', 'volatile', 'all'];
+  if (typeof value === 'string' && valid.includes(value as Strategy['regime_affinity'])) {
+    return value as Strategy['regime_affinity'];
+  }
+  if (Array.isArray(value)) {
+    const matches = value.filter((entry): entry is Strategy['regime_affinity'] =>
+      typeof entry === 'string' && valid.includes(entry as Strategy['regime_affinity'])
+    );
+    if (matches.length === 1) {
+      return matches[0];
+    }
+  }
+  return 'all';
+}
+
 export function adaptBotState(backendStatus: JsonObject, backendPosition: JsonObject, backendBalance: JsonObject): Bot {
   let position: Position | null = null;
   if (backendPosition && backendPosition.is_open) {
@@ -74,7 +90,7 @@ export function adaptStrategy(backendStrategy: JsonObject): Strategy {
   return {
     name: String(backendStrategy.name ?? ''),
     description: String(backendStrategy.description ?? ((backendStrategy.metadata as JsonObject | undefined)?.description ?? '')),
-    regime_affinity: (backendStrategy.regime_affinity as Strategy['regime_affinity']) || 'all',
+    regime_affinity: normalizeRegimeAffinity(backendStrategy.regime_affinity),
     builtin: backendStrategy.type !== 'custom',
     win_rate: backendStrategy.win_rate as number | undefined,
     sharpe: (backendStrategy.sharpe_ratio as number | undefined) ?? (backendStrategy.sharpe as number | undefined),

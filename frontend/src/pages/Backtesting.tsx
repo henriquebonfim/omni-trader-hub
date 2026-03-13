@@ -1,12 +1,12 @@
-import { useState } from 'react';
-import { Panel } from '@/shared/components/Panel';
-import { StatusBadge } from '@/shared/components/StatusBadge';
-import { mockStrategies } from '@/domains/strategy/mocks';
-import { mockBacktestResults } from '@/domains/trade/mocks';
-import { mockMarkets } from '@/domains/market/mocks';
 import { cn } from '@/core/utils';
-import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, BarChart, Bar, Cell } from 'recharts';
-import { Play, Download } from 'lucide-react';
+import { fetchMarkets } from '@/domains/market/api';
+import type { MarketPair } from '@/domains/market/types';
+import { fetchStrategies } from '@/domains/strategy/api';
+import { mockBacktestResults } from '@/domains/trade/mocks';
+import { Panel } from '@/shared/components/Panel';
+import { Download, Play } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { Area, AreaChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 
 const metricTargets: Record<string, { target: number; better: 'higher' | 'lower' }> = {
   sharpe_ratio: { target: 1.0, better: 'higher' },
@@ -16,23 +16,59 @@ const metricTargets: Record<string, { target: number; better: 'higher' | 'lower'
   win_rate_pct: { target: 45, better: 'higher' },
 };
 
-import { runBacktest, fetchBacktestResults } from '@/domains/trade/api';
+import type { Strategy } from '@/domains/strategy/types';
+import { fetchBacktestResults, runBacktest } from '@/domains/trade/api';
 import type { BacktestResults } from '@/domains/trade/types';
+import { useSearchParams } from 'react-router-dom';
 
 export default function Backtesting() {
-  const [symbol, setSymbol] = useState('BTC/USDT');
-  const [strategy, setStrategy] = useState('ADX Trend');
-  const [timeframe, setTimeframe] = useState('1h');
+  const [searchParams] = useSearchParams();
+  const [symbol, setSymbol] = useState(searchParams.get('symbol') || 'BTC/USDT');
+  const [strategy, setStrategy] = useState(searchParams.get('strategy') || 'ADX Trend');
+  const [timeframe, setTimeframe] = useState(searchParams.get('timeframe') || '1h');
+  const [startDate, setStartDate] = useState(searchParams.get('start_date') || '2024-01-01');
+  const [endDate, setEndDate] = useState(searchParams.get('end_date') || '2024-06-30');
   const [running, setRunning] = useState(false);
   const [hasResults, setHasResults] = useState(true);
   const [r, setR] = useState<BacktestResults>(mockBacktestResults);
+  const [markets, setMarkets] = useState<MarketPair[]>([]);
+  const [strategies, setStrategies] = useState<Strategy[]>([]);
+
+  useEffect(() => {
+    fetchMarkets().then(setMarkets).catch(console.error);
+    fetchStrategies().then(setStrategies).catch(console.error);
+  }, []);
+
+  const marketOptions = markets;
+  const strategyOptions = strategies;
+
+  const presets: Array<{ label: string; start: string; end: string; timeframe: string }> = [
+    { label: 'Bear Market 2022', start: '2022-01-01', end: '2022-12-31', timeframe: '4h' },
+    { label: 'Bull Run 2024', start: '2024-01-01', end: '2024-12-31', timeframe: '1h' },
+    { label: 'Last 6 Months', start: new Date(Date.now() - 180 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10), end: new Date().toISOString().slice(0, 10), timeframe: '1h' },
+  ];
+
+  const handleExportEquityCsv = () => {
+    const header = 'timestamp,equity,drawdown\n';
+    const rows = r.equity_curve.map((point) => `${point.timestamp},${point.equity},${point.drawdown}`);
+    const csv = [header.trimEnd(), ...rows].join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', `equity-curve-${symbol.replace('/', '-')}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+  };
 
   const handleRun = async () => {
     setRunning(true);
     try {
       const res = await runBacktest({
         symbol, strategy, timeframe,
-        start_date: '2024-01-01', end_date: '2024-06-30',
+        start_date: startDate, end_date: endDate,
         initial_capital: 10000, position_size_pct: 5, leverage: 3
       });
       const results = await fetchBacktestResults(res.id);
@@ -55,13 +91,15 @@ export default function Backtesting() {
           <div>
             <label className="text-[11px] text-muted-foreground mb-1 block">Symbol</label>
             <select value={symbol} onChange={e => setSymbol(e.target.value)} className="w-full px-2 py-1.5 rounded-md border border-border bg-secondary/30 text-xs focus:outline-none focus:ring-1 focus:ring-accent">
-              {mockMarkets.map(m => <option key={m.symbol} value={m.symbol}>{m.symbol}</option>)}
+              {marketOptions.length === 0 && <option value="">No live symbols</option>}
+              {marketOptions.map(m => <option key={m.symbol} value={m.symbol}>{m.symbol}</option>)}
             </select>
           </div>
           <div>
             <label className="text-[11px] text-muted-foreground mb-1 block">Strategy</label>
             <select value={strategy} onChange={e => setStrategy(e.target.value)} className="w-full px-2 py-1.5 rounded-md border border-border bg-secondary/30 text-xs focus:outline-none focus:ring-1 focus:ring-accent">
-              {mockStrategies.map(s => <option key={s.name} value={s.name}>{s.name}</option>)}
+              {strategyOptions.length === 0 && <option value="">No live strategies</option>}
+              {strategyOptions.map(s => <option key={s.name} value={s.name}>{s.name}</option>)}
             </select>
           </div>
           <div>
@@ -90,12 +128,21 @@ export default function Backtesting() {
 
         {/* Presets */}
         <div className="flex gap-2 mt-3">
-          {['Bear Market 2022', 'Bull Run 2024', 'Last 6 Months'].map(p => (
-            <button key={p} className="px-2.5 py-1 rounded-md border border-border text-[11px] text-muted-foreground hover:text-foreground hover:bg-secondary/50 transition-colors">
-              {p}
+          {presets.map(p => (
+            <button
+              key={p.label}
+              onClick={() => {
+                setStartDate(p.start);
+                setEndDate(p.end);
+                setTimeframe(p.timeframe);
+              }}
+              className="px-2.5 py-1 rounded-md border border-border text-[11px] text-muted-foreground hover:text-foreground hover:bg-secondary/50 transition-colors"
+            >
+              {p.label}
             </button>
           ))}
         </div>
+        <p className="mt-2 text-[11px] text-muted-foreground">Range: {startDate} to {endDate}</p>
       </Panel>
 
       {hasResults && (
@@ -140,7 +187,7 @@ export default function Backtesting() {
           </div>
 
           {/* Equity Chart */}
-          <Panel title="Equity Curve" actions={<button className="text-[11px] text-accent flex items-center gap-1"><Download className="h-3 w-3" /> Export</button>}>
+          <Panel title="Equity Curve" actions={<button onClick={handleExportEquityCsv} className="text-[11px] text-accent flex items-center gap-1"><Download className="h-3 w-3" /> Export</button>}>
             <div className="h-[300px]">
               <ResponsiveContainer width="100%" height="100%">
                 <AreaChart data={r.equity_curve}>

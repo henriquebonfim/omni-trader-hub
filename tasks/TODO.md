@@ -2,29 +2,29 @@
 
 Forward-looking queue only. Completed work is archived in DONE.md, and active execution work belongs in TASKS.md.
 
-> Last updated: 2026-03-11 | Sprint: Next-sprint queue
+> Last updated: 2026-03-12 | Sprint: Next-sprint queue
 
 ---
 
 ## CRITICAL — Runtime-Breaking Bugs
 
-### T63. [BUG] Fix exchange method name mismatches in API routes
+### T63. [BUG] Normalize OHLCV contract between exchange adapters and backtest engine
 - **Priority**: CRITICAL
 - **Depends on**: None
-- **Scope**: `bot.py:72,97`, `bots.py:116,144`, `system.py:31` call `exchange.fetch_position()` and `exchange.fetch_balance()` — methods that do not exist on `BaseExchange`. Correct names are `get_position()` and `get_balance()`. All three endpoints throw `AttributeError` at runtime.
-- **Files**: `backend/src/api/routes/bot.py`, `backend/src/api/routes/bots.py`, `backend/src/api/routes/system.py`
+- **Scope**: `CCXTExchange.fetch_ohlcv()` returns a Pandas DataFrame, while `BacktestEngine.run()` expects a list of candle dictionaries with integer millisecond timestamps. The live execution path cannot feed fetched historical data into the backtest engine without ad hoc conversion.
+- **Files**: `backend/src/exchanges/ccxt_adapter.py`, `backend/src/exchanges/base.py`, `backend/src/backtest/engine.py`
 
-### T64. [BUG] Add `redis` attribute to `OmniTrader` (markets endpoint crash)
+### T64. [BUG] Fix shutdown cleanup for WebSocket and CCXT client resources
 - **Priority**: CRITICAL
 - **Depends on**: None
-- **Scope**: `markets.py:42` reads `bot.redis` but `OmniTrader` never defines `self.redis`. The markets endpoint throws `AttributeError` in production (test fixture masks this with `MagicMock`). Add `self.redis = aioredis.from_url(...)` in `OmniTrader.__init__` or inject via app state.
-- **Files**: `backend/src/api/routes/markets.py`, `backend/src/main.py`
+- **Scope**: Restarting the stack produces `asyncio.CancelledError` traces, explicit CCXT warnings about missing `await exchange.close()`, and unclosed `aiohttp` client sessions. The bot stop path needs deterministic shutdown ordering and task cancellation for WS feed and exchange resources.
+- **Files**: `backend/src/main.py`, `backend/src/ws_feed.py`, `backend/src/exchanges/ccxt_adapter.py`
 
-### T65. [BUG] Fix `bot.db` → `bot.database` in indicators route
+### T65. [SECURITY] Stop printing full auto-generated API keys to logs/stdout
 - **Priority**: CRITICAL
 - **Depends on**: None
-- **Scope**: `indicators.py:102` checks `if not bot or not bot.db:`. Runtime bot uses `bot.database`. Indicator computation endpoint always short-circuits as if the database is missing.
-- **Files**: `backend/src/api/routes/indicators.py`
+- **Scope**: Dev-mode auth initialization prints the entire generated bearer token to stdout on startup. This is unsafe in shared terminals, CI logs, and container logs. Replace it with masked output or a one-time secure retrieval path.
+- **Files**: `backend/src/api/auth.py`
 
 ---
 
@@ -32,7 +32,7 @@ Forward-looking queue only. Completed work is archived in DONE.md, and active ex
 
 ### T66. [BUG] Fix strategy selector Cypher schema mismatch
 - **Priority**: HIGH
-- **Depends on**: T63 (stable route layer before testing auto-mode)
+- **Depends on**: None
 - **Scope**: `selector.py:42` queries `(:Trade)-[:TRIGGERED_BY]->(:Signal)`, `t.status='closed'`, `s.strategy_name` — none of which exist in the actual Memgraph schema. Auto-selection always falls back to `adx_trend` regardless of performance history.
 - **Options**: (A) Add `strategy_name` to Signal nodes and create `:TRIGGERED_BY` relationship in `memgraph.py` trade-close writer; (B) rewrite selector query against existing Trade + Signal fields.
 - **Files**: `backend/src/strategy/selector.py`, `backend/src/database/memgraph.py`
@@ -44,11 +44,17 @@ Forward-looking queue only. Completed work is archived in DONE.md, and active ex
 - **Resolution**: Standardize to `:MENTIONS` — update `ingestor.py` to write `:MENTIONS`, or update all graph route queries to use `:IMPACTS`.
 - **Files**: `backend/src/intelligence/ingestor.py`, `backend/src/api/routes/graph.py`
 
-### T68. [BUG] Add Celery Beat schedule for `ingest_news_cycle`
+### T68. [BUG] Run Celery Beat in the deployed stack so `ingest_news_cycle` actually executes
 - **Priority**: HIGH
 - **Depends on**: None
-- **Scope**: `ingest_news_cycle` Celery task is implemented but `workers/__init__.py` defines no `beat_schedule`. News ingestion never runs automatically; the news graph accumulates no live data unless triggered manually.
-- **Files**: `backend/src/workers/__init__.py`
+- **Scope**: `workers/__init__.py` already defines a beat schedule, but the compose stack only starts a Celery worker and never launches a Beat process. News ingestion still never runs automatically in production-like runtime.
+- **Files**: `backend/src/workers/__init__.py`, `compose.yml`, `compose.dev.yml`
+
+### T74. [FEATURE] Add a live signals API endpoint backed by persisted `Signal` nodes
+- **Priority**: HIGH
+- **Depends on**: None
+- **Scope**: Signals are persisted through `database.log_signal(...)`, but there is no `/api/signals` route in the current API surface. Monitoring and dashboard flows cannot retrieve recent signal history directly.
+- **Files**: `backend/src/api/__init__.py`, `backend/src/api/routes`, `backend/src/database/memgraph.py`
 
 ---
 
@@ -66,33 +72,57 @@ Forward-looking queue only. Completed work is archived in DONE.md, and active ex
 - **Scope**: Engine currently simulates fills at bar close with no market impact model. Add configurable slippage (fixed bps, vol-scaled, or empirical) and spread cost per trade. Required for realistic P&L reporting and execution policy validation.
 - **Files**: `backend/src/backtest/engine.py`
 
+### T75. [IMPROVEMENT] Add executable walk-forward runner over real fetched history
+- **Priority**: MEDIUM
+- **Depends on**: T55
+- **Scope**: `generate_walk_forward_splits()` exists, but there is no integrated runner that fetches enough history, validates horizon sufficiency, executes train/test windows, and summarizes out-of-sample performance. In the live run, a 1,000-bar sample produced zero monthly splits.
+- **Files**: `backend/src/backtest/metrics.py`, `backend/src/backtest/engine.py`
+
+### T76. [IMPROVEMENT] Improve runtime reporting surface for backtest and trade analytics
+- **Priority**: MEDIUM
+- **Depends on**: T69
+- **Scope**: Current monitoring surface exposes health, status, trades, and indicators, but there is no API/report contract for equity curves, drawdowns, bootstrap CI, or backtest summaries. Add a reporting endpoint or export layer aligned with the implemented metrics.
+- **Files**: `backend/src/api/routes/trades.py`, `backend/src/backtest/engine.py`, `backend/src/backtest/metrics.py`
+
 ---
 
 ## LOW — Test Coverage Gaps
 
-### T71. [TEST] Add integration tests for live exchange method naming
-- **Priority**: LOW
-- **Depends on**: T63
-- **Scope**: `test_api_bot.py` and `test_api_bots.py` mock at the fixture level (injecting `MagicMock` exchange), masking the `fetch_position` vs `get_position` naming bug. Add contract tests that call `hasattr(exchange, 'get_position')` against all concrete `BaseExchange` implementations.
-- **Files**: `backend/tests/test_api_bots.py`, `backend/tests/test_api_bot.py`
-
-### T72. [TEST] Add live-schema integration test for strategy selector
+### T71. [TEST] Add live-schema integration test for strategy selector
 - **Priority**: LOW
 - **Depends on**: T66
 - **Scope**: `test_selector.py` mocks the DB driver with pre-canned records, hiding the Cypher schema mismatch. Add a test that runs the selector query against an in-memory Memgraph instance (or validated fixture data) to assert correct field and relationship names.
 - **Files**: `backend/tests/test_selector.py`
 
-### T73. [TEST] Add end-to-end news ingestion + graph route test
+### T72. [TEST] Add end-to-end news ingestion + graph route test
 - **Priority**: LOW
 - **Depends on**: T67
 - **Scope**: No test validates the round-trip: ingestor writes `:IMPACTS`/`:MENTIONS` → graph route reads back data for the same asset. Add a parametrized integration test fixture that seeds a news event and asserts the graph route returns it.
 - **Files**: `backend/tests/test_ingestor.py`, `backend/tests/test_api_graph.py`
 
+### T73. [TEST] Add regression coverage for exchange-to-backtest OHLCV normalization
+- **Priority**: LOW
+- **Depends on**: T63
+- **Scope**: Current tests validate backtest behavior with fixture candles, but not the real adapter output shape. Add a contract test that uses concrete exchange adapter output or a DataFrame-shaped fixture and verifies the normalization path into `BacktestEngine.run()`.
+- **Files**: `backend/tests/test_backtest.py`, `backend/tests/test_exchanges.py`
+
+### T77. [TEST] Fix unawaited AsyncMock warning in crisis integration tests
+- **Priority**: LOW
+- **Depends on**: None
+- **Scope**: `make test` passes but still emits an unawaited coroutine warning from `test_crisis_integration.py` via the circuit-breaker path in `main.py`. Clean up the mock/await contract so the suite is warning-free.
+- **Files**: `backend/tests/test_crisis_integration.py`, `backend/src/main.py`
+
+### T78. [DOC] Reconcile README/API documentation with the actual runtime surface
+- **Priority**: LOW
+- **Depends on**: None
+- **Scope**: Some operator-facing docs and assumptions lag behind the actual stack behavior and API surface. Update documentation to reflect current routes, Memgraph-first persistence, auth behavior, and implemented reporting capabilities.
+- **Files**: `README.md`, `tasks/TODO.md`, `tasks/BACKLOG.md`
+
 ---
 
-## Local Triage (No Open GitHub Issues) - 2026-03-11
+## Local Triage (No Open GitHub Issues) - 2026-03-12
 
-Promoted from BACKLOG with explicit research labels and dependency mapping.
+Runtime verification completed against the live Docker stack. Stale items removed where the current code already matches the intended behavior, and newly verified runtime gaps have been promoted into the queue.
 
 ---
 

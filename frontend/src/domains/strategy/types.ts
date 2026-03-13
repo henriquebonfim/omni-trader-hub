@@ -28,3 +28,13 @@ export interface IndicatorConfig {
   params: Record<string, number>;
   output_name: string;
 }
+
+export interface StrategyPerformanceEntry {
+  name: string;
+  regime: Exclude<Strategy['regime_affinity'], 'all'>;
+  sample_size: number;
+  sharpe: number;
+  profit_factor: number;
+  win_rate: number;
+  composite_score: number;
+}

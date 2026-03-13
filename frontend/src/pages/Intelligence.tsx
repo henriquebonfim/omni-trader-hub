@@ -1,5 +1,5 @@
 import { cn } from '@/core/utils';
-import { fetchCorrelationMatrix, fetchCrisisStatus, fetchNews, fetchSentiment } from '@/domains/market/api';
+import { fetchCorrelationMatrix, fetchCrisisStatus, fetchMacroIndicators, fetchNews, fetchSentiment, toggleCrisisMode } from '@/domains/market/api';
 import type { CorrelationMatrixData, NewsItem, SentimentData } from '@/domains/market/types';
 import type { CrisisStatus } from '@/domains/system/types';
 import { CorrelationHeatmap } from '@/shared/components/CorrelationHeatmap';
@@ -11,10 +11,12 @@ import { useEffect, useState } from 'react';
 
 export default function Intelligence() {
   const [newsFilter, setNewsFilter] = useState<'all' | 'high' | 'asset'>('all');
+  const [selectedAsset, setSelectedAsset] = useState<string>('BTC/USDT');
   const [sentimentData, setSentimentData] = useState<SentimentData | null>(null);
   const [crisisStatus, setCrisisStatus] = useState<CrisisStatus | null>(null);
   const [news, setNews] = useState<NewsItem[]>([]);
   const [correlationData, setCorrelationData] = useState<CorrelationMatrixData | null>(null);
+  const [fearGreed, setFearGreed] = useState<number | null>(null);
 
   const [loadingSentiment, setLoadingSentiment] = useState(true);
   const [errorSentiment, setErrorSentiment] = useState(false);
@@ -48,14 +50,27 @@ export default function Intelligence() {
       .then(res => { setCorrelationData(res); setErrorCorrelation(false); })
       .catch(e => { console.error(e); setErrorCorrelation(true); })
       .finally(() => setLoadingCorrelation(false));
+
+    fetchMacroIndicators()
+      .then((rows) => {
+        const fg = rows.find(r => r.name === 'Fear & Greed Index');
+        setFearGreed(fg ? fg.value : null);
+      })
+      .catch(console.error);
   }, []);
 
   const sentiment = sentimentData?.score || 0;
   const crisisActive = crisisStatus?.active || false;
+  const fearGreedValue = fearGreed ?? 62;
+  const fearGreedLabel = fearGreedValue > 70 ? 'Extreme Greed' : fearGreedValue > 55 ? 'Greed' : fearGreedValue > 45 ? 'Neutral' : fearGreedValue > 30 ? 'Fear' : 'Extreme Fear';
+  const divergenceDetected = Math.abs(sentiment) >= 0.5;
 
+  const allAssets = Array.from(new Set(news.flatMap((item) => item.assets))).sort();
   const filteredNews = newsFilter === 'high'
     ? news.filter(n => n.impact_level > 0.7)
-    : news;
+    : newsFilter === 'asset'
+      ? news.filter((n) => n.assets.includes(selectedAsset))
+      : news;
 
   const sentimentLabel = sentiment > 0.5 ? 'Bullish' : sentiment > 0.2 ? 'Slightly Bullish' : sentiment > -0.2 ? 'Neutral' : sentiment > -0.5 ? 'Slightly Bearish' : 'Bearish';
   const sentimentEmoji = sentiment > 0.5 ? '😊' : sentiment > 0.2 ? '🙂' : sentiment > -0.2 ? '😐' : sentiment > -0.5 ? '😟' : '😢';
@@ -113,7 +128,10 @@ export default function Intelligence() {
                   <p className="text-[11px] text-muted-foreground mt-1">Leverage: 1×, Position: 0.5%, ADX Trend only</p>
                 )}
               </div>
-              <button className="mt-3 w-full py-2 rounded-md border border-border text-xs font-medium hover:bg-secondary/50 transition-colors">
+              <button
+                onClick={() => toggleCrisisMode(!crisisActive).then(() => fetchCrisisStatus().then(setCrisisStatus)).catch(console.error)}
+                className="mt-3 w-full py-2 rounded-md border border-border text-xs font-medium hover:bg-secondary/50 transition-colors"
+              >
                 {crisisActive ? 'Deactivate Crisis Mode' : 'Activate Crisis Mode'}
               </button>
             </>
@@ -127,13 +145,13 @@ export default function Intelligence() {
               <svg viewBox="0 0 36 36" className="h-16 w-16 -rotate-90">
                 <circle cx="18" cy="18" r="15" fill="none" stroke="hsl(var(--border))" strokeWidth="3" />
                 <circle cx="18" cy="18" r="15" fill="none" stroke="hsl(var(--yellow))" strokeWidth="3"
-                  strokeDasharray={`${62 * 94.2 / 100} 94.2`} strokeLinecap="round" />
+                  strokeDasharray={`${fearGreedValue * 94.2 / 100} 94.2`} strokeLinecap="round" />
               </svg>
-              <span className="absolute inset-0 flex items-center justify-center text-sm font-bold font-mono">62</span>
+              <span className="absolute inset-0 flex items-center justify-center text-sm font-bold font-mono">{Math.round(fearGreedValue)}</span>
             </div>
             <div>
-              <p className="text-sm font-semibold text-warning">Greed</p>
-              <p className="text-[11px] text-muted-foreground">+3 from yesterday</p>
+              <p className="text-sm font-semibold text-warning">{fearGreedLabel}</p>
+              <p className="text-[11px] text-muted-foreground">{fearGreed !== null ? 'Live from graph macro feed' : 'Fallback value'}</p>
             </div>
           </div>
         </Panel>
@@ -149,13 +167,15 @@ export default function Intelligence() {
       </div>
 
       {/* Divergence alert banner */}
-      <div className="rounded-md border border-warning/30 bg-warning/5 p-3 flex items-center gap-3">
-        <AlertTriangle className="h-4 w-4 text-warning shrink-0" />
-        <div>
-          <p className="text-xs font-medium text-warning">Divergence Detected</p>
-          <p className="text-[11px] text-muted-foreground">Price action diverging from sentiment on BTC/USDT. Monitor closely.</p>
+      {divergenceDetected && (
+        <div className="rounded-md border border-warning/30 bg-warning/5 p-3 flex items-center gap-3">
+          <AlertTriangle className="h-4 w-4 text-warning shrink-0" />
+          <div>
+            <p className="text-xs font-medium text-warning">Divergence Detected</p>
+            <p className="text-[11px] text-muted-foreground">Sentiment is at {sentiment.toFixed(2)} on BTC/USDT. Monitor position sizing and drawdown closely.</p>
+          </div>
         </div>
-      </div>
+      )}
 
       <Panel title="Cross-Asset Correlation" subtitle="Rolling return relationships across active symbols">
         {loadingCorrelation ? (
@@ -176,7 +196,7 @@ export default function Intelligence() {
       <Panel
         title="News Feed"
         actions={
-          <div className="flex gap-1">
+          <div className="flex gap-1 items-center">
             {(['all', 'high', 'asset'] as const).map(f => (
               <button
                 key={f}
@@ -190,6 +210,21 @@ export default function Intelligence() {
                 {f === 'high' ? 'High Impact' : f === 'asset' ? 'By Asset' : 'All'}
               </button>
             ))}
+            {newsFilter === 'asset' && (
+              <select
+                value={selectedAsset}
+                onChange={(e) => setSelectedAsset(e.target.value)}
+                className="px-2 py-0.5 rounded border border-border bg-secondary/30 text-[11px] focus:outline-none focus:ring-1 focus:ring-accent"
+              >
+                {allAssets.length === 0 ? (
+                  <option value="">No assets</option>
+                ) : (
+                  allAssets.map((asset) => (
+                    <option key={asset} value={asset}>{asset}</option>
+                  ))
+                )}
+              </select>
+            )}
           </div>
         }
       >

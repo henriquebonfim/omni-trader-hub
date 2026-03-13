@@ -1,7 +1,12 @@
 import { request } from '@/core/api';
 import type { CrisisStatus } from '@/domains/system/types';
-import { stubMarkets } from '@/lib/stubs';
 import type { CorrelationMatrixData, MarketPair, NewsItem, SentimentData } from './types';
+
+export interface MacroIndicator {
+  name: string;
+  value: number;
+  timestamp: number;
+}
 
 export const fetchSentiment = async (symbol: string) => {
   return request<SentimentData>(`/api/graph/sentiment/${encodeURIComponent(symbol)}`);
@@ -18,13 +23,12 @@ export const fetchNews = async () => {
   return request<NewsItem[]>('/api/graph/news');
 };
 
+export const fetchMacroIndicators = async () => {
+  return request<MacroIndicator[]>('/api/graph/macro');
+};
+
 export const fetchMarkets = async () => {
-  try {
-    return await request<MarketPair[]>('/api/markets');
-  } catch (e) {
-    console.warn('fetchMarkets stubbed', e);
-    return stubMarkets();
-  }
+  return request<MarketPair[]>('/api/markets');
 };
 
 export const fetchCorrelationMatrix = async (

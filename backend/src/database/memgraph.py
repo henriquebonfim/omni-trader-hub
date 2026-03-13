@@ -568,11 +568,12 @@ class MemgraphDatabase(BaseDatabase):
         signal: str,
         regime: str,
         reason: str,
-        strategy_name: str,
-        indicators: dict,
+        strategy_name: str = "",
+        indicators: Optional[dict] = None,
     ) -> None:
         """Log a strategy signal with indicator snapshot."""
         timestamp = int(time.time() * 1000)  # ms epoch
+        indicators = indicators or {}
 
         query = """
         CREATE (s:Signal {

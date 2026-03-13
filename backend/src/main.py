@@ -490,7 +490,14 @@ class OmniTrader:
 
         # Load custom strategy if needed
         strategy_name = getattr(self.config.strategy, "name", "ema_volume")
-        if self.strategy.metadata.get("name") != strategy_name:
+        try:
+            built_in_strategy = get_strategy(strategy_name)
+        except ValueError:
+            built_in_strategy = None
+
+        if built_in_strategy is None or not isinstance(
+            self.strategy, built_in_strategy
+        ):
             from src.strategy.custom_executor import CustomStrategyExecutor
 
             cs_data = await self.database.get_custom_strategy(strategy_name)

@@ -13,10 +13,15 @@ router = APIRouter(tags=["trades"], dependencies=[Depends(verify_api_key)])
 async def get_trades(
     request: Request,
     limit: int = Query(default=50, ge=1, le=500),
+    symbol: str | None = Query(
+        None, description="Filter trades by trading pair, e.g. BTC/USDT"
+    ),
 ):
-    """Recent trade history."""
+    """Recent trade history, optionally filtered by symbol."""
     bot = request.app.state.bot
     trades = await bot.database.get_recent_trades(limit=limit)
+    if symbol:
+        trades = [t for t in trades if t.get("symbol") == symbol]
     return {"trades": trades, "count": len(trades)}
 
 

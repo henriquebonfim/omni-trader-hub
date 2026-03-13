@@ -1,16 +1,13 @@
-import { Activity, Bell, Settings, Wifi, WifiOff, ChevronDown } from 'lucide-react';
-import { StatusBadge } from '@/shared/components/StatusBadge';
 import { useAppStore } from '@/app/store/app-store';
+import { StatusBadge } from '@/shared/components/StatusBadge';
+import { Activity, Bell, ChevronDown, Settings, Wifi, WifiOff } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { cn } from '@/core/utils';
-import { useState, useRef, useEffect } from 'react';
-import { mockAlerts } from '@/domains/system/mocks';
 
 export function Topbar() {
   const { wsStatus, bots, unreadAlerts, markAlertsRead, alerts } = useAppStore();
   const [showAlerts, setShowAlerts] = useState(false);
   const alertRef = useRef<HTMLDivElement>(null);
-  const displayAlerts = alerts.length > 0 ? alerts : mockAlerts;
 
   const activeBots = bots.filter(b => b.status === 'running');
   const activeSymbols = activeBots.map(b => b.symbol);
@@ -38,7 +35,7 @@ export function Topbar() {
         <button className="flex items-center gap-2 px-3 py-1.5 rounded-md border border-border bg-secondary/50 hover:bg-secondary text-xs transition-colors">
           <span className="text-muted-foreground">Active:</span>
           <span className="font-medium">
-            {activeSymbols.length > 0 ? activeSymbols.slice(0, 3).join(', ') : 'BTC/USDT, ETH/USDT, SOL/USDT'}
+            {activeSymbols.length > 0 ? activeSymbols.slice(0, 3).join(', ') : 'No active symbols'}
           </span>
           {activeSymbols.length > 3 && (
             <StatusBadge variant="info" size="sm">+{activeSymbols.length - 3}</StatusBadge>
@@ -77,20 +74,24 @@ export function Topbar() {
               <div className="p-3 border-b border-border">
                 <h4 className="text-xs font-semibold">Alerts</h4>
               </div>
-              {displayAlerts.map((a, i) => (
-                <div key={i} className="px-3 py-2.5 border-b border-border/50 hover:bg-secondary/30 last:border-0">
-                  <div className="flex items-center gap-2 mb-0.5">
-                    <StatusBadge
-                      variant={a.level === 'critical' ? 'danger' : a.level === 'warning' ? 'warning' : 'info'}
-                      size="sm"
-                    >
-                      {a.level}
-                    </StatusBadge>
-                    <span className="text-xs font-medium">{a.title}</span>
+              {alerts.length === 0 ? (
+                <div className="px-3 py-4 text-[11px] text-muted-foreground">No live alerts yet.</div>
+              ) : (
+                alerts.map((a, i) => (
+                  <div key={i} className="px-3 py-2.5 border-b border-border/50 hover:bg-secondary/30 last:border-0">
+                    <div className="flex items-center gap-2 mb-0.5">
+                      <StatusBadge
+                        variant={a.level === 'critical' ? 'danger' : a.level === 'warning' ? 'warning' : 'info'}
+                        size="sm"
+                      >
+                        {a.level}
+                      </StatusBadge>
+                      <span className="text-xs font-medium">{a.title}</span>
+                    </div>
+                    <p className="text-[11px] text-muted-foreground">{a.body}</p>
                   </div>
-                  <p className="text-[11px] text-muted-foreground">{a.body}</p>
-                </div>
-              ))}
+                ))
+              )}
             </div>
           )}
         </div>

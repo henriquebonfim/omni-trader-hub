@@ -1,14 +1,19 @@
-import { beforeEach, describe, expect, it, mock } from 'bun:test';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const mockRequest = mock(() => Promise.resolve({}));
+const { mockRequest } = vi.hoisted(() => ({
+  mockRequest: vi.fn(() => Promise.resolve({})),
+}));
 
-mock.module('@/core/api', () => ({ request: mockRequest }));
-mock.module('@/lib/stubs', () => ({ stubMarkets: mock(() => []) }));
+vi.mock('@/core/api', () => ({ request: mockRequest }));
+vi.mock('@/lib/stubs', () => ({ stubMarkets: vi.fn(() => []) }));
 
-// Import after mocking
-const { fetchSentiment, fetchCrisisStatus, fetchNews, fetchMarkets, fetchCorrelationMatrix } = await import(
-  '@/domains/market/api'
-);
+import {
+    fetchCorrelationMatrix,
+    fetchCrisisStatus,
+    fetchMarkets,
+    fetchNews,
+    fetchSentiment,
+} from '@/domains/market/api';
 
 describe('market api (real endpoints, no stubs)', () => {
   beforeEach(() => {

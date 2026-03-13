@@ -1,13 +1,23 @@
 import { useAppStore } from '@/app/store/app-store';
+import { request } from '@/core/api';
 import { cn } from '@/core/utils';
 import {
-    fetchConfig,
-    fetchEnvVars,
-    fetchNotificationRules,
-    updateConfig,
-    updateNotificationRules,
+  backupDatabase,
+  fetchConfig,
+  fetchDiscordWebhook,
+  fetchEnvVars,
+  fetchNotificationRules,
+  fetchStatusSummary,
+  fetchSystemInfo,
+  restartSystem,
+  testDiscordWebhook,
+  updateConfig,
+  updateDiscordWebhook,
+  updateEnvVars,
+  updateNotificationRules,
+  type SystemInfo,
 } from '@/domains/system/api';
-import type { EnvVariable, NotificationRules } from '@/domains/system/types';
+import type { AppConfig, EnvVariable, NotificationRules } from '@/domains/system/types';
 import { Panel } from '@/shared/components/Panel';
 import { StatusBadge } from '@/shared/components/StatusBadge';
 import { AlertTriangle, Eye, EyeOff, RotateCcw, Save, Send } from 'lucide-react';
@@ -27,12 +37,25 @@ export default function SettingsPage() {
     fetchEnvVars().then(setEnvVars).catch(console.error);
   }, [setConfig]);
 
-  const handleSaveConfig = async () => {
+  const handleSaveConfig = async (nextConfig: AppConfig, successMessage = 'Configuration saved') => {
     try {
-      await updateConfig(config);
-      toast.success('Configuration saved');
+      await updateConfig(nextConfig);
+      setConfig(nextConfig);
+      toast.success(successMessage);
     } catch (e) {
       toast.error('Failed to save configuration');
+    }
+  };
+
+  const handleRestartServices = async () => {
+    if (!window.confirm('Restart backend services now? This may briefly interrupt API responses.')) {
+      return;
+    }
+    try {
+      await restartSystem();
+      toast.success('Restart requested');
+    } catch {
+      toast.error('Failed to restart services');
     }
   };
 
@@ -65,24 +88,23 @@ export default function SettingsPage() {
         ))}
       </div>
 
-        {tab === 'general' && <GeneralTab config={config} />}
-        {tab === 'environment' && <EnvironmentTab envVars={envVars} />}
-        {tab === 'risk' && <RiskTab config={config} />}
+        {tab === 'general' && <GeneralTab config={config} onSave={handleSaveConfig} />}
+        {tab === 'environment' && <EnvironmentTab envVars={envVars} onRestart={handleRestartServices} />}
+        {tab === 'risk' && <RiskTab config={config} onSave={handleSaveConfig} />}
         {tab === 'notifications' && <NotificationsTab config={config} />}
-        {tab === 'exchange' && <ExchangeTab config={config} />}
+        {tab === 'exchange' && <ExchangeTab config={config} onSave={handleSaveConfig} />}
       {tab === 'system' && <SystemTab />}
     </div>
   );
 }
 
-import type { AppConfig } from '@/domains/system/types';
-
-function GeneralTab({ config }: { config: AppConfig }) {
+function GeneralTab({ config, onSave }: { config: AppConfig; onSave: (config: AppConfig, successMessage?: string) => Promise<void> }) {
   const [mode, setMode] = useState<'paper' | 'live'>(config.mode);
   const [leverage, setLeverage] = useState(config.default_leverage);
   const [posSize, setPosSize] = useState(config.default_position_size_pct);
   const [autoStrategy, setAutoStrategy] = useState(config.auto_strategy_mode);
   const [timeframe, setTimeframe] = useState(config.default_timeframe);
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     setMode(config.mode);
@@ -91,6 +113,25 @@ function GeneralTab({ config }: { config: AppConfig }) {
     setAutoStrategy(config.auto_strategy_mode);
     setTimeframe(config.default_timeframe);
   }, [config]);
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      await onSave(
+        {
+          ...config,
+          mode,
+          default_leverage: leverage,
+          default_position_size_pct: posSize,
+          auto_strategy_mode: autoStrategy,
+          default_timeframe: timeframe,
+        },
+        'General settings saved'
+      );
+    } finally {
+      setSaving(false);
+    }
+  };
 
   return (
     <Panel title="General Settings">
@@ -134,17 +175,22 @@ function GeneralTab({ config }: { config: AppConfig }) {
           </button>
         </SettingRow>
 
-        <button className="flex items-center gap-2 px-4 py-2 rounded-md bg-accent text-primary-foreground text-xs font-semibold hover:bg-accent/90 transition-colors">
-          <Save className="h-3.5 w-3.5" /> Save Changes
+        <button
+          onClick={handleSave}
+          disabled={saving}
+          className="flex items-center gap-2 px-4 py-2 rounded-md bg-accent text-primary-foreground text-xs font-semibold hover:bg-accent/90 transition-colors disabled:opacity-60"
+        >
+          <Save className="h-3.5 w-3.5" /> {saving ? 'Saving…' : 'Save Changes'}
         </button>
       </div>
     </Panel>
   );
 }
 
-function EnvironmentTab({ envVars }: { envVars: EnvVariable[] }) {
+function EnvironmentTab({ envVars, onRestart }: { envVars: EnvVariable[]; onRestart: () => Promise<void> }) {
   const [vars, setVars] = useState(envVars);
   const [revealed, setRevealed] = useState<Set<string>>(new Set());
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     setVars(envVars);
@@ -161,6 +207,18 @@ function EnvironmentTab({ envVars }: { envVars: EnvVariable[] }) {
   };
 
   const categories = [...new Set(vars.map(v => v.category))];
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      const result = await updateEnvVars(vars);
+      toast.success(result.requires_restart ? 'Saved — service restart required' : 'Environment variables saved');
+    } catch {
+      toast.error('Failed to save environment variables');
+    } finally {
+      setSaving(false);
+    }
+  };
 
   return (
     <div className="space-y-4">
@@ -201,10 +259,14 @@ function EnvironmentTab({ envVars }: { envVars: EnvVariable[] }) {
       ))}
 
       <div className="flex gap-2">
-        <button className="flex items-center gap-2 px-4 py-2 rounded-md bg-accent text-primary-foreground text-xs font-semibold hover:bg-accent/90 transition-colors">
-          <Save className="h-3.5 w-3.5" /> Save Changes
+        <button
+          onClick={handleSave}
+          disabled={saving}
+          className="flex items-center gap-2 px-4 py-2 rounded-md bg-accent text-primary-foreground text-xs font-semibold hover:bg-accent/90 transition-colors disabled:opacity-60"
+        >
+          <Save className="h-3.5 w-3.5" /> {saving ? 'Saving…' : 'Save Changes'}
         </button>
-        <button className="flex items-center gap-2 px-4 py-2 rounded-md border border-warning/50 text-warning text-xs font-medium hover:bg-warning/10 transition-colors">
+        <button onClick={onRestart} className="flex items-center gap-2 px-4 py-2 rounded-md border border-warning/50 text-warning text-xs font-medium hover:bg-warning/10 transition-colors">
           <RotateCcw className="h-3.5 w-3.5" /> Restart Services
         </button>
       </div>
@@ -212,33 +274,70 @@ function EnvironmentTab({ envVars }: { envVars: EnvVariable[] }) {
   );
 }
 
-function RiskTab({ config }: { config: AppConfig }) {
+function RiskTab({ config, onSave }: { config: AppConfig; onSave: (config: AppConfig, successMessage?: string) => Promise<void> }) {
+  const [maxDailyLoss, setMaxDailyLoss] = useState(config.max_daily_loss_pct);
+  const [maxWeeklyLoss, setMaxWeeklyLoss] = useState(config.max_weekly_loss_pct);
+  const [consecutiveLossLimit, setConsecutiveLossLimit] = useState(config.consecutive_loss_limit);
+  const [stopLossMode, setStopLossMode] = useState<AppConfig['stop_loss_mode']>(config.stop_loss_mode);
+  const [blackSwanThreshold, setBlackSwanThreshold] = useState(config.black_swan_threshold);
+  const [autoDeleverageDrawdown, setAutoDeleverageDrawdown] = useState(config.auto_deleverage_drawdown_pct);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    setMaxDailyLoss(config.max_daily_loss_pct);
+    setMaxWeeklyLoss(config.max_weekly_loss_pct);
+    setConsecutiveLossLimit(config.consecutive_loss_limit);
+    setStopLossMode(config.stop_loss_mode);
+    setBlackSwanThreshold(config.black_swan_threshold);
+    setAutoDeleverageDrawdown(config.auto_deleverage_drawdown_pct);
+  }, [config]);
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      await onSave(
+        {
+          ...config,
+          max_daily_loss_pct: maxDailyLoss,
+          max_weekly_loss_pct: maxWeeklyLoss,
+          consecutive_loss_limit: consecutiveLossLimit,
+          stop_loss_mode: stopLossMode,
+          black_swan_threshold: blackSwanThreshold,
+          auto_deleverage_drawdown_pct: autoDeleverageDrawdown,
+        },
+        'Risk defaults saved'
+      );
+    } finally {
+      setSaving(false);
+    }
+  };
+
   return (
     <Panel title="Risk Defaults">
       <div className="space-y-4 max-w-lg">
-        <SettingRow label="Max Daily Loss: 5%">
-          <input type="range" min={1} max={20} defaultValue={5} className="w-full accent-accent" />
+        <SettingRow label={`Max Daily Loss: ${maxDailyLoss}%`}>
+          <input type="range" min={1} max={20} value={maxDailyLoss} onChange={e => setMaxDailyLoss(Number(e.target.value))} className="w-full accent-accent" />
         </SettingRow>
-        <SettingRow label="Max Weekly Loss: 10%">
-          <input type="range" min={1} max={30} defaultValue={10} className="w-full accent-accent" />
+        <SettingRow label={`Max Weekly Loss: ${maxWeeklyLoss}%`}>
+          <input type="range" min={1} max={30} value={maxWeeklyLoss} onChange={e => setMaxWeeklyLoss(Number(e.target.value))} className="w-full accent-accent" />
         </SettingRow>
-        <SettingRow label="Consecutive Loss Limit: 3">
-          <input type="range" min={1} max={10} defaultValue={3} className="w-full accent-accent" />
+        <SettingRow label={`Consecutive Loss Limit: ${consecutiveLossLimit}`}>
+          <input type="range" min={1} max={10} value={consecutiveLossLimit} onChange={e => setConsecutiveLossLimit(Number(e.target.value))} className="w-full accent-accent" />
         </SettingRow>
         <SettingRow label="Stop Loss Mode">
           <div className="flex gap-2">
-            <button className="px-3 py-1.5 rounded-md border border-accent bg-accent/10 text-accent text-xs">ATR Multiplier</button>
-            <button className="px-3 py-1.5 rounded-md border border-border text-muted-foreground text-xs">Fixed %</button>
+            <button onClick={() => setStopLossMode('atr')} className={cn('px-3 py-1.5 rounded-md border text-xs', stopLossMode === 'atr' ? 'border-accent bg-accent/10 text-accent' : 'border-border text-muted-foreground')}>ATR Multiplier</button>
+            <button onClick={() => setStopLossMode('fixed')} className={cn('px-3 py-1.5 rounded-md border text-xs', stopLossMode === 'fixed' ? 'border-accent bg-accent/10 text-accent' : 'border-border text-muted-foreground')}>Fixed %</button>
           </div>
         </SettingRow>
-        <SettingRow label="Black Swan Threshold: 10%">
-          <input type="range" min={5} max={25} defaultValue={10} className="w-full accent-accent" />
+        <SettingRow label={`Black Swan Threshold: ${blackSwanThreshold}%`}>
+          <input type="range" min={5} max={25} value={blackSwanThreshold} onChange={e => setBlackSwanThreshold(Number(e.target.value))} className="w-full accent-accent" />
         </SettingRow>
-        <SettingRow label="Auto-Deleverage Drawdown: 15%">
-          <input type="range" min={5} max={30} defaultValue={15} className="w-full accent-accent" />
+        <SettingRow label={`Auto-Deleverage Drawdown: ${autoDeleverageDrawdown}%`}>
+          <input type="range" min={5} max={30} value={autoDeleverageDrawdown} onChange={e => setAutoDeleverageDrawdown(Number(e.target.value))} className="w-full accent-accent" />
         </SettingRow>
-        <button className="flex items-center gap-2 px-4 py-2 rounded-md bg-accent text-primary-foreground text-xs font-semibold">
-          <Save className="h-3.5 w-3.5" /> Save
+        <button onClick={handleSave} disabled={saving} className="flex items-center gap-2 px-4 py-2 rounded-md bg-accent text-primary-foreground text-xs font-semibold disabled:opacity-60">
+          <Save className="h-3.5 w-3.5" /> {saving ? 'Saving…' : 'Save'}
         </button>
       </div>
     </Panel>
@@ -255,6 +354,10 @@ function NotificationsTab({ config }: { config: AppConfig }) {
     pnl_critical_pct: 5.0,
   });
   const [saving, setSaving] = useState(false);
+  const [webhookUrl, setWebhookUrl] = useState('');
+  const [webhookPreview, setWebhookPreview] = useState('');
+  const [webhookConfigured, setWebhookConfigured] = useState(false);
+  const [testing, setTesting] = useState(false);
 
   useEffect(() => {
     fetchNotificationRules()
@@ -262,6 +365,12 @@ function NotificationsTab({ config }: { config: AppConfig }) {
       .catch(() => {
         // Keep fallback defaults in local state if API is temporarily unavailable.
       });
+    fetchDiscordWebhook()
+      .then((data) => {
+        setWebhookConfigured(data.configured);
+        setWebhookPreview(data.webhook_url_preview || '');
+      })
+      .catch(() => {});
   }, [config]);
 
   const toggleRule = (key: keyof NotificationRules) => {
@@ -277,9 +386,12 @@ function NotificationsTab({ config }: { config: AppConfig }) {
         pnl_warning_pct: Number(rules.pnl_warning_pct),
         pnl_critical_pct: Math.max(Number(rules.pnl_critical_pct), Number(rules.pnl_warning_pct)),
       };
-      await updateNotificationRules(normalized);
+      await Promise.all([
+        updateNotificationRules(normalized),
+        webhookUrl.trim() ? updateDiscordWebhook(webhookUrl.trim()) : Promise.resolve(),
+      ]);
       setRules(normalized);
-      toast.success('Notification rules saved');
+      toast.success('Notification settings saved');
     } catch {
       toast.error('Failed to save notification rules');
     } finally {
@@ -287,15 +399,32 @@ function NotificationsTab({ config }: { config: AppConfig }) {
     }
   };
 
+  const handleTestWebhook = async () => {
+    setTesting(true);
+    try {
+      await testDiscordWebhook();
+      toast.success('Test message sent to Discord');
+    } catch {
+      toast.error('Failed to send Discord test message');
+    } finally {
+      setTesting(false);
+    }
+  };
+
   return (
     <Panel title="Notification Settings">
       <div className="space-y-4 max-w-lg">
         <SettingRow label="Discord Webhook URL">
-          <div className="flex gap-2">
-            <input type="password" defaultValue="https://discord.com/api/webhooks/..." className="flex-1 px-3 py-1.5 rounded-md border border-border bg-secondary/30 text-xs font-mono focus:outline-none focus:ring-1 focus:ring-accent" />
-            <button className="px-3 py-1.5 rounded-md border border-border text-xs hover:bg-secondary/50 transition-colors flex items-center gap-1">
-              <Send className="h-3 w-3" /> Test
-            </button>
+          <div className="space-y-2">
+            <div className="flex gap-2">
+              <input type="password" value={webhookUrl} onChange={e => setWebhookUrl(e.target.value)} placeholder={webhookConfigured ? webhookPreview || 'Configured webhook' : 'https://discord.com/api/webhooks/...'} className="flex-1 px-3 py-1.5 rounded-md border border-border bg-secondary/30 text-xs font-mono focus:outline-none focus:ring-1 focus:ring-accent" />
+              <button onClick={handleTestWebhook} disabled={testing} className="px-3 py-1.5 rounded-md border border-border text-xs hover:bg-secondary/50 transition-colors flex items-center gap-1 disabled:opacity-60">
+                <Send className="h-3 w-3" /> {testing ? '…' : 'Test'}
+              </button>
+            </div>
+            {webhookConfigured && !webhookUrl && (
+              <p className="text-[10px] text-muted-foreground">A webhook is already configured. Enter a new URL only if you want to replace it.</p>
+            )}
           </div>
         </SettingRow>
 
@@ -349,17 +478,70 @@ function NotificationsTab({ config }: { config: AppConfig }) {
   );
 }
 
-function ExchangeTab({ config }: { config: AppConfig }) {
+function ExchangeTab({ config, onSave }: { config: AppConfig; onSave: (config: AppConfig, successMessage?: string) => Promise<void> }) {
+  const [exchangeAdapter, setExchangeAdapter] = useState<AppConfig['exchange_adapter']>(config.exchange_adapter);
+  const [testing, setTesting] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [connectionStatus, setConnectionStatus] = useState<'Connected' | 'Degraded' | 'Disconnected'>('Connected');
+  const [latencyMs, setLatencyMs] = useState<number | null>(null);
+  const [sysInfo, setSysInfo] = useState<SystemInfo | null>(null);
+
+  useEffect(() => {
+    setExchangeAdapter(config.exchange_adapter);
+  }, [config]);
+
+  useEffect(() => {
+    fetchSystemInfo().then(setSysInfo).catch(console.error);
+  }, []);
+
+  const handleSaveExchange = async () => {
+    setSaving(true);
+    try {
+      await onSave({ ...config, exchange_adapter: exchangeAdapter }, 'Exchange settings saved');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleTestConnection = async () => {
+    setTesting(true);
+    const started = performance.now();
+    try {
+      await request('/api/health');
+      const status = await request<{ running: boolean; total_bots?: number }>('/api/status');
+      const elapsed = Math.round(performance.now() - started);
+      setLatencyMs(elapsed);
+      setConnectionStatus(status.running ? 'Connected' : 'Degraded');
+      toast.success(`Connection OK (${elapsed}ms)`);
+      // Refresh rate limit stats after test
+      fetchSystemInfo().then(setSysInfo).catch(console.error);
+    } catch {
+      setConnectionStatus('Disconnected');
+      setLatencyMs(null);
+      toast.error('Connection test failed');
+    } finally {
+      setTesting(false);
+    }
+  };
+
+  const rlUsed = sysInfo?.rate_limit_used ?? null;
+  const rlCapacity = sysInfo?.rate_limit_capacity ?? 2000;
+  const rlPct = rlUsed !== null ? ((rlUsed / rlCapacity) * 100).toFixed(1) : null;
+
   return (
     <Panel title="Exchange Connection">
       <div className="space-y-4 max-w-lg">
         <SettingRow label="Exchange Adapter">
           <div className="flex gap-2">
-            {['Binance Direct', 'CCXT', 'Auto-fallback'].map(a => (
-              <button key={a} className={cn(
+            {[
+              { label: 'Binance Direct', value: 'binance' as const },
+              { label: 'CCXT', value: 'ccxt' as const },
+              { label: 'Auto-fallback', value: 'auto' as const },
+            ].map(a => (
+              <button key={a.label} onClick={() => setExchangeAdapter(a.value)} className={cn(
                 'px-3 py-1.5 rounded-md border text-xs transition-colors',
-                a === 'Binance Direct' ? 'border-accent bg-accent/10 text-accent' : 'border-border text-muted-foreground'
-              )}>{a}</button>
+                exchangeAdapter === a.value ? 'border-accent bg-accent/10 text-accent' : 'border-border text-muted-foreground'
+              )}>{a.label}</button>
             ))}
           </div>
         </SettingRow>
@@ -367,68 +549,122 @@ function ExchangeTab({ config }: { config: AppConfig }) {
         <div className="rounded-md border border-border p-3 space-y-2">
           <div className="flex items-center justify-between text-xs">
             <span className="text-muted-foreground">Connection Status</span>
-            <StatusBadge variant="success" pulse size="sm">Connected</StatusBadge>
+            <StatusBadge variant={connectionStatus === 'Connected' ? 'success' : connectionStatus === 'Degraded' ? 'warning' : 'danger'} pulse={connectionStatus === 'Connected'} size="sm">{connectionStatus}</StatusBadge>
           </div>
           <div className="flex items-center justify-between text-xs">
             <span className="text-muted-foreground">Latency</span>
-            <span className="font-mono text-success">42ms</span>
+            <span className={cn('font-mono', latencyMs !== null && latencyMs <= 150 ? 'text-success' : 'text-warning')}>{latencyMs !== null ? `${latencyMs}ms` : '—'}</span>
           </div>
           <div className="flex items-center justify-between text-xs">
-            <span className="text-muted-foreground">Success Rate</span>
-            <span className="font-mono">99.8%</span>
-          </div>
-          <div className="flex items-center justify-between text-xs">
-            <span className="text-muted-foreground">Rate Limit</span>
-            <span className="font-mono">42 / 1200</span>
+            <span className="text-muted-foreground">Rate Limit Used</span>
+            <span className={cn('font-mono', rlPct !== null && parseFloat(rlPct) > 70 ? 'text-warning' : 'text-foreground')}>
+              {rlUsed !== null ? `${rlUsed} / ${rlCapacity}${rlPct ? ` (${rlPct}%)` : ''}` : '—'}
+            </span>
           </div>
         </div>
 
-        <button className="px-4 py-2 rounded-md border border-border text-xs hover:bg-secondary/50 transition-colors">
-          Test Connection
-        </button>
+        <div className="flex gap-2">
+          <button onClick={handleTestConnection} disabled={testing} className="px-4 py-2 rounded-md border border-border text-xs hover:bg-secondary/50 transition-colors disabled:opacity-60">
+            {testing ? 'Testing…' : 'Test Connection'}
+          </button>
+          <button onClick={handleSaveExchange} disabled={saving} className="px-4 py-2 rounded-md bg-accent text-primary-foreground text-xs font-semibold hover:bg-accent/90 transition-colors disabled:opacity-60">
+            {saving ? 'Saving…' : 'Save'}
+          </button>
+        </div>
       </div>
     </Panel>
   );
 }
 
 function SystemTab() {
-  const services = [
-    { name: 'omnitrader', status: 'running' },
-    { name: 'memgraph', status: 'running' },
-    { name: 'redis', status: 'running' },
-    { name: 'ollama', status: 'running' },
-  ];
+  const [info, setInfo] = useState<SystemInfo | null>(null);
+  const [backingUp, setBackingUp] = useState(false);
+
+  useEffect(() => {
+    fetchSystemInfo().then(setInfo).catch(console.error);
+    fetchStatusSummary().then(status => {
+      setInfo(prev => prev ? { ...prev, services: { ...prev.services, omnitrader: status.running ? 'running' : 'stopped' } } : prev);
+    }).catch(console.error);
+  }, []);
+
+  const SERVICE_NAMES = ['omnitrader', 'memgraph', 'redis', 'ollama'] as const;
+
+  const handleBackup = async () => {
+    setBackingUp(true);
+    try {
+      const res = await backupDatabase();
+      toast.success(`Backup created at ${new Date(res.timestamp).toLocaleTimeString()}`);
+    } catch {
+      toast.error('Backup failed — check Memgraph connection');
+    } finally {
+      setBackingUp(false);
+    }
+  };
+
+  const handleViewLogs = () => {
+    if (!info) return;
+    const lines = [
+      `OmniTrader ${info.version}`,
+      `Uptime: ${Math.floor(info.uptime_seconds / 3600)}h ${Math.floor((info.uptime_seconds % 3600) / 60)}m`,
+      `Memgraph nodes: ${info.node_count.toLocaleString()}`,
+      `Memgraph relationships: ${info.relationship_count.toLocaleString()}`,
+      `Rate limit: ${info.rate_limit_used} / ${info.rate_limit_capacity}`,
+      `Ollama model: ${info.ollama_model}`,
+    ].join('\n');
+    toast.info(lines, { duration: 8000 });
+  };
+
+  const formatUptime = (s: number) => {
+    const h = Math.floor(s / 3600);
+    const m = Math.floor((s % 3600) / 60);
+    return h > 0 ? `${h}h ${m}m` : `${m}m`;
+  };
 
   return (
     <div className="space-y-4">
       <Panel title="Docker Services">
         <div className="space-y-2">
-          {services.map(s => (
-            <div key={s.name} className="flex items-center justify-between rounded-md border border-border/50 p-3">
-              <span className="text-xs font-mono font-medium">{s.name}</span>
-              <StatusBadge variant={s.status === 'running' ? 'success' : 'danger'} pulse={s.status === 'running'} size="sm">
-                {s.status}
-              </StatusBadge>
-            </div>
-          ))}
+          {SERVICE_NAMES.map(name => {
+            const status = info?.services?.[name] ?? 'unknown';
+            return (
+              <div key={name} className="flex items-center justify-between rounded-md border border-border/50 p-3">
+                <span className="text-xs font-mono font-medium">{name}</span>
+                <StatusBadge
+                  variant={status === 'running' ? 'success' : status === 'stopped' ? 'danger' : 'warning'}
+                  pulse={status === 'running'}
+                  size="sm"
+                >
+                  {info ? status : 'loading…'}
+                </StatusBadge>
+              </div>
+            );
+          })}
         </div>
       </Panel>
 
       <Panel title="System Info">
         <div className="space-y-2 text-xs">
-          <div className="flex justify-between"><span className="text-muted-foreground">Memgraph Nodes</span><span className="font-mono">1,247</span></div>
-          <div className="flex justify-between"><span className="text-muted-foreground">Memgraph Relationships</span><span className="font-mono">3,891</span></div>
-          <div className="flex justify-between"><span className="text-muted-foreground">Redis Memory</span><span className="font-mono">24.5 MB</span></div>
-          <div className="flex justify-between"><span className="text-muted-foreground">Ollama Model</span><span className="font-mono">llama3.1:8b</span></div>
-          <div className="flex justify-between"><span className="text-muted-foreground">Version</span><span className="font-mono">v2.4.1</span></div>
+          <div className="flex justify-between"><span className="text-muted-foreground">Memgraph Nodes</span><span className="font-mono">{info ? info.node_count.toLocaleString() : '—'}</span></div>
+          <div className="flex justify-between"><span className="text-muted-foreground">Memgraph Relationships</span><span className="font-mono">{info ? info.relationship_count.toLocaleString() : '—'}</span></div>
+          <div className="flex justify-between"><span className="text-muted-foreground">Rate Limit Used</span><span className="font-mono">{info ? `${info.rate_limit_used} / ${info.rate_limit_capacity}` : '—'}</span></div>
+          <div className="flex justify-between"><span className="text-muted-foreground">Uptime</span><span className="font-mono">{info ? formatUptime(info.uptime_seconds) : '—'}</span></div>
+          <div className="flex justify-between"><span className="text-muted-foreground">Ollama Model</span><span className="font-mono">{info?.ollama_model ?? '—'}</span></div>
+          <div className="flex justify-between"><span className="text-muted-foreground">Version</span><span className="font-mono">{info?.version ?? '—'}</span></div>
         </div>
       </Panel>
 
       <div className="flex gap-2">
-        <button className="px-4 py-2 rounded-md border border-border text-xs hover:bg-secondary/50 transition-colors">
-          Backup Database
+        <button
+          onClick={handleBackup}
+          disabled={backingUp}
+          className="px-4 py-2 rounded-md border border-border text-xs hover:bg-secondary/50 transition-colors disabled:opacity-60"
+        >
+          {backingUp ? 'Backing up…' : 'Backup Database'}
         </button>
-        <button className="px-4 py-2 rounded-md border border-border text-xs hover:bg-secondary/50 transition-colors">
+        <button
+          onClick={handleViewLogs}
+          className="px-4 py-2 rounded-md border border-border text-xs hover:bg-secondary/50 transition-colors"
+        >
           View Logs
         </button>
       </div>

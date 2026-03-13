@@ -122,8 +122,8 @@ class BaseDatabase(ABC):
         signal: str,
         regime: str,
         reason: str,
-        strategy_name: str,
-        indicators: dict,
+        strategy_name: str = "",
+        indicators: Optional[dict] = None,
     ) -> None:
         """Log a strategy signal with indicator snapshot."""
         pass

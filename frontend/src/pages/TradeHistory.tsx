@@ -1,11 +1,11 @@
-import { useState } from 'react';
-import { Panel } from '@/shared/components/Panel';
-import { StatusBadge } from '@/shared/components/StatusBadge';
-import { StatCard } from '@/shared/components/StatCard';
-import { mockTrades } from '@/domains/trade/mocks';
 import { cn } from '@/core/utils';
-import { Download, ChevronDown, ChevronUp, Search } from 'lucide-react';
 import type { Trade } from '@/domains/trade/types';
+import { exportToCSV, exportToExcel, exportToPDF } from '@/lib/export';
+import { Panel } from '@/shared/components/Panel';
+import { StatCard } from '@/shared/components/StatCard';
+import { StatusBadge } from '@/shared/components/StatusBadge';
+import { ChevronDown, ChevronUp, Download, Search } from 'lucide-react';
+import { Fragment, useState } from 'react';
 
 import { fetchTradeHistory } from '@/domains/trade/api';
 import { useEffect } from 'react';
@@ -18,8 +18,9 @@ export default function TradeHistory() {
   const [page, setPage] = useState(0);
   const [expanded, setExpanded] = useState<number | null>(null);
   const perPage = 20;
-  
-  const [trades, setTrades] = useState<Trade[]>(mockTrades);
+  const [exportOpen, setExportOpen] = useState(false);
+
+  const [trades, setTrades] = useState<Trade[]>([]);
 
   useEffect(() => {
     fetchTradeHistory({ limit: '500' }).then(res => {
@@ -28,7 +29,17 @@ export default function TradeHistory() {
   }, []);
 
   const closedTrades = trades.filter(t => t.pnl !== undefined);
-  const filtered = closedTrades.filter(t =>
+  const now = Date.now();
+  const cutoff = period === 'today'
+    ? now - 24 * 60 * 60 * 1000
+    : period === 'week'
+      ? now - 7 * 24 * 60 * 60 * 1000
+      : period === 'month'
+        ? now - 30 * 24 * 60 * 60 * 1000
+        : 0;
+  const periodFiltered = period === 'all' ? closedTrades : closedTrades.filter(t => t.timestamp >= cutoff);
+
+  const filtered = periodFiltered.filter(t =>
     t.symbol.toLowerCase().includes(search.toLowerCase()) ||
     t.strategy.toLowerCase().includes(search.toLowerCase())
   );
@@ -56,13 +67,39 @@ export default function TradeHistory() {
     sortField === field ? (sortDir === 'asc' ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />) : null
   );
 
+  useEffect(() => {
+    setPage(0);
+  }, [period, search]);
+
   return (
     <div className="space-y-4 animate-fade-in">
       <div className="flex items-center justify-between">
         <h1 className="text-lg font-semibold">Trade History</h1>
-        <button className="flex items-center gap-1.5 px-3 py-1.5 rounded-md border border-border text-xs text-muted-foreground hover:text-foreground transition-colors">
-          <Download className="h-3.5 w-3.5" /> Export CSV
-        </button>
+        <div className="relative">
+          <button
+            onClick={() => setExportOpen(o => !o)}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-md border border-border text-xs text-muted-foreground hover:text-foreground transition-colors"
+          >
+            <Download className="h-3.5 w-3.5" /> Export <ChevronDown className="h-3 w-3" />
+          </button>
+          {exportOpen && (
+            <div className="absolute right-0 mt-1 w-36 rounded-md border border-border bg-background shadow-lg z-10">
+              {[
+                { label: 'CSV', action: () => exportToCSV(sorted) },
+                { label: 'Excel (.xlsx)', action: () => exportToExcel(sorted) },
+                { label: 'PDF', action: () => exportToPDF(sorted) },
+              ].map(opt => (
+                <button
+                  key={opt.label}
+                  onClick={() => { opt.action(); setExportOpen(false); }}
+                  className="w-full text-left px-3 py-2 text-xs hover:bg-secondary/50 transition-colors"
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Summary */}
@@ -130,7 +167,7 @@ export default function TradeHistory() {
             </thead>
             <tbody>
               {paginated.map(trade => (
-                <React.Fragment key={trade.id}>
+                <Fragment key={trade.id}>
                   <tr
                     className="border-b border-border/30 hover:bg-secondary/30 cursor-pointer"
                     onClick={() => setExpanded(expanded === trade.id ? null : trade.id)}
@@ -160,7 +197,7 @@ export default function TradeHistory() {
                       </td>
                     </tr>
                   )}
-                </React.Fragment>
+                </Fragment>
               ))}
             </tbody>
           </table>

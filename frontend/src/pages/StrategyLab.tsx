@@ -1,11 +1,11 @@
-import { useState, useEffect } from 'react';
+import { cn } from '@/core/utils';
+import type { IndicatorCondition, Strategy, StrategyPerformanceEntry } from '@/domains/strategy/types';
+import { EmptyState } from '@/shared/components/EmptyState';
 import { Panel } from '@/shared/components/Panel';
 import { StatusBadge } from '@/shared/components/StatusBadge';
-import { EmptyState } from '@/shared/components/EmptyState';
-import { mockStrategies } from '@/domains/strategy/mocks';
-import { cn } from '@/core/utils';
-import { Plus, FlaskConical, Edit2, Copy, Target, Trash2, X, Search } from 'lucide-react';
-import type { Strategy } from '@/domains/strategy/types';
+import { Copy, Edit2, FlaskConical, Plus, Search, Target, Trash2, X } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 
 const TA_CATEGORIES: Record<string, string[]> = {
   'Overlap Studies': ['BBANDS', 'DEMA', 'EMA', 'HT_TRENDLINE', 'KAMA', 'MA', 'MAMA', 'SMA', 'T3', 'TEMA', 'TRIMA', 'WMA'],
@@ -16,21 +16,38 @@ const TA_CATEGORIES: Record<string, string[]> = {
   'Cycle': ['HT_DCPERIOD', 'HT_DCPHASE', 'HT_PHASOR', 'HT_SINE', 'HT_TRENDMODE'],
 };
 
-import { fetchStrategies } from '@/domains/strategy/api';
+import { deleteStrategy, fetchStrategies, fetchStrategyPerformance, saveStrategy, updateStrategy } from '@/domains/strategy/api';
 
 export default function StrategyLab() {
+  const navigate = useNavigate();
   const [showEditor, setShowEditor] = useState(false);
   const [editingStrategy, setEditingStrategy] = useState<Strategy | null>(null);
-  const [strategies, setStrategies] = useState<Strategy[]>(mockStrategies);
+  const [strategies, setStrategies] = useState<Strategy[]>([]);
+  const [performance, setPerformance] = useState<StrategyPerformanceEntry[]>([]);
 
-  useEffect(() => {
-    fetchStrategies().then(res => {
-      if (res && res.length > 0) setStrategies(res);
-    }).catch(console.error);
-  }, []);
+  const refetch = () => {
+    fetchStrategies().then(res => { if (res.length > 0) setStrategies(res); }).catch(console.error);
+    fetchStrategyPerformance().then(setPerformance).catch(console.error);
+  };
+
+  useEffect(() => { refetch(); }, []);
 
   const builtins = strategies.filter(s => s.builtin);
   const customs = strategies.filter(s => !s.builtin);
+  const strategyLookup = new Map(strategies.map((strategy) => [strategy.name, strategy]));
+  const comparisonRows = performance.length > 0
+    ? performance.map((entry) => {
+        const strategy = strategyLookup.get(entry.name);
+        return {
+          name: entry.name,
+          regime_affinity: entry.regime,
+          win_rate: entry.win_rate,
+          sharpe: entry.sharpe,
+          avg_trade: strategy?.avg_trade,
+          active_bots: strategy?.active_bots ?? entry.sample_size,
+        };
+      })
+    : [];
 
   return (
     <div className="space-y-4 animate-fade-in">
@@ -75,7 +92,14 @@ export default function StrategyLab() {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
             {customs.map(s => (
-              <StrategyCard key={s.name} strategy={s} onEdit={() => { setEditingStrategy(s); setShowEditor(true); }} />
+              <StrategyCard
+                key={s.name}
+                strategy={s}
+                onEdit={() => { setEditingStrategy(s); setShowEditor(true); }}
+                onDuplicate={() => saveStrategy({ ...s, name: `${s.name}_copy` }).then(() => refetch()).catch(console.error)}
+                onDelete={() => deleteStrategy(s.name).then(() => refetch()).catch(console.error)}
+                onBacktest={() => navigate(`/backtesting?strategy=${encodeURIComponent(s.name)}`)}
+              />
             ))}
           </div>
         )}
@@ -93,7 +117,7 @@ export default function StrategyLab() {
               </tr>
             </thead>
             <tbody>
-              {mockStrategies.map(s => (
+              {comparisonRows.map(s => (
                 <tr key={s.name} className="border-b border-border/50 hover:bg-secondary/30">
                   <td className="px-4 py-3 font-medium">{s.name}</td>
                   <td className="px-4 py-3">
@@ -104,9 +128,9 @@ export default function StrategyLab() {
                       {s.regime_affinity.toUpperCase()}
                     </StatusBadge>
                   </td>
-                  <td className="px-4 py-3 font-mono">{s.win_rate}%</td>
-                  <td className="px-4 py-3 font-mono">{s.sharpe?.toFixed(2)}</td>
-                  <td className="px-4 py-3 font-mono">{s.avg_trade?.toFixed(2)}%</td>
+                  <td className="px-4 py-3 font-mono">{s.win_rate ?? '—'}{typeof s.win_rate === 'number' ? '%' : ''}</td>
+                  <td className="px-4 py-3 font-mono">{typeof s.sharpe === 'number' ? s.sharpe.toFixed(2) : '—'}</td>
+                  <td className="px-4 py-3 font-mono">{typeof s.avg_trade === 'number' ? `${s.avg_trade.toFixed(2)}%` : '—'}</td>
                   <td className="px-4 py-3 font-mono">{s.active_bots}</td>
                 </tr>
               ))}
@@ -116,12 +140,12 @@ export default function StrategyLab() {
       </Panel>
 
       {/* Strategy Editor Drawer */}
-      {showEditor && <StrategyEditor strategy={editingStrategy} onClose={() => setShowEditor(false)} />}
+      {showEditor && <StrategyEditor strategy={editingStrategy} onClose={() => setShowEditor(false)} onSaved={() => { setShowEditor(false); refetch(); }} onBacktest={(name) => navigate(`/backtesting?strategy=${encodeURIComponent(name)}`)} />}
     </div>
   );
 }
 
-function StrategyCard({ strategy, onEdit, readonly }: { strategy: Strategy; onEdit: () => void; readonly?: boolean }) {
+function StrategyCard({ strategy, onEdit, onDuplicate, onDelete, onBacktest, readonly }: { strategy: Strategy; onEdit: () => void; onDuplicate?: () => void; onDelete?: () => void; onBacktest?: () => void; readonly?: boolean }) {
   return (
     <div className="rounded-lg border border-border bg-secondary/20 p-4 hover:bg-secondary/30 transition-colors">
       <div className="flex items-center justify-between mb-2">
@@ -155,13 +179,13 @@ function StrategyCard({ strategy, onEdit, readonly }: { strategy: Strategy; onEd
           <button onClick={onEdit} className="px-2 py-1 rounded text-[11px] text-accent hover:bg-accent/10 transition-colors flex items-center gap-1">
             <Edit2 className="h-3 w-3" /> Edit
           </button>
-          <button className="px-2 py-1 rounded text-[11px] text-muted-foreground hover:bg-secondary transition-colors flex items-center gap-1">
+          <button onClick={onDuplicate} className="px-2 py-1 rounded text-[11px] text-muted-foreground hover:bg-secondary transition-colors flex items-center gap-1">
             <Copy className="h-3 w-3" /> Duplicate
           </button>
-          <button className="px-2 py-1 rounded text-[11px] text-accent hover:bg-accent/10 transition-colors flex items-center gap-1">
+          <button onClick={onBacktest} className="px-2 py-1 rounded text-[11px] text-accent hover:bg-accent/10 transition-colors flex items-center gap-1">
             <Target className="h-3 w-3" /> Backtest
           </button>
-          <button className="px-2 py-1 rounded text-[11px] text-danger hover:bg-danger/10 transition-colors flex items-center gap-1 ml-auto">
+          <button onClick={onDelete} className="px-2 py-1 rounded text-[11px] text-danger hover:bg-danger/10 transition-colors flex items-center gap-1 ml-auto">
             <Trash2 className="h-3 w-3" />
           </button>
         </div>
@@ -170,11 +194,68 @@ function StrategyCard({ strategy, onEdit, readonly }: { strategy: Strategy; onEd
   );
 }
 
-function StrategyEditor({ strategy, onClose }: { strategy: Strategy | null; onClose: () => void }) {
+function StrategyEditor({ strategy, onClose, onSaved, onBacktest }: { strategy: Strategy | null; onClose: () => void; onSaved: () => void; onBacktest: (name: string) => void }) {
   const [name, setName] = useState(strategy?.name || '');
   const [description, setDescription] = useState(strategy?.description || '');
   const [regime, setRegime] = useState(strategy?.regime_affinity || 'all');
   const [indicatorSearch, setIndicatorSearch] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  type ConditionType = 'entry_long' | 'entry_short' | 'exit_long' | 'exit_short';
+  type ConditionRow = { id: string; indicator: string; conditionType: ConditionType; operator: IndicatorCondition['operator']; value: string };
+
+  const toRows = (type: ConditionType, conds?: IndicatorCondition[]): ConditionRow[] =>
+    (conds ?? []).map((c, i) => ({ id: `${type}-${i}`, indicator: c.indicator, conditionType: type, operator: c.operator, value: String(c.value) }));
+
+  const [conditions, setConditions] = useState<ConditionRow[]>([
+    ...toRows('entry_long', strategy?.entry_long),
+    ...toRows('entry_short', strategy?.entry_short),
+    ...toRows('exit_long', strategy?.exit_long),
+    ...toRows('exit_short', strategy?.exit_short),
+  ]);
+
+  const addCondition = (indicator: string) => {
+    setConditions(prev => [...prev, { id: `${Date.now()}`, indicator, conditionType: 'entry_long', operator: '>', value: '0' }]);
+  };
+
+  const updateCondition = (id: string, patch: Partial<ConditionRow>) => {
+    setConditions(prev => prev.map(c => c.id === id ? { ...c, ...patch } : c));
+  };
+
+  const removeCondition = (id: string) => {
+    setConditions(prev => prev.filter(c => c.id !== id));
+  };
+
+  const handleSave = async () => {
+    if (!name.trim()) return;
+    setSaving(true);
+    try {
+      const byType = (type: ConditionType): IndicatorCondition[] =>
+        conditions
+          .filter(c => c.conditionType === type)
+          .map(c => ({ indicator: c.indicator, operator: c.operator, value: isNaN(Number(c.value)) ? c.value : Number(c.value) }));
+
+      const payload: Partial<Strategy> = {
+        name: name.trim(),
+        description,
+        regime_affinity: regime as Strategy['regime_affinity'],
+        entry_long: byType('entry_long'),
+        entry_short: byType('entry_short'),
+        exit_long: byType('exit_long'),
+        exit_short: byType('exit_short'),
+      };
+      if (strategy) {
+        await updateStrategy(strategy.name, payload);
+      } else {
+        await saveStrategy(payload);
+      }
+      onSaved();
+    } catch (e) {
+      console.error('save strategy error', e);
+    } finally {
+      setSaving(false);
+    }
+  };
 
   const filteredCategories = Object.entries(TA_CATEGORIES).reduce((acc, [cat, indicators]) => {
     const filtered = indicators.filter(i => i.toLowerCase().includes(indicatorSearch.toLowerCase()));
@@ -220,7 +301,7 @@ function StrategyEditor({ strategy, onClose }: { strategy: Strategy | null; onCl
 
           {/* Indicator Selector */}
           <div>
-            <label className="text-[11px] text-muted-foreground mb-1 block">Indicators (TA-Lib)</label>
+            <label className="text-[11px] text-muted-foreground mb-1 block">Indicators (TA-Lib) — click to add condition</label>
             <div className="relative mb-2">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground" />
               <input
@@ -230,13 +311,18 @@ function StrategyEditor({ strategy, onClose }: { strategy: Strategy | null; onCl
                 className="w-full pl-8 pr-3 py-1.5 rounded-md border border-border bg-secondary/30 text-xs focus:outline-none focus:ring-1 focus:ring-accent"
               />
             </div>
-            <div className="max-h-60 overflow-y-auto border border-border rounded-md">
+            <div className="max-h-48 overflow-y-auto border border-border rounded-md">
               {Object.entries(filteredCategories).map(([cat, indicators]) => (
                 <div key={cat}>
                   <div className="px-3 py-1.5 bg-secondary/50 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider sticky top-0">{cat}</div>
                   {indicators.map(ind => (
-                    <button key={ind} className="w-full text-left px-3 py-1.5 text-xs hover:bg-secondary/30 transition-colors font-mono">
+                    <button
+                      key={ind}
+                      onClick={() => addCondition(ind)}
+                      className="w-full text-left px-3 py-1.5 text-xs hover:bg-accent/10 hover:text-accent transition-colors font-mono flex items-center justify-between group"
+                    >
                       {ind}
+                      <span className="text-[10px] text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity">+ add</span>
                     </button>
                   ))}
                 </div>
@@ -245,15 +331,67 @@ function StrategyEditor({ strategy, onClose }: { strategy: Strategy | null; onCl
           </div>
 
           {/* Conditions placeholder */}
-          <div className="rounded-md border border-border/50 bg-secondary/10 p-3">
-            <p className="text-[11px] text-muted-foreground text-center">Select indicators above to build entry/exit conditions</p>
+          {/* Conditions Builder */}
+          <div>
+            <label className="text-[11px] text-muted-foreground mb-2 block">
+              Conditions ({conditions.length}) — define entry/exit rules
+            </label>
+            {conditions.length === 0 ? (
+              <div className="rounded-md border border-border/50 bg-secondary/10 p-3 text-center">
+                <p className="text-[11px] text-muted-foreground">Click an indicator above to add a condition</p>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {conditions.map(cond => (
+                  <div key={cond.id} className="flex items-center gap-1.5 rounded-md border border-border bg-secondary/20 p-2">
+                    <span className="text-[11px] font-mono text-accent shrink-0 w-16 truncate">{cond.indicator}</span>
+                    <select
+                      value={cond.conditionType}
+                      onChange={e => updateCondition(cond.id, { conditionType: e.target.value as ConditionType })}
+                      className="flex-1 px-1.5 py-1 rounded border border-border bg-secondary/30 text-[11px] focus:outline-none focus:ring-1 focus:ring-accent"
+                    >
+                      <option value="entry_long">Entry Long</option>
+                      <option value="entry_short">Entry Short</option>
+                      <option value="exit_long">Exit Long</option>
+                      <option value="exit_short">Exit Short</option>
+                    </select>
+                    <select
+                      value={cond.operator}
+                      onChange={e => updateCondition(cond.id, { operator: e.target.value as IndicatorCondition['operator'] })}
+                      className="w-20 px-1.5 py-1 rounded border border-border bg-secondary/30 text-[11px] focus:outline-none focus:ring-1 focus:ring-accent"
+                    >
+                      <option value=">">{">"}</option>
+                      <option value="<">{"<"}</option>
+                      <option value=">=">{">="}</option>
+                      <option value="<=">{"<="}</option>
+                      <option value="crosses_above">↑ cross</option>
+                      <option value="crosses_below">↓ cross</option>
+                    </select>
+                    <input
+                      type="text"
+                      value={cond.value}
+                      onChange={e => updateCondition(cond.id, { value: e.target.value })}
+                      className="w-14 px-1.5 py-1 rounded border border-border bg-secondary/30 text-[11px] font-mono focus:outline-none focus:ring-1 focus:ring-accent"
+                      placeholder="value"
+                    />
+                    <button onClick={() => removeCondition(cond.id)} className="p-1 rounded hover:bg-danger/10 text-danger/70 hover:text-danger transition-colors">
+                      <X className="h-3 w-3" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
           <div className="flex gap-2">
-            <button className="flex-1 py-2.5 rounded-md bg-accent text-primary-foreground text-xs font-semibold hover:bg-accent/90 transition-colors">
-              Save Strategy
+            <button
+              onClick={handleSave}
+              disabled={!name.trim() || saving}
+              className="flex-1 py-2.5 rounded-md bg-accent text-primary-foreground text-xs font-semibold hover:bg-accent/90 transition-colors disabled:opacity-60"
+            >
+              {saving ? 'Saving…' : 'Save Strategy'}
             </button>
-            <button className="px-4 py-2.5 rounded-md border border-border text-xs font-medium hover:bg-secondary/50 transition-colors">
+            <button onClick={() => onBacktest(name.trim() || strategy?.name || 'ADX Trend')} className="px-4 py-2.5 rounded-md border border-border text-xs font-medium hover:bg-secondary/50 transition-colors">
               Backtest
             </button>
           </div>

@@ -1,8 +1,7 @@
 import { useAppStore } from '@/app/store/app-store';
 import { cn } from '@/core/utils';
-import { fetchBots } from '@/domains/bot/api';
-import { mockPrices } from '@/domains/market/mocks';
-import { mockAlerts } from '@/domains/system/mocks';
+import { fetchBots, startBot, stopBot } from '@/domains/bot/api';
+import { fetchSentiment } from '@/domains/market/api';
 import { fetchEquitySnapshots, fetchTradeHistory } from '@/domains/trade/api';
 import type { EquitySnapshot, Trade } from '@/domains/trade/types';
 import { Panel } from '@/shared/components/Panel';
@@ -31,16 +30,19 @@ export default function Dashboard() {
   const prices = useAppStore(s => s.livePrices);
   const bots = storeBots;
   const liveAlerts = useAppStore(s => s.alerts);
-  const liveP = Object.keys(prices).length > 0 ? prices : mockPrices;
-  const alerts = liveAlerts.length > 0 ? liveAlerts : mockAlerts;
+  const alerts = liveAlerts;
 
   const [trades, setTrades] = useState<Trade[]>([]);
   const [equityDataAll, setEquityDataAll] = useState<EquitySnapshot[]>([]);
+  const [sentimentScore, setSentimentScore] = useState<number>(0);
+
+  const refreshBots = () => fetchBots().then(setBots).catch(console.error);
 
   useEffect(() => {
     fetchBots().then(setBots).catch(console.error);
     fetchTradeHistory().then(res => setTrades(res.trades.slice(0, 10))).catch(console.error);
     fetchEquitySnapshots().then(setEquityDataAll).catch(console.error);
+    fetchSentiment('BTC/USDT').then((res) => setSentimentScore(res.score)).catch(console.error);
   }, [setBots]);
 
   const activeBots = bots.filter(b => b.status === 'running');
@@ -52,6 +54,10 @@ export default function Dashboard() {
   const [equityRange, setEquityRange] = useState<'7D' | '30D' | '90D'>('30D');
   let equityData = equityDataAll.slice(equityRange === '7D' ? -7 : equityRange === '30D' ? -30 : 0);
   if (equityData.length === 0) equityData = [{timestamp: Date.now(), equity: 0}];
+  const hasCriticalAlert = alerts.some((a) => a.level === 'critical');
+  const hasWarningAlert = alerts.some((a) => a.level === 'warning');
+  const circuitBreakerLabel = alerts.length === 0 ? 'No alerts' : hasCriticalAlert ? 'Tripped' : hasWarningAlert ? 'Warning' : 'All OK';
+  const circuitBreakerColor = alerts.length === 0 ? 'accent' : hasCriticalAlert ? 'red' : hasWarningAlert ? 'yellow' : 'green';
 
   return (
     <div className="space-y-4 animate-fade-in">
@@ -61,8 +67,13 @@ export default function Dashboard() {
         <StatCard label="Today's PnL" value={`$${totalPnl.toFixed(2)}`} suffix={` (${totalPnlPct.toFixed(2)}%)`} color={totalPnl >= 0 ? 'green' : 'red'} trend={totalPnl > 0 ? 'up' : totalPnl < 0 ? 'down' : 'neutral'} />
         <StatCard label="Active Bots" value={`${activeBots.length} / ${bots.length}`} color="accent" />
         <StatCard label="Open Positions" value={openPositions} color="accent" />
-        <StatCard label="Circuit Breakers" value="All OK" color="green" />
-        <StatCard label="Sentiment" value="0.42" color="green" trend="up" />
+        <StatCard label="Circuit Breakers" value={circuitBreakerLabel} color={circuitBreakerColor} />
+        <StatCard
+          label="Sentiment"
+          value={sentimentScore.toFixed(2)}
+          color={sentimentScore >= 0 ? 'green' : 'red'}
+          trend={sentimentScore > 0 ? 'up' : sentimentScore < 0 ? 'down' : 'neutral'}
+        />
       </div>
 
       {/* Bot Grid + Equity */}
@@ -84,7 +95,11 @@ export default function Dashboard() {
                         {bot.status}
                       </StatusBadge>
                     </div>
-                    <span className="font-mono text-sm">${(liveP[bot.symbol] || 0).toLocaleString(undefined, { maximumFractionDigits: 2 })}</span>
+                    <span className="font-mono text-sm">
+                      {prices[bot.symbol] !== undefined
+                        ? `$${prices[bot.symbol].toLocaleString(undefined, { maximumFractionDigits: 2 })}`
+                        : '—'}
+                    </span>
                   </div>
 
                   <div className="flex items-center gap-2 mb-2 flex-wrap">
@@ -114,16 +129,20 @@ export default function Dashboard() {
 
                   <div className="flex items-center gap-1.5 pt-2 border-t border-border/50">
                     {bot.status === 'running' && (
-                      <button className="px-2 py-1 rounded text-[11px] bg-warning/15 text-warning hover:bg-warning/25 transition-colors">
+                      <button
+                        onClick={() => stopBot(bot.id).then(refreshBots).catch(console.error)}
+                        className="px-2 py-1 rounded text-[11px] bg-warning/15 text-warning hover:bg-warning/25 transition-colors"
+                        title="Pause (mapped to stop)"
+                      >
                         <Pause className="h-3 w-3" />
                       </button>
                     )}
                     {bot.status === 'paused' && (
-                      <button className="px-2 py-1 rounded text-[11px] bg-success/15 text-success hover:bg-success/25 transition-colors">
+                      <button onClick={() => startBot(bot.id).then(refreshBots).catch(console.error)} className="px-2 py-1 rounded text-[11px] bg-success/15 text-success hover:bg-success/25 transition-colors">
                         <Play className="h-3 w-3" />
                       </button>
                     )}
-                    <button className="px-2 py-1 rounded text-[11px] bg-danger/15 text-danger hover:bg-danger/25 transition-colors">
+                    <button onClick={() => stopBot(bot.id).then(refreshBots).catch(console.error)} className="px-2 py-1 rounded text-[11px] bg-danger/15 text-danger hover:bg-danger/25 transition-colors">
                       <Square className="h-3 w-3" />
                     </button>
                     <Link to="/bots" className="ml-auto px-2 py-1 rounded text-[11px] text-accent hover:bg-accent/10 transition-colors flex items-center gap-1">

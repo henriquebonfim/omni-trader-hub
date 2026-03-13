@@ -174,6 +174,32 @@ async def get_asset_news(
     return {"symbol": symbol, "news": news}
 
 
+@router.get("/macro")
+async def get_macro_indicators(request: Request) -> List[Dict[str, Any]]:
+    """Return latest MacroIndicator values stored in Memgraph."""
+    bot = request.app.state.bot
+    query = """
+    MATCH (m:MacroIndicator)
+    RETURN m.name AS name, m.value AS value, m.timestamp AS timestamp
+    ORDER BY m.name
+    """
+    try:
+        async with bot.database._driver.session() as session:
+            result = await session.run(query)
+            records = await result.fetch(100)
+    except Exception:
+        return []
+
+    return [
+        {
+            "name": str(r.get("name", "")),
+            "value": float(r.get("value", 0)),
+            "timestamp": int(r.get("timestamp", 0) or 0),
+        }
+        for r in records
+    ]
+
+
 @router.get("/correlation-matrix")
 async def get_correlation_matrix(
     request: Request,

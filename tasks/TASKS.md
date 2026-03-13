@@ -1,10 +1,8 @@
 # OmniTrader — Technical Debt & Audit Findings
 
-Active execution queue only. Completed work is archived in DONE.md, and future candidate work stays in TODO.md.
+Active execution queue only. Completed work is archived in DONE.md. Use `TODO.md` for lower-priority candidates and `BACKLOG.md` for research/design candidates.
 
-Last updated: 2026-03-11 | Sprint status: Post-T49 remediation complete; promoted next-sprint queue staged in TODO.
-
-> Last updated: 2026-03-11 | Sprint status: Post-T49 remediation complete; promoted next-sprint queue staged in TODO.
+> Last updated: 2026-03-13 | Sprint status: API contract/wiring audit promoted to active queue.
 
 ---
 
@@ -20,8 +18,55 @@ Next-sprint candidates (`T55-T62`) are now parked in `TODO.md` with explicit lab
 
 ## Active Queue
 
-No active remediation items are currently parked in this file.
+### Contract/Wiring Remediation - 2026-03-13
 
-Use `TODO.md` for next-sprint candidates and `BACKLOG.md` for research/design candidates.
+#### Broken Contract
+
+- `T63` - Fix `GET /api/env` response contract mismatch
+	- Details: Frontend parser expects metadata shape per key (`value`, `masked`, `description`, `requires_restart`) but backend returns masked string values only, forcing fallback stubs.
+	- Possible solutions: update backend `GET /api/env` to return the richer metadata envelope, define and enforce a shared typed schema in frontend/backend tests.
+
+- `T64` - Fix `PUT /api/env` payload shape mismatch
+	- Details: Backend expects `{ "updates": { KEY: VALUE } }` while frontend currently submits a flat object `{ KEY: VALUE }`, causing request failure and fallback behavior.
+	- Possible solutions: (1) patch frontend to send `{ updates: ... }`; add request contract tests and remove dual-shape support after migration.
+
+- `T65` - Align `PUT /api/bots/{bot_id}` update schema
+	- Details: Backend route binds `ConfigUpdate` while frontend sends a generic partial bot object; accepted fields are not guaranteed to map cleanly and can silently drift.
+	- Possible solutions: (1) introduce `BotUpdateRequest` schema and update frontend payload adapter, add E2E test that updates real bot config fields from UI payload.
+
+#### No Frontend Caller
+
+- `T66` - Decide fate of `GET /api/daily-summary/{date}`
+	- Details: Endpoint is implemented but has no frontend consumer.
+	- Possible solutions: Check if forntend has Daily Sumary, them implement this feature;
+
+- `T67` - Decide fate of `GET /api/strategies/{name}`
+	- Details: Strategy detail route exists but UI only uses list/performance and save/update/delete.
+	- Possible solutions: use detail route when opening strategy editor. avoid duplicated srategies with same name;
+
+- `T68` - Decide fate of `GET /api/graph/news/{symbol}`
+	- Details: Symbol-scoped news exists but Intelligence page currently pulls only global feed.
+	- Possible solutions: add symbol filter panel using this endpoint;
+
+- `T69` - Decide fate of indicators API (`GET /api/indicators`, `POST /api/indicators/compute`)
+	- Details: Full TA-Lib catalog/compute backend exists, but frontend has no indicator explorer or compute caller.
+	- Possible solutions: add Indicator Lab UI, use compute endpoint in Strategy Lab condition builder;
+
+- `T70` - Decide fate of single-bot lifecycle extras (`POST /api/bot/restart`, `GET /api/bot/state`, `POST /api/bot/trade/open`, `POST /api/bot/trade/close`)
+	- Details: Only start/stop are called by frontend; restart/state/manual trade routes have no caller.
+	- Possible solutions: (1) add controls in Bots/Risk pages; (2) expose only for operator API and document as non-UI endpoints; (3) disable/remove manual trade endpoints if policy forbids manual intervention.
+
+- `T71` - Decide fate of multi-bot detail/manual routes (`GET /api/bots/{bot_id}`, `POST /api/bots/{bot_id}/trade/open`, `POST /api/bots/{bot_id}/trade/close`)
+	- Details: UI calls create/update/delete/start/stop, but does not call bot detail or manual trade routes.
+	- Possible solutions: (1) wire bot detail drawer to `/api/bots/{bot_id}` as source of truth; (2) add per-bot manual trade controls with permission gating; (3) remove unused routes to reduce maintenance surface.
+
+- `T72` - Decide fate of `GET /api/bots` listing route
+	- Details: Frontend bot list is synthesized from `/api/status`, `/api/position`, `/api/balance` and stubs, not from backend `/api/bots`.
+	- Possible solutions: (1) switch bot list source to `/api/bots`; (2) keep synthetic list but document `/api/bots` as external API only; (3) remove synthetic merge path once `/api/bots` includes required metrics.
+
+- `T73` - Decide fate of `GET /api/backtest/history`
+	- Details: Endpoint exists as 501 stub and has no frontend caller; backtest UI currently uses run/results with mock fallback.
+	- Possible solutions: (1) implement real backtest history and wire UI history table; (2) hide history route until backtest engine ships; (3) remove stub route and track in backlog until implementation window.
+
 
 ---

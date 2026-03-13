@@ -6,8 +6,8 @@ import type { BacktestConfig, BacktestResults } from './types';
 export const fetchTradeHistory = async (filters?: Record<string, string>) => {
   const params = new URLSearchParams(filters);
   try {
-    const res = await request<{ trades: Record<string, unknown>[]; total: number }>(`/api/trades/history?${params}`);
-    return { trades: res.trades.map(adaptTrade), total: res.total };
+    const res = await request<{ trades: Record<string, unknown>[]; count: number }>(`/api/trades?${params}`);
+    return { trades: res.trades.map(adaptTrade), total: res.count };
   } catch (e) {
     console.error('fetchTradeHistory error', e);
     return { trades: [], total: 0 };
@@ -19,8 +19,8 @@ export const fetchEquitySnapshots = async (symbol?: string, days?: number) => {
   if (symbol) params.set('symbol', symbol);
   if (days) params.set('days', String(days));
   try {
-    const res = await request<Record<string, unknown>[]>(`/api/equity/snapshots?${params}`);
-    return res.map(adaptEquitySnapshot);
+    const res = await request<{ snapshots: Record<string, unknown>[]; count: number }>(`/api/equity?${params}`);
+    return res.snapshots.map(adaptEquitySnapshot);
   } catch (e) {
     console.error('fetchEquitySnapshots error', e);
     return [];

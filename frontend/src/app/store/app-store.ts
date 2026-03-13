@@ -1,6 +1,34 @@
-import { create } from 'zustand';
 import type { Bot } from '@/domains/bot/types';
-import type { CycleMessage, AlertMessage, TradeMessage } from '@/domains/system/types';
+import type { AlertMessage, AppConfig, CycleMessage, TradeMessage } from '@/domains/system/types';
+import { create } from 'zustand';
+
+const defaultConfig: AppConfig = {
+  mode: 'paper',
+  default_timeframe: '15m',
+  default_leverage: 1,
+  default_position_size_pct: 1,
+  auto_strategy_mode: true,
+  regime_sensitivity: 0,
+  max_daily_loss_pct: 5,
+  max_weekly_loss_pct: 10,
+  consecutive_loss_limit: 3,
+  stop_loss_mode: 'fixed',
+  stop_loss_value: 0,
+  take_profit_mode: 'fixed',
+  take_profit_value: 0,
+  trailing_stop_activation_pct: 0,
+  trailing_stop_callback_pct: 0,
+  black_swan_threshold: 10,
+  auto_deleverage_drawdown_pct: 15,
+  discord_webhook_url: '',
+  notify_trades: true,
+  notify_circuit_breakers: true,
+  notify_daily_summary: true,
+  notify_errors: true,
+  notify_strategy_rotations: true,
+  notification_cooldown_secs: 60,
+  exchange_adapter: 'binance',
+};
 
 interface AppState {
   // WS
@@ -22,6 +50,10 @@ interface AppState {
   // Trade events (live)
   tradeEvents: TradeMessage[];
   addTradeEvent: (t: TradeMessage) => void;
+
+  // Config
+  config: AppConfig;
+  updateConfig: (config: AppConfig) => void;
 
   // Selected asset
   selectedSymbol: string | null;
@@ -73,6 +105,9 @@ export const useAppStore = create<AppState>((set) => ({
     set((state) => ({
       tradeEvents: [t, ...state.tradeEvents].slice(0, 50),
     })),
+
+  config: defaultConfig,
+  updateConfig: (config) => set({ config }),
 
   selectedSymbol: null,
   setSelectedSymbol: (selectedSymbol) => set({ selectedSymbol }),
