@@ -6,6 +6,8 @@ from datetime import datetime, timezone
 
 from fastapi import APIRouter, Request
 
+from ..auth import get_api_key, is_dev_mode
+
 router = APIRouter(tags=["status"])
 
 
@@ -95,3 +97,11 @@ async def get_position(request: Request):
         "leverage": position.leverage,
         "liquidation_price": position.liquidation_price,
     }
+
+
+@router.get("/auth/key")
+async def get_auth_key():
+    """Get the API key for authentication (dev mode only)."""
+    if not is_dev_mode():
+        return {"error": "Not in dev mode"}
+    return {"api_key": get_api_key()}

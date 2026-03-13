@@ -5,6 +5,11 @@ All notable changes to OmniTrader will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+- Fixed 401 Unauthorized errors in frontend by adding /api/auth/key endpoint for dev mode API key retrieval
+
 ## [1.0.0] - 2026-03-05
 
 ### 🎉 Initial Release - Institutional Audit Complete

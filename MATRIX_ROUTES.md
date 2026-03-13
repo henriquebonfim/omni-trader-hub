@@ -108,6 +108,7 @@ Status legend:
 |---|---|---|
 | GET /api/health (status router) | Settings exchange test | Live |
 | GET /api/health (app-level route) | Settings exchange test | Live |
+| GET /api/auth/key | Frontend auth | Live |
 | GET /api/status | Dashboard, Settings, bot adapter | Live |
 | GET /api/balance | bot adapter | Live |
 | GET /api/position | bot adapter | Live |
