@@ -1,27 +1,19 @@
 const BASE = import.meta.env.VITE_API_URL || '';
-let API_KEY = import.meta.env.VITE_API_KEY || '';
-let keyPromise: Promise<string> | null = null;
 
-async function getApiKey(): Promise<string> {
-  if (API_KEY) return API_KEY;
-  if (keyPromise) return keyPromise;
-  keyPromise = fetch(`${BASE}/api/auth/key`)
-    .then(res => res.json())
-    .then(data => {
-      if (data.api_key) {
-        API_KEY = data.api_key;
-        return API_KEY;
-      }
-      throw new Error('No API key available');
-    });
-  return keyPromise;
+function getApiKey(): string {
+  // Try localStorage first (user-provided at login)
+  const storedKey = localStorage.getItem('omnitrader_api_key');
+  if (storedKey) return storedKey;
+  
+  // Fallback to build-time env var
+  return import.meta.env.VITE_API_KEY || '';
 }
 
 export async function request<T>(path: string, options?: RequestInit): Promise<T> {
-  const key = await getApiKey();
   const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-  if (key) {
-    headers['Authorization'] = `Bearer ${key}`;
+  const apiKey = getApiKey();
+  if (apiKey) {
+    headers['Authorization'] = `Bearer ${apiKey}`;
   }
 
   const res = await fetch(`${BASE}${path}`, {
@@ -33,4 +25,16 @@ export async function request<T>(path: string, options?: RequestInit): Promise<T
   // Return null if empty response (like 204 No Content)
   const text = await res.text();
   return text ? JSON.parse(text) : null;
+}
+
+export function setApiKey(key: string): void {
+  localStorage.setItem('omnitrader_api_key', key);
+}
+
+export function getStoredApiKey(): string | null {
+  return localStorage.getItem('omnitrader_api_key');
+}
+
+export function clearApiKey(): void {
+  localStorage.removeItem('omnitrader_api_key');
 }
