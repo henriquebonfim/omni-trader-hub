@@ -14,12 +14,9 @@ export function useLiveFeed() {
 
   const connect = useCallback(() => {
     try {
-      // Connect to backend WebSocket at port 8000
-      // In development: ws://localhost:8000/ws/live
-      // In production: use VITE_WS_URL env var
-      const wsUrl = import.meta.env.VITE_WS_URL 
-        ? import.meta.env.VITE_WS_URL
-        : `ws://${window.location.hostname}:8000/ws/live`;
+      // Use VITE_WS_URL from .env if set, otherwise use relative URL via Vite proxy
+      const wsProtocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
+      const wsUrl = import.meta.env.VITE_WS_URL || `${wsProtocol}://${window.location.host}/ws/live`;
       const ws = new WebSocket(wsUrl);
       wsRef.current = ws;
 
