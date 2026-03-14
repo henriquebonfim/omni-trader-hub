@@ -113,7 +113,6 @@ Status legend:
 | GET /api/balance | bot adapter | Live |
 | GET /api/position | bot adapter | Live |
 | GET /api/trades | Dashboard, Trade History, Risk, Bots detail | Live |
-| GET /api/daily-summary/{date} | no caller | Not wired |
 | GET /api/equity | Dashboard, Risk | Live |
 | GET /api/strategies/performance | Strategy Lab | Live |
 | GET /api/strategies | Strategy Lab, Bots detail, Backtesting | Live |

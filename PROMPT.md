@@ -180,7 +180,6 @@ DELETE /api/strategies/{name}                 // delete custom strategy (only us
 // Analytics & History
 GET  /api/trades/history?symbol=&limit=&offset=
 GET  /api/equity/snapshots?symbol=&days=
-GET  /api/daily-summary?date=
 GET  /api/slippage/analysis?symbol=
 
 // Intelligence / Graph

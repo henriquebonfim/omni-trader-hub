@@ -79,7 +79,7 @@ def test_trades_protected_when_key_set(mock_bot, monkeypatch):
     app = create_api(mock_bot)
     client = TestClient(app)
 
-    for endpoint in ["/api/trades", "/api/daily-summary/2023-01-01", "/api/equity"]:
+    for endpoint in ["/api/trades", "/api/equity"]:
         # Request without token
         response = client.get(endpoint)
         # FastAPI HTTPBearer with auto_error=False returns 401 because of our logic in auth.py
