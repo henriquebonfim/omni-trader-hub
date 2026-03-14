@@ -59,12 +59,6 @@ export default function Login() {
     }
   };
 
-  const handleSkip = () => {
-    // Allow users to skip if API key is optional (unauthenticated endpoints only)
-    setApiKey('');
-    navigate('/');
-  };
-
   return (
     <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 px-4">
       <Card className="w-full max-w-md border border-slate-700 bg-slate-800 shadow-2xl">
@@ -91,7 +85,7 @@ export default function Login() {
                 className="bg-slate-700 border-slate-600 text-white placeholder:text-slate-500"
               />
               <p className="text-xs text-slate-400 mt-2">
-                Find your API key in the backend logs or leave empty to use unauthenticated mode
+                Find your API key in the backend logs
               </p>
             </div>
 
@@ -102,23 +96,14 @@ export default function Login() {
               </div>
             )}
 
-            {/* Buttons */}
-            <div className="space-y-2 pt-2">
+            {/* Button */}
+            <div className="pt-2">
               <Button
                 type="submit"
                 disabled={isLoading}
                 className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium"
               >
                 {isLoading ? 'Validating...' : 'Sign In'}
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={handleSkip}
-                disabled={isLoading}
-                className="w-full text-slate-300 border-slate-600 hover:bg-slate-700"
-              >
-                Skip (Unauthenticated)
               </Button>
             </div>
           </form>
