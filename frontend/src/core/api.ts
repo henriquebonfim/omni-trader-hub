@@ -9,9 +9,23 @@ function getApiKey(): string {
   return import.meta.env.VITE_API_KEY || '';
 }
 
+function redirectToLogin(): void {
+  // Clear any stored API key on unauthorized
+  localStorage.removeItem('omnitrader_api_key');
+  // Redirect to login page
+  window.location.href = '/login';
+}
+
 export async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const headers: Record<string, string> = { 'Content-Type': 'application/json' };
   const apiKey = getApiKey();
+  
+  // For most routes, API key is required
+  if (!apiKey && !path.match(/^\/api\/(health|status)$/)) {
+    redirectToLogin();
+    throw new Error('No API key available');
+  }
+  
   if (apiKey) {
     headers['Authorization'] = `Bearer ${apiKey}`;
   }
@@ -20,6 +34,13 @@ export async function request<T>(path: string, options?: RequestInit): Promise<T
     headers: { ...headers, ...options?.headers },
     ...options,
   });
+  
+  // Handle 401 Unauthorized - redirect to login
+  if (res.status === 401) {
+    redirectToLogin();
+    throw new Error('Unauthorized - redirecting to login');
+  }
+  
   if (!res.ok) throw new Error(`API Error: ${res.status} ${res.statusText}`);
   
   // Return null if empty response (like 204 No Content)
