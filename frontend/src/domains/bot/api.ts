@@ -21,7 +21,7 @@ export const fetchBots = async () => {
 export const createBot = (config: Partial<Bot>) =>
   request<{ ok: boolean; bot_id: string }>('/api/bots', { method: 'POST', body: JSON.stringify({ config }) });
 export const updateBot = (id: string, config: Partial<Bot>) =>
-  request<Bot>(`/api/bots/${id}`, { method: 'PUT', body: JSON.stringify(config) });
+  request<Bot>(`/api/bots/${id}`, { method: 'PUT', body: JSON.stringify({ config }) });
 export const deleteBot = (id: string) =>
   request<void>(`/api/bots/${id}`, { method: 'DELETE' });
 export const startBot = async (id: string) => {

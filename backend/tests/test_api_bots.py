@@ -96,8 +96,8 @@ def auth_headers():
     return {"Authorization": f"Bearer {key}"}
 
 
-def test_list_bots(client):
-    response = client.get("/api/bots")
+def test_list_bots(client, auth_headers):
+    response = client.get("/api/bots", headers=auth_headers)
     assert response.status_code == 200
     bots = response.json()
     assert len(bots) == 2
@@ -107,8 +107,8 @@ def test_list_bots(client):
     assert "ETH/USDT" in symbols
 
 
-def test_get_bot(client):
-    response = client.get("/api/bots/bot1")
+def test_get_bot(client, auth_headers):
+    response = client.get("/api/bots/bot1", headers=auth_headers)
     assert response.status_code == 200
     bot = response.json()
     assert bot["id"] == "bot1"
@@ -116,8 +116,8 @@ def test_get_bot(client):
     assert bot["daily_pnl"] == 100.0
 
 
-def test_get_bot_not_found(client):
-    response = client.get("/api/bots/missing")
+def test_get_bot_not_found(client, auth_headers):
+    response = client.get("/api/bots/missing", headers=auth_headers)
     assert response.status_code == 404
 
 
@@ -147,3 +147,37 @@ def test_status_aggregation(client):
     assert status["running"]
     assert status["running_count"] == 1
     assert status["symbol"] == "multiple"
+
+
+def test_update_bot_authorized(client, auth_headers, mock_bot_manager):
+    payload = {"config": {"trading": {"symbol": "DOGE/USDT"}}}
+    response = client.put(
+        "/api/bots/bot1",
+        json=payload,
+        headers=auth_headers,
+    )
+    assert response.status_code == 200
+    assert response.json()["ok"]
+    mock_bot_manager.update_bot.assert_called_once_with(
+        "bot1", {"trading": {"symbol": "DOGE/USDT"}}
+    )
+
+
+def test_update_bot_unauthorized(client):
+    payload = {"config": {"trading": {"symbol": "DOGE/USDT"}}}
+    response = client.put(
+        "/api/bots/bot1",
+        json=payload,
+    )
+    assert response.status_code == 401
+
+
+def test_update_bot_not_found(client, auth_headers, mock_bot_manager):
+    mock_bot_manager.update_bot.return_value = False
+    payload = {"config": {"trading": {"symbol": "DOGE/USDT"}}}
+    response = client.put(
+        "/api/bots/missing",
+        json=payload,
+        headers=auth_headers,
+    )
+    assert response.status_code == 404

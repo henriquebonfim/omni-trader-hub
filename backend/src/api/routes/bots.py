@@ -14,7 +14,7 @@ class BotCreateRequest(BaseModel):
 
 
 class BotUpdateRequest(BaseModel):
-    config: dict
+    config: ConfigUpdate
 
 
 class TradeRequest(BaseModel):
@@ -62,12 +62,14 @@ async def get_bot(request: Request, bot_id: str):
 
 
 @router.put("/{bot_id}", dependencies=[Depends(verify_api_key)])
-async def update_bot(request: Request, bot_id: str, body: ConfigUpdate):
+async def update_bot(request: Request, bot_id: str, body: BotUpdateRequest):
     """Update a specific bot's configuration."""
     manager = request.app.state.bot_manager
     try:
         # Pass the validated model payload as dictionary
-        updated = await manager.update_bot(bot_id, body.model_dump(exclude_unset=True))
+        updated = await manager.update_bot(
+            bot_id, body.config.model_dump(exclude_unset=True)
+        )
         if not updated:
             raise HTTPException(status_code=404, detail="Bot not found")
         return {"ok": True, "message": "Bot updated"}
