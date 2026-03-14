@@ -650,4 +650,12 @@
 - [x] Updated `BotManager.list_bots()` to return full bot summaries
 - [x] Implemented `adaptBot` in frontend and switched `fetchBots()` to use `GET /api/bots`
 - [x] Removed legacy `adaptBotState` and complex Promise-based synthesis in frontend
+
+### T71. Single-Bot Lifecycle & Manual Trade Wiring ✅ **COMPLETED 2026-03-14**
+- [x] Wired `POST /api/bot/restart`, `POST /api/bot/trade/open`, and `POST /api/bot/trade/close` in frontend API
+- [x] Added manual trade (Long/Short/Close) and restart buttons to legacy bot context
+
+### T72. Multi-Bot Detail & Manual Trade Wiring ✅ **COMPLETED 2026-03-14**
+- [x] Wired `GET /api/bots/{bot_id}` as source of truth for bot details
+- [x] Added per-bot manual trade (Long/Short/Close) and restart controls in `BotDetailDrawer` and `Dashboard`
 ---

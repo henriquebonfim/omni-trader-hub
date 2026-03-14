@@ -1,6 +1,6 @@
 import { useAppStore } from '@/app/store/app-store';
 import { cn } from '@/core/utils';
-import { fetchBots, startBot, stopBot } from '@/domains/bot/api';
+import { fetchBots, startBot, stopBot, restartBot, manualOpenTrade, manualCloseTrade } from '@/domains/bot/api';
 import { fetchSentiment } from '@/domains/market/api';
 import { fetchEquitySnapshots, fetchTradeHistory } from '@/domains/trade/api';
 import type { EquitySnapshot, Trade } from '@/domains/trade/types';
@@ -137,16 +137,50 @@ export default function Dashboard() {
                         <Pause className="h-3 w-3" />
                       </button>
                     )}
-                    {bot.status === 'paused' && (
-                      <button onClick={() => startBot(bot.id).then(refreshBots).catch(console.error)} className="px-2 py-1 rounded text-[11px] bg-success/15 text-success hover:bg-success/25 transition-colors">
+                    {(bot.status === 'paused' || bot.status === 'stopped') && (
+                      <button onClick={() => startBot(bot.id).then(refreshBots).catch(console.error)} className="px-2 py-1 rounded text-[11px] bg-success/15 text-success hover:bg-success/25 transition-colors" title="Start">
                         <Play className="h-3 w-3" />
                       </button>
                     )}
-                    <button onClick={() => stopBot(bot.id).then(refreshBots).catch(console.error)} className="px-2 py-1 rounded text-[11px] bg-danger/15 text-danger hover:bg-danger/25 transition-colors">
+                    <button
+                      onClick={() => restartBot(bot.id).then(refreshBots).catch(console.error)}
+                      className="px-2 py-1 rounded text-[11px] bg-secondary/50 text-muted-foreground hover:bg-secondary transition-colors"
+                      title="Restart"
+                    >
+                      <Zap className="h-3 w-3" />
+                    </button>
+                    {bot.status === 'running' && !bot.position && (
+                      <div className="flex gap-1">
+                        <button
+                          onClick={() => manualOpenTrade(bot.id, 'long').then(refreshBots).catch(console.error)}
+                          className="px-1.5 py-1 rounded text-[10px] bg-success/10 text-success hover:bg-success/20 transition-colors"
+                          title="Manual Long"
+                        >
+                          L
+                        </button>
+                        <button
+                          onClick={() => manualOpenTrade(bot.id, 'short').then(refreshBots).catch(console.error)}
+                          className="px-1.5 py-1 rounded text-[10px] bg-danger/10 text-danger hover:bg-danger/20 transition-colors"
+                          title="Manual Short"
+                        >
+                          S
+                        </button>
+                      </div>
+                    )}
+                    {bot.position && (
+                      <button
+                        onClick={() => manualCloseTrade(bot.id).then(refreshBots).catch(console.error)}
+                        className="px-1.5 py-1 rounded text-[10px] bg-warning/10 text-warning hover:bg-warning/20 transition-colors"
+                        title="Manual Close"
+                      >
+                        CLOSE
+                      </button>
+                    )}
+                    <button onClick={() => stopBot(bot.id).then(refreshBots).catch(console.error)} className="ml-auto px-2 py-1 rounded text-[11px] bg-danger/15 text-danger hover:bg-danger/25 transition-colors" title="Force Stop">
                       <Square className="h-3 w-3" />
                     </button>
-                    <Link to="/bots" className="ml-auto px-2 py-1 rounded text-[11px] text-accent hover:bg-accent/10 transition-colors flex items-center gap-1">
-                      Details <ArrowRight className="h-3 w-3" />
+                    <Link to="/bots" className="px-2 py-1 rounded text-[11px] text-accent hover:bg-accent/10 transition-colors flex items-center gap-1">
+                      <ArrowRight className="h-3 w-3" />
                     </Link>
                   </div>
                 </div>

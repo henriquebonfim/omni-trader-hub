@@ -1,6 +1,6 @@
 import { useAppStore } from '@/app/store/app-store';
 import { cn } from '@/core/utils';
-import { createBot, deleteBot, fetchBots, startBot, stopBot } from '@/domains/bot/api';
+import { createBot, deleteBot, fetchBots, startBot, stopBot, restartBot, manualOpenTrade, manualCloseTrade } from '@/domains/bot/api';
 import { fetchMarkets } from '@/domains/market/api';
 import type { MarketPair } from '@/domains/market/types';
 import { fetchStrategies } from '@/domains/strategy/api';
@@ -285,11 +285,13 @@ function AddBotDrawer({ onClose, onCreated }: { onClose: () => void; onCreated: 
 
 function BotDetailDrawer({ botId, onClose }: { botId: string; onClose: () => void }) {
   const storeBots = useAppStore(s => s.bots);
+  const setBots = useAppStore(s => s.setBots);
   const bots = storeBots;
   const bot = bots.find(b => b.id === botId);
   const [tab, setTab] = useState<'overview' | 'position' | 'trades' | 'strategy' | 'risk'>('overview');
   const [trades, setTrades] = useState<Trade[]>([]);
   const [strategy, setStrategy] = useState<Strategy | null>(null);
+  const [processing, setProcessing] = useState(false);
 
   useEffect(() => {
     if (!bot) return;
@@ -302,6 +304,38 @@ function BotDetailDrawer({ botId, onClose }: { botId: string; onClose: () => voi
   }, [bot?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!bot) return null;
+
+  const refresh = () => fetchBots().then(setBots).catch(console.error);
+
+  const handleRestart = async () => {
+    setProcessing(true);
+    try {
+      await restartBot(botId);
+      await refresh();
+    } finally {
+      setProcessing(false);
+    }
+  };
+
+  const handleManualOpen = async (side: 'long' | 'short') => {
+    setProcessing(true);
+    try {
+      await manualOpenTrade(botId, side);
+      await refresh();
+    } finally {
+      setProcessing(false);
+    }
+  };
+
+  const handleManualClose = async () => {
+    setProcessing(true);
+    try {
+      await manualCloseTrade(botId);
+      await refresh();
+    } finally {
+      setProcessing(false);
+    }
+  };
 
   const closedTrades = trades.filter(t => t.action === 'CLOSE');
   const wins = closedTrades.filter(t => (t.pnl ?? 0) > 0).length;
@@ -347,6 +381,44 @@ function BotDetailDrawer({ botId, onClose }: { botId: string; onClose: () => voi
         </div>
 
         <div className="p-4 space-y-4">
+          {/* Quick Actions */}
+          <div className="flex flex-wrap gap-2 pb-4 border-b border-border/50">
+            <button
+              onClick={handleRestart}
+              disabled={processing}
+              className="px-3 py-1.5 rounded-md border border-border bg-secondary/30 text-[11px] font-medium hover:bg-secondary/50 transition-colors disabled:opacity-50"
+            >
+              Restart Bot
+            </button>
+            {bot.status === 'running' && !bot.position && (
+              <>
+                <button
+                  onClick={() => handleManualOpen('long')}
+                  disabled={processing}
+                  className="px-3 py-1.5 rounded-md border border-success/30 bg-success/5 text-success text-[11px] font-medium hover:bg-success/10 transition-colors disabled:opacity-50"
+                >
+                  Manual Long
+                </button>
+                <button
+                  onClick={() => handleManualOpen('short')}
+                  disabled={processing}
+                  className="px-3 py-1.5 rounded-md border border-danger/30 bg-danger/5 text-danger text-[11px] font-medium hover:bg-danger/10 transition-colors disabled:opacity-50"
+                >
+                  Manual Short
+                </button>
+              </>
+            )}
+            {bot.position && (
+              <button
+                onClick={handleManualClose}
+                disabled={processing}
+                className="px-3 py-1.5 rounded-md border border-warning/30 bg-warning/5 text-warning text-[11px] font-medium hover:bg-warning/10 transition-colors disabled:opacity-50"
+              >
+                Close Position
+              </button>
+            )}
+          </div>
+
           {tab === 'overview' && (
             <>
               <div className="grid grid-cols-2 gap-3">

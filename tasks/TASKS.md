@@ -26,12 +26,13 @@ Next-sprint candidates (`T55-T62`) are now parked in `TODO.md` with explicit lab
         - Details: Frontend bot list is synthesized from `/api/status`, `/api/position`, `/api/balance` and stubs, not from backend `/api/bots`.
         - Resolved: Switched bot list source to `/api/bots` and enriched backend summary data.
 
-- `T71` - single-bot lifecycle extras (`POST /api/bot/restart`, `GET /api/bot/state`, `POST /api/bot/trade/open`, `POST /api/bot/trade/close`)	- Details: Only start/stop are called by frontend; restart/state/manual trade routes have no caller.
-	- Possible solutions: (1) add controls in Bots/Risk pages; 
+- `T71` - [DONE] single-bot lifecycle extras (`POST /api/bot/restart`, `GET /api/bot/state`, `POST /api/bot/trade/open`, `POST /api/bot/trade/close`)
+        - Details: Only start/stop are called by frontend; restart/state/manual trade routes have no caller.
+        - Resolved: Wired restart, manual open/close, and state fetch for legacy bot routes.
 
-- `T72` - multi-bot detail/manual routes (`GET /api/bots/{bot_id}`, `POST /api/bots/{bot_id}/trade/open`, `POST /api/bots/{bot_id}/trade/close`)
-	- Details: UI calls create/update/delete/start/stop, but does not call bot detail or manual trade routes.
-	- Possible solutions: (1) wire bot detail drawer to `/api/bots/{bot_id}` as source of truth; add per-bot manual trade controls with permission gating;
+- `T72` - [DONE] multi-bot detail/manual routes (`GET /api/bots/{bot_id}`, `POST /api/bots/{bot_id}/trade/open`, `POST /api/bots/{bot_id}/trade/close`)
+        - Details: UI calls create/update/delete/start/stop, but does not call bot detail or manual trade routes.
+        - Resolved: Wired bot detail drawer to `/api/bots/{bot_id}` as source of truth; added per-bot manual trade and restart controls.
 
 .
 
