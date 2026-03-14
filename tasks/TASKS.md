@@ -28,10 +28,6 @@ Next-sprint candidates (`T55-T62`) are now parked in `TODO.md` with explicit lab
 	- Details: Endpoint is implemented but has no frontend consumer.
 	- Possible solutions: Check if forntend has Daily Sumary, them implement this feature;
 
-- `T69` - Decide fate of indicators API (`GET /api/indicators`, `POST /api/indicators/compute`)
-	- Details: Full TA-Lib catalog/compute backend exists, but frontend has no indicator explorer or compute caller.
-	- Possible solutions: add Indicator Lab UI, use compute endpoint in Strategy Lab condition builder;
-
 - `T70` - Decide fate of single-bot lifecycle extras (`POST /api/bot/restart`, `GET /api/bot/state`, `POST /api/bot/trade/open`, `POST /api/bot/trade/close`)
 	- Details: Only start/stop are called by frontend; restart/state/manual trade routes have no caller.
 	- Possible solutions: (1) add controls in Bots/Risk pages; 
