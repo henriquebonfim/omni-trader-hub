@@ -10,13 +10,14 @@ from src.intelligence.nlp import OllamaNLP
 def nlp():
     return OllamaNLP()
 
+
 @pytest.mark.asyncio
 async def test_extract_entities_success(nlp):
     news_text = "Bitcoin rallies as DeFi sees massive adoption."
     mock_response = {
         "response": '{"assets": ["BTC"], "sectors": ["DeFi"], "sentiment": 0.8, "impact": 0.5}'
     }
-    
+
     with patch.object(nlp.client, "post", new_callable=AsyncMock) as mock_post:
         mock_post_res = AsyncMock()
         mock_post_res.raise_for_status = MagicMock()
@@ -30,16 +31,18 @@ async def test_extract_entities_success(nlp):
         assert entities["sentiment"] == 0.8
         assert entities["impact"] == 0.5
 
+
 @pytest.mark.asyncio
 async def test_extract_entities_failure(nlp):
     news_text = "Market crashes."
-    
+
     with patch.object(nlp.client, "post", new_callable=AsyncMock) as mock_post:
         mock_post.side_effect = httpx.RequestError("Timeout")
 
         entities = await nlp.extract_entities(news_text)
 
         assert entities == {}
+
 
 @pytest.mark.asyncio
 async def test_enrich_news_event(nlp):
@@ -48,8 +51,11 @@ async def test_enrich_news_event(nlp):
     mock_db._driver.session = MagicMock()
     mock_db._driver.session.return_value.__aenter__.return_value = mock_session
 
-    mock_record = {"raw_text": "Ethereum upgrades to proof of stake.", "fallback_sentiment": 0.2}
-    
+    mock_record = {
+        "raw_text": "Ethereum upgrades to proof of stake.",
+        "fallback_sentiment": 0.2,
+    }
+
     # Setup mock result to be an asynchronous iterable
     class MockResult:
         def __init__(self, records):
@@ -82,4 +88,4 @@ async def test_enrich_news_event(nlp):
         await nlp.enrich_news_event("event_123", mock_db)
 
         # verify session.run was called multiple times
-        assert mock_session.run.call_count == 4 # fetch, update, asset, sector
+        assert mock_session.run.call_count == 4  # fetch, update, asset, sector

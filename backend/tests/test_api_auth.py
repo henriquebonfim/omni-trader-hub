@@ -169,9 +169,9 @@ def test_mutation_routes_protected_when_key_set(mock_bot, monkeypatch):
             response = client.post(endpoint, json=payload)
         else:
             response = client.put(endpoint, json=payload)
-        assert (
-            response.status_code == 401
-        ), f"{method} {endpoint} should be 401 without token"
+        assert response.status_code == 401, (
+            f"{method} {endpoint} should be 401 without token"
+        )
 
         # Request with invalid token
         headers = {"Authorization": "Bearer wrong-token"}
@@ -179,9 +179,9 @@ def test_mutation_routes_protected_when_key_set(mock_bot, monkeypatch):
             response = client.post(endpoint, json=payload, headers=headers)
         else:
             response = client.put(endpoint, json=payload, headers=headers)
-        assert (
-            response.status_code == 401
-        ), f"{method} {endpoint} should be 401 with invalid token"
+        assert response.status_code == 401, (
+            f"{method} {endpoint} should be 401 with invalid token"
+        )
 
         # Request with valid token (we just expect it NOT to be 401, could be 200 or 500/400 depending on mock)
         headers = {"Authorization": "Bearer test-secret"}
@@ -189,6 +189,6 @@ def test_mutation_routes_protected_when_key_set(mock_bot, monkeypatch):
             response = client.post(endpoint, json=payload, headers=headers)
         else:
             response = client.put(endpoint, json=payload, headers=headers)
-        assert (
-            response.status_code != 401
-        ), f"{method} {endpoint} should not be 401 with valid token"
+        assert response.status_code != 401, (
+            f"{method} {endpoint} should not be 401 with valid token"
+        )

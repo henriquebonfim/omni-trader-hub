@@ -1054,19 +1054,21 @@ class CCXTExchange(BaseExchange):
                     continue
                 if market.get("type") != "swap":
                     continue
-                
+
                 # Default status if active is True
                 status = "active"
-                
+
                 ticker = tickers.get(symbol, {})
-                
+
                 # Get limits
                 limits = market.get("limits", {})
                 amount_limits = limits.get("amount", {})
                 price_limits = limits.get("price", {})
-                
+
                 min_size = amount_limits.get("min", 0.0)
-                tick_size = price_limits.get("min", 0.0) # tick size is usually price min
+                tick_size = price_limits.get(
+                    "min", 0.0
+                )  # tick size is usually price min
                 if "info" in market and "filters" in market["info"]:
                     for f in market["info"]["filters"]:
                         if f.get("filterType") == "PRICE_FILTER":
@@ -1074,17 +1076,21 @@ class CCXTExchange(BaseExchange):
                         elif f.get("filterType") == "LOT_SIZE":
                             min_size = float(f.get("minQty", min_size))
 
-                result.append({
-                    "symbol": symbol,
-                    "base": market.get("base"),
-                    "quote": market.get("quote"),
-                    "min_size": min_size,
-                    "tick_size": tick_size,
-                    "volume_24h": ticker.get("quoteVolume", 0.0), # Quote volume is usually preferred, or baseVolume
-                    "last_price": ticker.get("last", 0.0),
-                    "status": status,
-                })
-            
+                result.append(
+                    {
+                        "symbol": symbol,
+                        "base": market.get("base"),
+                        "quote": market.get("quote"),
+                        "min_size": min_size,
+                        "tick_size": tick_size,
+                        "volume_24h": ticker.get(
+                            "quoteVolume", 0.0
+                        ),  # Quote volume is usually preferred, or baseVolume
+                        "last_price": ticker.get("last", 0.0),
+                        "status": status,
+                    }
+                )
+
             return result
         except ccxt.NetworkError as e:
             logger.error("ccxt_network_error_fetch_markets", error=str(e))

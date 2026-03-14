@@ -180,6 +180,10 @@ Runtime verification completed against the live Docker stack. Stale items remove
 - **Depends on**: None
 - **Scope**: CSS variable theme tokens + persisted user preference
 
+
+- `T73` - Decide fate of `GET /api/backtest/history`
+	- Details: Endpoint exists as 501 stub and has no frontend caller; backtest UI currently uses run/results with mock fallback.
+	- Possible solutions: (1) implement real backtest history and wire UI history table; (2) hide history route until backtest engine ships; (3) remove stub route and track in backlog until implementation window
 ---
 
 ## Notes

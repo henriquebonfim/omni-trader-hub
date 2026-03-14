@@ -54,19 +54,16 @@ Next-sprint candidates (`T55-T62`) are now parked in `TODO.md` with explicit lab
 
 - `T70` - Decide fate of single-bot lifecycle extras (`POST /api/bot/restart`, `GET /api/bot/state`, `POST /api/bot/trade/open`, `POST /api/bot/trade/close`)
 	- Details: Only start/stop are called by frontend; restart/state/manual trade routes have no caller.
-	- Possible solutions: (1) add controls in Bots/Risk pages; (2) expose only for operator API and document as non-UI endpoints; (3) disable/remove manual trade endpoints if policy forbids manual intervention.
+	- Possible solutions: (1) add controls in Bots/Risk pages; 
 
 - `T71` - Decide fate of multi-bot detail/manual routes (`GET /api/bots/{bot_id}`, `POST /api/bots/{bot_id}/trade/open`, `POST /api/bots/{bot_id}/trade/close`)
 	- Details: UI calls create/update/delete/start/stop, but does not call bot detail or manual trade routes.
-	- Possible solutions: (1) wire bot detail drawer to `/api/bots/{bot_id}` as source of truth; (2) add per-bot manual trade controls with permission gating; (3) remove unused routes to reduce maintenance surface.
+	- Possible solutions: (1) wire bot detail drawer to `/api/bots/{bot_id}` as source of truth; add per-bot manual trade controls with permission gating;
 
 - `T72` - Decide fate of `GET /api/bots` listing route
 	- Details: Frontend bot list is synthesized from `/api/status`, `/api/position`, `/api/balance` and stubs, not from backend `/api/bots`.
-	- Possible solutions: (1) switch bot list source to `/api/bots`; (2) keep synthetic list but document `/api/bots` as external API only; (3) remove synthetic merge path once `/api/bots` includes required metrics.
-
-- `T73` - Decide fate of `GET /api/backtest/history`
-	- Details: Endpoint exists as 501 stub and has no frontend caller; backtest UI currently uses run/results with mock fallback.
-	- Possible solutions: (1) implement real backtest history and wire UI history table; (2) hide history route until backtest engine ships; (3) remove stub route and track in backlog until implementation window.
+	- Possible solutions: (1) switch bot list source to `/api/bots`; 
+.
 
 
 ---

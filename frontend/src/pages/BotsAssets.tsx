@@ -189,7 +189,7 @@ function AddBotDrawer({ onClose, onCreated }: { onClose: () => void; onCreated: 
     if (!symbol) return;
     setCreating(true);
     try {
-      await createBot({ symbol, mode, leverage, balance_allocated: allocation } as any);
+      await createBot({ symbol, mode, leverage, balance_allocated: allocation });
       onCreated();
       onClose();
     } catch (e) {

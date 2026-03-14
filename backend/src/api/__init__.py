@@ -80,7 +80,9 @@ def create_api(bot_instance=None, bot_manager=None) -> FastAPI:
     if bot_manager:
         # Provide fallback for legacy consumers
         bots_list = list(bot_manager.bots.values())
-        app.state.bot = bot_manager.get_bot("default") or (bots_list[0] if bots_list else bot_instance)
+        app.state.bot = bot_manager.get_bot("default") or (
+            bots_list[0] if bots_list else bot_instance
+        )
     else:
         app.state.bot = bot_instance
     app.state.started_at = datetime.now(timezone.utc)

@@ -27,18 +27,29 @@ async def get_status(request: Request):
     if manager and manager.bots:
         # Aggregate multi-bot stats
         running_count = sum(1 for bot in manager.bots.values() if bot._running)
-        cb_active = any(bot.risk.check_circuit_breaker() for bot in manager.bots.values())
-        paper_mode = all(getattr(bot.config.exchange, "paper_mode", True) for bot in manager.bots.values())
-        
+        cb_active = any(
+            bot.risk.check_circuit_breaker() for bot in manager.bots.values()
+        )
+        paper_mode = all(
+            getattr(bot.config.exchange, "paper_mode", True)
+            for bot in manager.bots.values()
+        )
+
         # Use primary bot for basic fields if there's only one, otherwise generalized
         primary_bot = manager.get_bot("default") or list(manager.bots.values())[0]
-        symbol = primary_bot.config.trading.symbol if len(manager.bots) == 1 else "multiple"
-        strategy = getattr(primary_bot.config.strategy, "name", "unknown") if len(manager.bots) == 1 else "multiple"
-        
+        symbol = (
+            primary_bot.config.trading.symbol if len(manager.bots) == 1 else "multiple"
+        )
+        strategy = (
+            getattr(primary_bot.config.strategy, "name", "unknown")
+            if len(manager.bots) == 1
+            else "multiple"
+        )
+
         ws_clients = 0
         if primary_bot.ws_manager:
             ws_clients = await primary_bot.ws_manager.get_client_count()
-            
+
         return {
             "running": running_count > 0,
             "running_count": running_count,

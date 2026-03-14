@@ -66,7 +66,11 @@ class BinanceDirectExchange(BaseExchange):
         return signature
 
     async def _request(
-        self, method: str, endpoint: str, signed: bool = False, params: Optional[Dict[str, Any]] = None
+        self,
+        method: str,
+        endpoint: str,
+        signed: bool = False,
+        params: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
         if not self.session:
             self.session = aiohttp.ClientSession()
@@ -110,32 +114,46 @@ class BinanceDirectExchange(BaseExchange):
         for attempt in range(3):
             try:
                 if method == "GET":
-                    async with self.session.get(url, params=params, headers=headers) as response:
+                    async with self.session.get(
+                        url, params=params, headers=headers
+                    ) as response:
                         self._last_headers = response.headers
                         data = await response.json()
                         if response.status >= 400:
-                            logger.error("binance_api_error", status=response.status, data=data)
+                            logger.error(
+                                "binance_api_error", status=response.status, data=data
+                            )
                             raise ExchangeError(f"Binance API error: {data}")
                         return data
                 elif method == "POST":
-                    async with self.session.post(url, data=params, headers=headers) as response:
+                    async with self.session.post(
+                        url, data=params, headers=headers
+                    ) as response:
                         self._last_headers = response.headers
                         data = await response.json()
                         if response.status >= 400:
-                            logger.error("binance_api_error", status=response.status, data=data)
+                            logger.error(
+                                "binance_api_error", status=response.status, data=data
+                            )
                             raise ExchangeError(f"Binance API error: {data}")
                         return data
                 elif method == "DELETE":
-                    async with self.session.delete(url, params=params, headers=headers) as response:
+                    async with self.session.delete(
+                        url, params=params, headers=headers
+                    ) as response:
                         self._last_headers = response.headers
                         data = await response.json()
                         if response.status >= 400:
-                            logger.error("binance_api_error", status=response.status, data=data)
+                            logger.error(
+                                "binance_api_error", status=response.status, data=data
+                            )
                             raise ExchangeError(f"Binance API error: {data}")
                         return data
             except aiohttp.ClientError as e:
                 if attempt == 2:
-                    raise NetworkError(f"Network error during {method} {endpoint}: {e}") from e
+                    raise NetworkError(
+                        f"Network error during {method} {endpoint}: {e}"
+                    ) from e
                 await asyncio.sleep(1)
         return {}
 
@@ -261,7 +279,12 @@ class BinanceDirectExchange(BaseExchange):
             b_symbol = symbol.split(":")[0].replace("/", "")
             leverage = self.config.exchange.leverage
             try:
-                await self._request("POST", "/fapi/v1/leverage", signed=True, params={"symbol": b_symbol, "leverage": leverage})
+                await self._request(
+                    "POST",
+                    "/fapi/v1/leverage",
+                    signed=True,
+                    params={"symbol": b_symbol, "leverage": leverage},
+                )
                 logger.info("leverage_updated", symbol=symbol, leverage=leverage)
             except Exception as e:
                 logger.warning("leverage_update_failed", error=str(e))
@@ -269,38 +292,50 @@ class BinanceDirectExchange(BaseExchange):
     async def connect(self) -> bool:
         if not self.session:
             self.session = aiohttp.ClientSession()
-        
+
         try:
             # Ping exchange info
             await self._request("GET", "/fapi/v1/exchangeInfo")
             self._markets_loaded = True
         except Exception as e:
             if self.paper_mode:
-                logger.warning("exchange_connection_failed_paper_mode_offline", error=str(e))
+                logger.warning(
+                    "exchange_connection_failed_paper_mode_offline", error=str(e)
+                )
                 self._markets_loaded = False
             else:
                 logger.error("exchange_connection_failed", error=str(e))
                 raise
 
         symbol = self.config.trading.symbol
-        
+
         if self.paper_mode:
             logger.info("paper_mode_enabled", balance=self._paper_balance)
             logger.info("exchange_connected", paper_mode=True, symbol=symbol)
             return True
-            
+
         if self._markets_loaded:
             b_symbol = symbol.split(":")[0].replace("/", "")
             leverage = self.config.exchange.leverage
             try:
-                await self._request("POST", "/fapi/v1/leverage", signed=True, params={"symbol": b_symbol, "leverage": leverage})
+                await self._request(
+                    "POST",
+                    "/fapi/v1/leverage",
+                    signed=True,
+                    params={"symbol": b_symbol, "leverage": leverage},
+                )
                 logger.info("leverage_set", symbol=symbol, leverage=leverage)
             except Exception as e:
                 logger.warning("leverage_set_failed", error=str(e))
 
             try:
                 margin_type = self.config.exchange.margin_type.upper()
-                await self._request("POST", "/fapi/v1/marginType", signed=True, params={"symbol": b_symbol, "marginType": margin_type})
+                await self._request(
+                    "POST",
+                    "/fapi/v1/marginType",
+                    signed=True,
+                    params={"symbol": b_symbol, "marginType": margin_type},
+                )
                 logger.info("margin_mode_set", symbol=symbol, mode=margin_type)
             except Exception as e:
                 # Often fails if already set
@@ -318,19 +353,40 @@ class BinanceDirectExchange(BaseExchange):
         logger.info("exchange_disconnected")
 
     async def fetch_ohlcv(
-        self, symbol: Optional[str] = None, timeframe: Optional[str] = None, limit: int = 100
+        self,
+        symbol: Optional[str] = None,
+        timeframe: Optional[str] = None,
+        limit: int = 100,
     ) -> pd.DataFrame:
         symbol = symbol or self.config.trading.symbol
         b_symbol = symbol.split(":")[0].replace("/", "")
         timeframe = timeframe or self.config.trading.timeframe
-        
+
         # CCXT uses '1m', Binance uses '1m' etc, mapping is straightforward mostly
-        
-        data = await self._request("GET", "/fapi/v1/klines", params={"symbol": b_symbol, "interval": timeframe, "limit": limit})
-        
+
+        data = await self._request(
+            "GET",
+            "/fapi/v1/klines",
+            params={"symbol": b_symbol, "interval": timeframe, "limit": limit},
+        )
+
         # Binance klines format: [Open time, Open, High, Low, Close, Volume, Close time, Quote asset volume, Number of trades, Taker buy base asset volume, Taker buy quote asset volume, Ignore]
         df = pd.DataFrame(
-            data, columns=["timestamp", "open", "high", "low", "close", "volume", "close_time", "qav", "num_trades", "taker_base_vol", "taker_quote_vol", "ignore"]
+            data,
+            columns=[
+                "timestamp",
+                "open",
+                "high",
+                "low",
+                "close",
+                "volume",
+                "close_time",
+                "qav",
+                "num_trades",
+                "taker_base_vol",
+                "taker_quote_vol",
+                "ignore",
+            ],
         )
         df = df[["timestamp", "open", "high", "low", "close", "volume"]]
         df["timestamp"] = pd.to_datetime(df["timestamp"], unit="ms")
@@ -354,12 +410,14 @@ class BinanceDirectExchange(BaseExchange):
                 "timestamp": int(time.time() * 1000),
             }
 
-        data = await self._request("GET", "/fapi/v1/ticker/24hr", params={"symbol": b_symbol})
+        data = await self._request(
+            "GET", "/fapi/v1/ticker/24hr", params={"symbol": b_symbol}
+        )
         # Wrap like CCXT
         ticker = {
             "symbol": symbol,
             "last": float(data.get("lastPrice", 0)),
-            "timestamp": int(data.get("closeTime", time.time()*1000)),
+            "timestamp": int(data.get("closeTime", time.time() * 1000)),
         }
 
         if self.paper_mode:
@@ -381,10 +439,10 @@ class BinanceDirectExchange(BaseExchange):
         data = await self._request("GET", "/fapi/v2/balance", signed=True)
         # Find USDT
         usdt_bal = next((b for b in data if b["asset"] == "USDT"), {})
-        
+
         total = float(usdt_bal.get("balance", 0))
         available = float(usdt_bal.get("availableBalance", 0))
-        
+
         return {
             "total": total,
             "free": available,
@@ -398,21 +456,23 @@ class BinanceDirectExchange(BaseExchange):
         notional = float(pos_data.get("notional", abs(amt * entry)))
         lev = int(pos_data.get("leverage", 1))
         liq = float(pos_data.get("liquidationPrice", 0))
-        
+
         if amt == 0:
             return Position()
-            
+
         side = "long" if amt > 0 else "short"
-        return Position({
-            "symbol": symbol,
-            "side": side,
-            "contracts": abs(amt),
-            "entryPrice": entry,
-            "notional": notional,
-            "unrealizedPnl": unrealized,
-            "leverage": lev,
-            "liquidationPrice": liq,
-        })
+        return Position(
+            {
+                "symbol": symbol,
+                "side": side,
+                "contracts": abs(amt),
+                "entryPrice": entry,
+                "notional": notional,
+                "unrealizedPnl": unrealized,
+                "leverage": lev,
+                "liquidationPrice": liq,
+            }
+        )
 
     async def get_position(self, symbol: Optional[str] = None) -> Position:
         symbol = symbol or self.config.trading.symbol
@@ -423,11 +483,13 @@ class BinanceDirectExchange(BaseExchange):
             return Position()
 
         b_symbol = symbol.split(":")[0].replace("/", "")
-        data = await self._request("GET", "/fapi/v2/positionRisk", signed=True, params={"symbol": b_symbol})
-        
+        data = await self._request(
+            "GET", "/fapi/v2/positionRisk", signed=True, params={"symbol": b_symbol}
+        )
+
         if data and len(data) > 0:
             return self._format_position(data[0], symbol)
-            
+
         return Position()
 
     async def get_open_positions(self) -> List[Position]:
@@ -441,42 +503,54 @@ class BinanceDirectExchange(BaseExchange):
         for pos in data:
             amt = float(pos.get("positionAmt", 0))
             if amt != 0:
-                # Recover ccxt-like symbol format or just use what we have, 
+                # Recover ccxt-like symbol format or just use what we have,
                 # we'll approximate CCXT symbol mapping for simplicity if needed
                 sym = pos["symbol"]
                 if sym.endswith("USDT"):
                     sym = sym.replace("USDT", "/USDT:USDT")
                 open_positions.append(self._format_position(pos, sym))
-                
+
         return open_positions
 
-    async def fetch_open_orders(self, symbol: Optional[str] = None) -> List[Dict[str, Any]]:
+    async def fetch_open_orders(
+        self, symbol: Optional[str] = None
+    ) -> List[Dict[str, Any]]:
         symbol = symbol or self.config.trading.symbol
         if self.paper_mode:
-            return [o for o in self._paper_orders if o["status"] == "open" and o["symbol"] == symbol]
+            return [
+                o
+                for o in self._paper_orders
+                if o["status"] == "open" and o["symbol"] == symbol
+            ]
 
         b_symbol = symbol.split(":")[0].replace("/", "")
-        data = await self._request("GET", "/fapi/v1/openOrders", signed=True, params={"symbol": b_symbol})
-        
+        data = await self._request(
+            "GET", "/fapi/v1/openOrders", signed=True, params={"symbol": b_symbol}
+        )
+
         # Transform slightly to match expected CCXT keys
         orders = []
         for o in data:
-            orders.append({
-                "id": str(o.get("orderId")),
-                "symbol": symbol,
-                "type": o.get("type"),
-                "side": "buy" if o.get("side") == "BUY" else "sell",
-                "price": float(o.get("price", 0)),
-                "stopPrice": float(o.get("stopPrice", 0)),
-                "amount": float(o.get("origQty", 0)),
-                "status": "open",
-            })
+            orders.append(
+                {
+                    "id": str(o.get("orderId")),
+                    "symbol": symbol,
+                    "type": o.get("type"),
+                    "side": "buy" if o.get("side") == "BUY" else "sell",
+                    "price": float(o.get("price", 0)),
+                    "stopPrice": float(o.get("stopPrice", 0)),
+                    "amount": float(o.get("origQty", 0)),
+                    "status": "open",
+                }
+            )
         return orders
 
-    def _execute_paper_market(self, symbol: str, amount: float, price: float, side: str) -> Dict[str, Any]:
+    def _execute_paper_market(
+        self, symbol: str, amount: float, price: float, side: str
+    ) -> Dict[str, Any]:
         leverage = self.config.exchange.leverage
         notional = amount * price
-        
+
         self._paper_position = {
             "symbol": symbol,
             "side": side,
@@ -485,7 +559,9 @@ class BinanceDirectExchange(BaseExchange):
             "notional": notional,
             "unrealizedPnl": 0.0,
             "leverage": leverage,
-            "liquidationPrice": price * (1 - 1 / leverage * 0.9) if side == "long" else price * (1 + 1 / leverage * 0.9),
+            "liquidationPrice": price * (1 - 1 / leverage * 0.9)
+            if side == "long"
+            else price * (1 + 1 / leverage * 0.9),
         }
 
         order_id = f"paper_{int(time.time() * 1000)}_{uuid.uuid4().hex[:6]}"
@@ -503,23 +579,27 @@ class BinanceDirectExchange(BaseExchange):
             "fees": [{"cost": amount * price * 0.0004, "currency": "USDT"}],
         }
 
-        self._paper_trades.append({
-            "id": f"trade_{int(time.time() * 1000)}",
-            "order": order_id,
-            "symbol": symbol,
-            "side": bs_side,
-            "price": price,
-            "amount": amount,
-            "cost": notional,
-            "fee": {"cost": amount * price * 0.0004, "currency": "USDT"},
-            "timestamp": int(time.time() * 1000),
-            "datetime": pd.Timestamp.now(tz="UTC").isoformat(),
-        })
+        self._paper_trades.append(
+            {
+                "id": f"trade_{int(time.time() * 1000)}",
+                "order": order_id,
+                "symbol": symbol,
+                "side": bs_side,
+                "price": price,
+                "amount": amount,
+                "cost": notional,
+                "fee": {"cost": amount * price * 0.0004, "currency": "USDT"},
+                "timestamp": int(time.time() * 1000),
+                "datetime": pd.Timestamp.now(tz="UTC").isoformat(),
+            }
+        )
 
         logger.info(f"paper_{side}_opened", symbol=symbol, amount=amount, price=price)
         return order
 
-    async def market_long(self, symbol: Optional[str] = None, amount: Optional[float] = None) -> Dict[str, Any]:
+    async def market_long(
+        self, symbol: Optional[str] = None, amount: Optional[float] = None
+    ) -> Dict[str, Any]:
         if amount is None or amount <= 0:
             raise ValueError(f"market_long requires amount > 0, got {amount}")
         symbol = symbol or self.config.trading.symbol
@@ -529,17 +609,26 @@ class BinanceDirectExchange(BaseExchange):
             return self._execute_paper_market(symbol, amount, ticker["last"], "long")
 
         b_symbol = symbol.split(":")[0].replace("/", "")
-        data = await self._request("POST", "/fapi/v1/order", signed=True, params={
-            "symbol": b_symbol,
-            "side": "BUY",
-            "type": "MARKET",
-            "quantity": amount
-        })
-        
-        logger.info("long_opened", symbol=symbol, amount=amount, order_id=data.get("orderId"))
+        data = await self._request(
+            "POST",
+            "/fapi/v1/order",
+            signed=True,
+            params={
+                "symbol": b_symbol,
+                "side": "BUY",
+                "type": "MARKET",
+                "quantity": amount,
+            },
+        )
+
+        logger.info(
+            "long_opened", symbol=symbol, amount=amount, order_id=data.get("orderId")
+        )
         return {"id": str(data.get("orderId"))}
 
-    async def market_short(self, symbol: Optional[str] = None, amount: Optional[float] = None) -> Dict[str, Any]:
+    async def market_short(
+        self, symbol: Optional[str] = None, amount: Optional[float] = None
+    ) -> Dict[str, Any]:
         if amount is None or amount <= 0:
             raise ValueError(f"market_short requires amount > 0, got {amount}")
         symbol = symbol or self.config.trading.symbol
@@ -549,17 +638,26 @@ class BinanceDirectExchange(BaseExchange):
             return self._execute_paper_market(symbol, amount, ticker["last"], "short")
 
         b_symbol = symbol.split(":")[0].replace("/", "")
-        data = await self._request("POST", "/fapi/v1/order", signed=True, params={
-            "symbol": b_symbol,
-            "side": "SELL",
-            "type": "MARKET",
-            "quantity": amount
-        })
-        
-        logger.info("short_opened", symbol=symbol, amount=amount, order_id=data.get("orderId"))
+        data = await self._request(
+            "POST",
+            "/fapi/v1/order",
+            signed=True,
+            params={
+                "symbol": b_symbol,
+                "side": "SELL",
+                "type": "MARKET",
+                "quantity": amount,
+            },
+        )
+
+        logger.info(
+            "short_opened", symbol=symbol, amount=amount, order_id=data.get("orderId")
+        )
         return {"id": str(data.get("orderId"))}
 
-    async def close_position(self, symbol: Optional[str] = None) -> Optional[Dict[str, Any]]:
+    async def close_position(
+        self, symbol: Optional[str] = None
+    ) -> Optional[Dict[str, Any]]:
         symbol = symbol or self.config.trading.symbol
         position = await self.get_position(symbol)
 
@@ -595,40 +693,65 @@ class BinanceDirectExchange(BaseExchange):
                 "fees": [{"cost": position.notional * 0.0004, "currency": "USDT"}],
             }
 
-            self._paper_trades.append({
-                "id": f"trade_{int(time.time() * 1000)}",
-                "order": order_id,
-                "symbol": symbol,
-                "side": side,
-                "price": exit_price,
-                "amount": position.size,
-                "cost": position.size * exit_price,
-                "fee": {"cost": position.size * exit_price * 0.0004, "currency": "USDT"},
-                "timestamp": int(time.time() * 1000),
-                "datetime": pd.Timestamp.now(tz="UTC").isoformat(),
-            })
+            self._paper_trades.append(
+                {
+                    "id": f"trade_{int(time.time() * 1000)}",
+                    "order": order_id,
+                    "symbol": symbol,
+                    "side": side,
+                    "price": exit_price,
+                    "amount": position.size,
+                    "cost": position.size * exit_price,
+                    "fee": {
+                        "cost": position.size * exit_price * 0.0004,
+                        "currency": "USDT",
+                    },
+                    "timestamp": int(time.time() * 1000),
+                    "datetime": pd.Timestamp.now(tz="UTC").isoformat(),
+                }
+            )
 
             self._paper_position = None
             self._paper_orders = []
-            logger.info("paper_position_closed", symbol=symbol, side=position.side, size=position.size, pnl=pnl)
+            logger.info(
+                "paper_position_closed",
+                symbol=symbol,
+                side=position.side,
+                size=position.size,
+                pnl=pnl,
+            )
             return order
 
         b_symbol = symbol.split(":")[0].replace("/", "")
         side = "SELL" if position.side == "long" else "BUY"
-        
-        data = await self._request("POST", "/fapi/v1/order", signed=True, params={
-            "symbol": b_symbol,
-            "side": side,
-            "type": "MARKET",
-            "quantity": position.size,
-            "reduceOnly": "true"
-        })
 
-        logger.info("position_closed", symbol=symbol, side=position.side, size=position.size, pnl=position.unrealized_pnl)
+        data = await self._request(
+            "POST",
+            "/fapi/v1/order",
+            signed=True,
+            params={
+                "symbol": b_symbol,
+                "side": side,
+                "type": "MARKET",
+                "quantity": position.size,
+                "reduceOnly": "true",
+            },
+        )
+
+        logger.info(
+            "position_closed",
+            symbol=symbol,
+            side=position.side,
+            size=position.size,
+            pnl=position.unrealized_pnl,
+        )
         return {"id": str(data.get("orderId"))}
 
     async def set_stop_loss(
-        self, symbol: Optional[str] = None, stop_price: Optional[float] = None, position_side: str = "long"
+        self,
+        symbol: Optional[str] = None,
+        stop_price: Optional[float] = None,
+        position_side: str = "long",
     ) -> Dict[str, Any]:
         symbol = symbol or self.config.trading.symbol
         position = await self.get_position(symbol)
@@ -640,7 +763,9 @@ class BinanceDirectExchange(BaseExchange):
         b_side = "SELL" if position.side == "long" else "BUY"
 
         if self.paper_mode:
-            self._paper_orders = [o for o in self._paper_orders if o["type"] != "stop_market"]
+            self._paper_orders = [
+                o for o in self._paper_orders if o["type"] != "stop_market"
+            ]
             order = {
                 "id": f"paper_sl_{int(time.time() * 1000)}",
                 "symbol": symbol,
@@ -654,27 +779,40 @@ class BinanceDirectExchange(BaseExchange):
             return order
 
         b_symbol = symbol.split(":")[0].replace("/", "")
-        
+
         # Cancel open SLs
         open_orders = await self.fetch_open_orders(symbol)
         for o in open_orders:
             if o["type"] == "STOP_MARKET":
-                await self._request("DELETE", "/fapi/v1/order", signed=True, params={"symbol": b_symbol, "orderId": o["id"]})
+                await self._request(
+                    "DELETE",
+                    "/fapi/v1/order",
+                    signed=True,
+                    params={"symbol": b_symbol, "orderId": o["id"]},
+                )
 
-        data = await self._request("POST", "/fapi/v1/order", signed=True, params={
-            "symbol": b_symbol,
-            "side": b_side,
-            "type": "STOP_MARKET",
-            "stopPrice": stop_price,
-            "closePosition": "true",
-            "timeInForce": "GTC"
-        })
+        data = await self._request(
+            "POST",
+            "/fapi/v1/order",
+            signed=True,
+            params={
+                "symbol": b_symbol,
+                "side": b_side,
+                "type": "STOP_MARKET",
+                "stopPrice": stop_price,
+                "closePosition": "true",
+                "timeInForce": "GTC",
+            },
+        )
 
         logger.info("stop_loss_set", symbol=symbol, stop_price=stop_price)
         return {"id": str(data.get("orderId"))}
 
     async def set_take_profit(
-        self, symbol: Optional[str] = None, take_profit_price: Optional[float] = None, position_side: str = "long"
+        self,
+        symbol: Optional[str] = None,
+        take_profit_price: Optional[float] = None,
+        position_side: str = "long",
     ) -> Dict[str, Any]:
         symbol = symbol or self.config.trading.symbol
         position = await self.get_position(symbol)
@@ -686,7 +824,9 @@ class BinanceDirectExchange(BaseExchange):
         b_side = "SELL" if position.side == "long" else "BUY"
 
         if self.paper_mode:
-            self._paper_orders = [o for o in self._paper_orders if o["type"] != "take_profit_market"]
+            self._paper_orders = [
+                o for o in self._paper_orders if o["type"] != "take_profit_market"
+            ]
             order = {
                 "id": f"paper_tp_{int(time.time() * 1000)}",
                 "symbol": symbol,
@@ -696,29 +836,43 @@ class BinanceDirectExchange(BaseExchange):
                 "status": "open",
             }
             self._paper_orders.append(order)
-            logger.info("paper_take_profit_set", symbol=symbol, tp_price=take_profit_price)
+            logger.info(
+                "paper_take_profit_set", symbol=symbol, tp_price=take_profit_price
+            )
             return order
 
         b_symbol = symbol.split(":")[0].replace("/", "")
-        
+
         open_orders = await self.fetch_open_orders(symbol)
         for o in open_orders:
             if o["type"] == "TAKE_PROFIT_MARKET":
-                await self._request("DELETE", "/fapi/v1/order", signed=True, params={"symbol": b_symbol, "orderId": o["id"]})
+                await self._request(
+                    "DELETE",
+                    "/fapi/v1/order",
+                    signed=True,
+                    params={"symbol": b_symbol, "orderId": o["id"]},
+                )
 
-        data = await self._request("POST", "/fapi/v1/order", signed=True, params={
-            "symbol": b_symbol,
-            "side": b_side,
-            "type": "TAKE_PROFIT_MARKET",
-            "stopPrice": take_profit_price,
-            "closePosition": "true",
-            "timeInForce": "GTC"
-        })
+        data = await self._request(
+            "POST",
+            "/fapi/v1/order",
+            signed=True,
+            params={
+                "symbol": b_symbol,
+                "side": b_side,
+                "type": "TAKE_PROFIT_MARKET",
+                "stopPrice": take_profit_price,
+                "closePosition": "true",
+                "timeInForce": "GTC",
+            },
+        )
 
         logger.info("take_profit_set", symbol=symbol, tp_price=take_profit_price)
         return {"id": str(data.get("orderId"))}
 
-    async def cancel_all_orders(self, symbol: Optional[str] = None) -> List[Dict[str, Any]]:
+    async def cancel_all_orders(
+        self, symbol: Optional[str] = None
+    ) -> List[Dict[str, Any]]:
         symbol = symbol or self.config.trading.symbol
         if self.paper_mode:
             self._paper_orders = []
@@ -726,7 +880,9 @@ class BinanceDirectExchange(BaseExchange):
             return []
 
         b_symbol = symbol.split(":")[0].replace("/", "")
-        await self._request("DELETE", "/fapi/v1/allOpenOrders", signed=True, params={"symbol": b_symbol})
+        await self._request(
+            "DELETE", "/fapi/v1/allOpenOrders", signed=True, params={"symbol": b_symbol}
+        )
         logger.info("orders_cancelled", symbol=symbol)
         # Fake return format since actual count not returned by this endpoint nicely
         return []
@@ -753,35 +909,41 @@ class BinanceDirectExchange(BaseExchange):
         params = {"symbol": b_symbol, "limit": limit}
         if since:
             params["startTime"] = since
-            
-        data = await self._request("GET", "/fapi/v1/userTrades", signed=True, params=params)
-        
+
+        data = await self._request(
+            "GET", "/fapi/v1/userTrades", signed=True, params=params
+        )
+
         trades = []
         for t in data:
-            trades.append({
-                "id": str(t.get("id")),
-                "order": str(t.get("orderId")),
-                "symbol": symbol,
-                "side": "buy" if t.get("buyer") else "sell",
-                "price": float(t.get("price", 0)),
-                "amount": float(t.get("qty", 0)),
-                "cost": float(t.get("quoteQty", 0)),
-                "fee": {
-                    "cost": float(t.get("commission", 0)),
-                    "currency": t.get("commissionAsset"),
-                },
-                "timestamp": t.get("time"),
-            })
+            trades.append(
+                {
+                    "id": str(t.get("id")),
+                    "order": str(t.get("orderId")),
+                    "symbol": symbol,
+                    "side": "buy" if t.get("buyer") else "sell",
+                    "price": float(t.get("price", 0)),
+                    "amount": float(t.get("qty", 0)),
+                    "cost": float(t.get("quoteQty", 0)),
+                    "fee": {
+                        "cost": float(t.get("commission", 0)),
+                        "currency": t.get("commissionAsset"),
+                    },
+                    "timestamp": t.get("time"),
+                }
+            )
         return trades
 
     async def fetch_funding_rate(self, symbol: Optional[str] = None) -> float:
         symbol = symbol or self.config.trading.symbol
         if self.paper_mode and not self._markets_loaded:
             return 0.0001
-            
+
         b_symbol = symbol.split(":")[0].replace("/", "")
         try:
-            data = await self._request("GET", "/fapi/v1/premiumIndex", params={"symbol": b_symbol})
+            data = await self._request(
+                "GET", "/fapi/v1/premiumIndex", params={"symbol": b_symbol}
+            )
             if isinstance(data, list):
                 data = data[0]
             return float(data.get("lastFundingRate", 0.0))
@@ -795,15 +957,23 @@ class BinanceDirectExchange(BaseExchange):
             return {"source": "paper", "bucket": bucket}
 
         result = {"source": "live", "bucket": bucket}
-        
+
         if hasattr(self, "_last_headers") and self._last_headers:
-            result["binance_used_weight_1m"] = int(self._last_headers.get("x-mbx-used-weight-1m", 0))
-            result["binance_used_weight"] = int(self._last_headers.get("x-mbx-used-weight", 0))
+            result["binance_used_weight_1m"] = int(
+                self._last_headers.get("x-mbx-used-weight-1m", 0)
+            )
+            result["binance_used_weight"] = int(
+                self._last_headers.get("x-mbx-used-weight", 0)
+            )
 
         return result
 
     async def get_order_fill_details(
-        self, order_id: str, symbol: Optional[str] = None, retries: int = 5, delay: float = 1.0
+        self,
+        order_id: str,
+        symbol: Optional[str] = None,
+        retries: int = 5,
+        delay: float = 1.0,
     ) -> Dict[str, Any]:
         symbol = symbol or self.config.trading.symbol
         logger.info("verifying_order_fills", order_id=order_id, symbol=symbol)
@@ -811,11 +981,15 @@ class BinanceDirectExchange(BaseExchange):
         for attempt in range(retries):
             try:
                 trades = await self.fetch_my_trades(symbol, limit=50)
-                order_trades = [t for t in trades if str(t.get("order")) == str(order_id)]
+                order_trades = [
+                    t for t in trades if str(t.get("order")) == str(order_id)
+                ]
 
                 if not order_trades:
                     if self.paper_mode:
-                        logger.warning("paper_trade_not_found_retrying", order_id=order_id)
+                        logger.warning(
+                            "paper_trade_not_found_retrying", order_id=order_id
+                        )
                     else:
                         logger.debug("no_fills_found_retrying", attempt=attempt + 1)
                     await asyncio.sleep(delay)
@@ -823,8 +997,12 @@ class BinanceDirectExchange(BaseExchange):
 
                 total_cost = sum(t.get("cost", 0) for t in order_trades)
                 total_amount = sum(t.get("amount", 0) for t in order_trades)
-                total_fee = sum(t.get("fee", {}).get("cost", 0) for t in order_trades if t.get("fee"))
-                
+                total_fee = sum(
+                    t.get("fee", {}).get("cost", 0)
+                    for t in order_trades
+                    if t.get("fee")
+                )
+
                 fee_currency = None
                 for t in order_trades:
                     if t.get("fee") and t["fee"].get("currency"):
@@ -833,10 +1011,20 @@ class BinanceDirectExchange(BaseExchange):
 
                 if total_amount == 0:
                     logger.warning("zero_amount_filled", order_id=order_id)
-                    return {"average_price": 0.0, "total_fee": 0.0, "fee_currency": None}
+                    return {
+                        "average_price": 0.0,
+                        "total_fee": 0.0,
+                        "fee_currency": None,
+                    }
 
                 average_price = total_cost / total_amount
-                logger.info("order_verified", order_id=order_id, avg_price=average_price, total_fee=total_fee, currency=fee_currency)
+                logger.info(
+                    "order_verified",
+                    order_id=order_id,
+                    avg_price=average_price,
+                    total_fee=total_fee,
+                    currency=fee_currency,
+                )
                 return {
                     "average_price": average_price,
                     "total_fee": total_fee,
@@ -845,7 +1033,9 @@ class BinanceDirectExchange(BaseExchange):
                 }
 
             except Exception as e:
-                logger.error("order_verification_failed", error=str(e), attempt=attempt + 1)
+                logger.error(
+                    "order_verification_failed", error=str(e), attempt=attempt + 1
+                )
                 await asyncio.sleep(delay)
 
         logger.error("order_verification_timeout", order_id=order_id)
@@ -862,43 +1052,45 @@ class BinanceDirectExchange(BaseExchange):
         """
         exchange_info = await self._public_request("GET", "/fapi/v1/exchangeInfo")
         tickers = await self._public_request("GET", "/fapi/v1/ticker/24hr")
-        
+
         tickers_map = {t["symbol"]: t for t in tickers}
-        
+
         result = []
         for symbol_info in exchange_info.get("symbols", []):
             if symbol_info.get("status") != "TRADING":
                 continue
             if symbol_info.get("contractType") != "PERPETUAL":
                 continue
-                
+
             symbol = symbol_info["symbol"]
-            
+
             # Format symbol to standard format (e.g. BTC/USDT)
             base = symbol_info.get("baseAsset", "")
             quote = symbol_info.get("quoteAsset", "")
             formatted_symbol = f"{base}/{quote}"
-            
+
             ticker = tickers_map.get(symbol, {})
-            
+
             min_size = 0.0
             tick_size = 0.0
-            
+
             for f in symbol_info.get("filters", []):
                 if f.get("filterType") == "PRICE_FILTER":
                     tick_size = float(f.get("tickSize", 0.0))
                 elif f.get("filterType") == "LOT_SIZE":
                     min_size = float(f.get("minQty", 0.0))
-            
-            result.append({
-                "symbol": formatted_symbol,
-                "base": base,
-                "quote": quote,
-                "min_size": min_size,
-                "tick_size": tick_size,
-                "volume_24h": float(ticker.get("quoteVolume", 0.0)),
-                "last_price": float(ticker.get("lastPrice", 0.0)),
-                "status": "active"
-            })
-            
+
+            result.append(
+                {
+                    "symbol": formatted_symbol,
+                    "base": base,
+                    "quote": quote,
+                    "min_size": min_size,
+                    "tick_size": tick_size,
+                    "volume_24h": float(ticker.get("quoteVolume", 0.0)),
+                    "last_price": float(ticker.get("lastPrice", 0.0)),
+                    "status": "active",
+                }
+            )
+
         return result

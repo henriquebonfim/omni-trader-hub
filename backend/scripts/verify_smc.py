@@ -45,13 +45,20 @@ async def main():
             dates.reverse()
 
             # Simple sine wave + trend
-            x = np.linspace(0, 4*np.pi, 200)
+            x = np.linspace(0, 4 * np.pi, 200)
             trend = np.linspace(100, 110, 200)
             price = trend + np.sin(x) * 2
 
-            df = pd.DataFrame({
-                "open": price, "high": price + 0.5, "low": price - 0.5, "close": price, "volume": 1000
-            }, index=dates)
+            df = pd.DataFrame(
+                {
+                    "open": price,
+                    "high": price + 0.5,
+                    "low": price - 0.5,
+                    "close": price,
+                    "volume": 1000,
+                },
+                index=dates,
+            )
             market_data[tf] = df
 
     # Analyze
@@ -72,12 +79,17 @@ async def main():
             print(f"  Last Low:  {last_low.price} (Index: {last_low.index})")
 
         if res.last_bos:
-            print(f"  Last BOS:  {res.last_bos.type} {res.last_bos.trend.name} @ {res.last_bos.price} (Time: {res.last_bos.time})")
+            print(
+                f"  Last BOS:  {res.last_bos.type} {res.last_bos.trend.name} @ {res.last_bos.price} (Time: {res.last_bos.time})"
+            )
 
         if res.last_choch:
-            print(f"  Last CHoCH:{res.last_choch.type} {res.last_choch.trend.name} @ {res.last_choch.price} (Time: {res.last_choch.time})")
+            print(
+                f"  Last CHoCH:{res.last_choch.type} {res.last_choch.trend.name} @ {res.last_choch.price} (Time: {res.last_choch.time})"
+            )
 
     await exchange.close()
+
 
 if __name__ == "__main__":
     asyncio.run(main())

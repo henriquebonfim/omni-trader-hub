@@ -45,9 +45,10 @@ def mock_bot():
 @pytest.fixture
 def client(mock_bot, monkeypatch):
     monkeypatch.setenv("OMNITRADER_API_KEY", "test-secret")
-    
+
     # Reset the singleton in auth.py for testing
     import src.api.auth as auth
+
     auth._API_KEY = None
     auth._AUTH_DEV_MODE = False
 
@@ -73,23 +74,32 @@ MEMGRAPH_PASSWORD="password123"
     """
     env_file = tmp_path / ".env"
     env_file.write_text(env_content)
-    
+
     # Monkeypatch the ENV_FILE to use our tmp file
     import src.api.routes.env as env_route
+
     monkeypatch.setattr(env_route, "ENV_FILE", env_file)
 
     response = client.get("/api/env")
     assert response.status_code == 200
     data = response.json()
-    
+
     assert "exchange" in data
     assert "database" in data
-    
-    assert data["exchange"]["BINANCE_API_KEY"] == "public_key"
-    assert data["exchange"]["BINANCE_SECRET"] == "su...ue" # masked
-    assert data["database"]["MEMGRAPH_HOST"] == "localhost"
-    assert data["database"]["MEMGRAPH_PASSWORD"] == "pa...23" # masked (also tests quotes stripping)
-    
+
+    assert data["exchange"]["BINANCE_API_KEY"]["value"] == "public_key"
+    assert data["exchange"]["BINANCE_API_KEY"]["description"] == "Binance API Key"
+    assert data["exchange"]["BINANCE_API_KEY"]["requires_restart"] is True
+    assert data["exchange"]["BINANCE_API_KEY"]["masked"] is False
+
+    assert data["exchange"]["BINANCE_SECRET"]["value"] == "su...ue"  # masked
+    assert data["exchange"]["BINANCE_SECRET"]["masked"] is True
+
+    assert data["database"]["MEMGRAPH_HOST"]["value"] == "localhost"
+    assert (
+        data["database"]["MEMGRAPH_PASSWORD"]["value"] == "pa...23"
+    )  # masked (also tests quotes stripping)
+
     # Check that non-whitelisted variable is NOT exposed
     assert "NOT_WHITELISTED" not in str(data)
 
@@ -102,8 +112,9 @@ NOT_WHITELISTED=hidden
     """
     env_file = tmp_path / ".env"
     env_file.write_text(env_content)
-    
+
     import src.api.routes.env as env_route
+
     monkeypatch.setattr(env_route, "ENV_FILE", env_file)
 
     payload = {
@@ -113,9 +124,11 @@ NOT_WHITELISTED=hidden
         }
     }
 
-    response = client.put("/api/env", json=payload, headers={"Authorization": "Bearer test-secret"})
+    response = client.put(
+        "/api/env", json=payload, headers={"Authorization": "Bearer test-secret"}
+    )
     assert response.status_code == 200
-    
+
     # Verify the file was updated correctly
     new_content = env_file.read_text()
     assert "BINANCE_API_KEY=new_key" in new_content
@@ -128,16 +141,20 @@ def test_put_env_validation(client, monkeypatch, tmp_path):
     env_file = tmp_path / ".env"
     env_file.write_text("")
     import src.api.routes.env as env_route
+
     monkeypatch.setattr(env_route, "ENV_FILE", env_file)
 
     # Test updating a non-whitelisted key
     payload = {"updates": {"NOT_WHITELISTED": "value"}}
-    response = client.put("/api/env", json=payload, headers={"Authorization": "Bearer test-secret"})
+    response = client.put(
+        "/api/env", json=payload, headers={"Authorization": "Bearer test-secret"}
+    )
     assert response.status_code == 400
     assert "not allowed to be modified" in response.json()["detail"]
 
     # Test invalid value type (raises 422 Unprocessable Entity)
     payload = {"updates": {"BINANCE_API_KEY": 123}}
-    response = client.put("/api/env", json=payload, headers={"Authorization": "Bearer test-secret"})
+    response = client.put(
+        "/api/env", json=payload, headers={"Authorization": "Bearer test-secret"}
+    )
     assert response.status_code == 422
-
