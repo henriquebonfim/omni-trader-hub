@@ -76,11 +76,11 @@ export const useAppStore = create<AppState>((set) => ({
         b.id === msg.bot_id
           ? {
               ...b,
-              active_strategy: msg.active_strategy,
+              active_strategy: msg.active_strategy || b.active_strategy,
               regime: msg.regime,
-              daily_pnl: msg.daily_pnl,
-              daily_pnl_pct: msg.daily_pnl_pct,
-              balance_allocated: msg.balance,
+              daily_pnl: msg.daily_pnl ?? 0,
+              daily_pnl_pct: msg.daily_pnl_pct ?? 0,
+              balance_allocated: msg.balance ?? 0,
               position: msg.position
                 ? { ...b.position!, side: msg.position, unrealized_pnl: 0 } as Bot['position']
                 : null,

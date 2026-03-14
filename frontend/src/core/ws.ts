@@ -14,8 +14,12 @@ export function useLiveFeed() {
 
   const connect = useCallback(() => {
     try {
-      // Connect relative to current host via proxy, or use absolute URL
-      const wsUrl = import.meta.env.VITE_WS_URL || `ws://${window.location.host}/ws/live`;
+      // Connect to backend WebSocket at port 8000
+      // In development: ws://localhost:8000/ws/live
+      // In production: use VITE_WS_URL env var
+      const wsUrl = import.meta.env.VITE_WS_URL 
+        ? import.meta.env.VITE_WS_URL
+        : `ws://${window.location.hostname}:8000/ws/live`;
       const ws = new WebSocket(wsUrl);
       wsRef.current = ws;
 
