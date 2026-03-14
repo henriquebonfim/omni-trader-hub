@@ -22,11 +22,13 @@ from .routes import (
     indicators,
     markets,
     notifications,
-    status as status_routes,
     strategies,
     stubs,
     system,
     trades,
+)
+from .routes import (
+    status as status_routes,
 )
 from .websocket import router as ws_router
 
@@ -56,15 +58,15 @@ def create_api(bot_instance=None, bot_manager=None) -> FastAPI:
     @app.middleware("http")
     async def auth_middleware(request: Request, call_next):
         """
-        Global authentication middleware. 
+        Global authentication middleware.
         Requires Authorization header with Bearer token for all routes except public ones.
         """
         path = request.url.path
-        
+
         # Allow public paths without authentication
         if path in PUBLIC_PATHS:
             return await call_next(request)
-        
+
         # Check Authorization header for all other paths
         auth_header = request.headers.get("Authorization", "")
         if not auth_header.startswith("Bearer "):
@@ -72,7 +74,7 @@ def create_api(bot_instance=None, bot_manager=None) -> FastAPI:
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 content={"detail": "Missing or invalid Authorization header"},
             )
-        
+
         return await call_next(request)
 
     # Store bot references

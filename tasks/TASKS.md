@@ -22,10 +22,6 @@ Next-sprint candidates (`T55-T62`) are now parked in `TODO.md` with explicit lab
 
 #### Broken Contract
 
-- `T64` - Fix `PUT /api/env` payload shape mismatch
-	- Details: Backend expects `{ "updates": { KEY: VALUE } }` while frontend currently submits a flat object `{ KEY: VALUE }`, causing request failure and fallback behavior.
-	- Possible solutions: (1) patch frontend to send `{ updates: ... }`; add request contract tests and remove dual-shape support after migration.
-
 - `T65` - Align `PUT /api/bots/{bot_id}` update schema
 	- Details: Backend route binds `ConfigUpdate` while frontend sends a generic partial bot object; accepted fields are not guaranteed to map cleanly and can silently drift.
 	- Possible solutions: (1) introduce `BotUpdateRequest` schema and update frontend payload adapter, add E2E test that updates real bot config fields from UI payload.
