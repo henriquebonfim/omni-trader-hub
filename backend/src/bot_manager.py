@@ -88,17 +88,7 @@ class BotManager:
         return self.bots.get(bot_id)
 
     def list_bots(self) -> List[dict]:
-        return [
-            {
-                "id": bot_id,
-                "symbol": bot.config.trading.symbol,
-                "timeframe": bot.config.trading.timeframe,
-                "strategy": getattr(bot.config.strategy, "name", "unknown"),
-                "paper_mode": getattr(bot.config.exchange, "paper_mode", True),
-                "running": bot._running,
-            }
-            for bot_id, bot in self.bots.items()
-        ]
+        return [bot.get_summary() for bot in self.bots.values()]
 
     async def create_bot(self, config_overrides: dict) -> str:
         """Create a new bot with the given config overrides and save state."""

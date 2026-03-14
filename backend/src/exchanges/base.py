@@ -33,6 +33,7 @@ class Position:
             self.unrealized_pnl = 0.0
             self.leverage = 1
             self.liquidation_price = 0.0
+            self.timestamp = None
         else:
             self.symbol = data.get("symbol")
             self.side = data.get("side")  # "long" or "short"
@@ -42,6 +43,7 @@ class Position:
             self.unrealized_pnl = float(data.get("unrealizedPnl", 0))
             self.leverage = int(data.get("leverage", 1))
             self.liquidation_price = float(data.get("liquidationPrice", 0))
+            self.timestamp = data.get("timestamp")
 
     @property
     def contracts(self) -> float:
@@ -51,6 +53,21 @@ class Position:
     @property
     def is_open(self) -> bool:
         return self.size > 0
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert position to dictionary for API serialization."""
+        return {
+            "symbol": self.symbol,
+            "side": self.side,
+            "size": self.size,
+            "entry_price": self.entry_price,
+            "notional": self.notional,
+            "unrealized_pnl": self.unrealized_pnl,
+            "leverage": self.leverage,
+            "liquidation_price": self.liquidation_price,
+            "is_open": self.is_open,
+            "timestamp": self.timestamp,
+        }
 
     def __repr__(self) -> str:
         if not self.is_open:

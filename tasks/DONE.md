@@ -613,3 +613,41 @@
 - [x] Aligned queue narrative so active work, forward queue, and backlog candidates are non-conflicting
 
 ---
+
+### T63. `GET /api/env` Contract Alignment ✅ **COMPLETED 2026-03-14**
+- [x] Updated backend `GET /api/env` to return `EnvVarMetadata` (value, masked, description, requires_restart) for each key
+- [x] Updated frontend `fetchEnvVars` in `frontend/src/domains/system/api.ts` to parse the new metadata structure
+- [x] Resolved contract mismatch and removed fallback stubs
+
+### T64. `PUT /api/env` Payload Shape Alignment ✅ **COMPLETED 2026-03-14**
+- [x] Updated frontend `updateEnvVars` to wrap updates in an `{ updates }` object matching backend `EnvUpdate` schema
+- [x] Verified atomic write and validation in `backend/src/api/routes/env.py`
+
+### T65. `PUT /api/bots/{bot_id}` Schema Alignment ✅ **COMPLETED 2026-03-14**
+- [x] Standardized backend `PUT /api/bots/{bot_id}` with `BotUpdateRequest` and `ConfigUpdate` schemas
+- [x] Updated frontend `updateBot` to send configuration changes under a `config` key
+- [x] Added integration test coverage for nested configuration updates
+
+### T66. Removal of Unused Daily Summary Endpoint ✅ **COMPLETED 2026-03-14**
+- [x] Determined `GET /api/daily-summary/{date}` was redundant for frontend requirements
+- [x] Deprecated and removed endpoint from `backend/src/api/routes/trades.py`
+
+### T67. Removal of Unused Strategy Detail Endpoint ✅ **COMPLETED 2026-03-14**
+- [x] Determined `GET /api/strategies/{name}` was unused by Strategy Lab UI
+- [x] Removed endpoint from `backend/src/api/routes/strategies.py`
+
+### T68. News Feed Filtering Strategy Resolution ✅ **COMPLETED 2026-03-14**
+- [x] Resolved T68 by implementing client-side filtering on the global news feed in `Intelligence.tsx`
+- [x] Decided against active use of symbol-scoped news endpoint to simplify frontend state management
+
+### T69. Indicators API Integration ✅ **COMPLETED 2026-03-14**
+- [x] Integrated `GET /api/indicators` and `POST /api/indicators/compute` backend capabilities into Strategy Lab
+- [x] Implemented searchable TA-Lib indicator list and condition builder in `StrategyLab.tsx`
+- [x] Wired custom strategy executor to handle user-defined indicator rules during runtime
+
+### T70. Normalize Bot List Source to `/api/bots` ✅ **COMPLETED 2026-03-14**
+- [x] Enhanced `OmniTrader` with `get_summary()` to provide enriched state (PnL, balance, position, uptime)
+- [x] Updated `BotManager.list_bots()` to return full bot summaries
+- [x] Implemented `adaptBot` in frontend and switched `fetchBots()` to use `GET /api/bots`
+- [x] Removed legacy `adaptBotState` and complex Promise-based synthesis in frontend
+---

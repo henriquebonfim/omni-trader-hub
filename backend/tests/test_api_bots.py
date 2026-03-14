@@ -33,10 +33,11 @@ def mock_bot_manager():
     )
 
     bot1 = AsyncMock(spec=OmniTrader)
+    bot1.bot_id = "bot1"
     bot1.config = Config(
         {
             "trading": {"symbol": "BTC/USDT", "timeframe": "1h"},
-            "exchange": {"paper_mode": True},
+            "exchange": {"paper_mode": True, "leverage": 10},
             "strategy": {"name": "ema_volume"},
         }
     )
@@ -52,11 +53,29 @@ def mock_bot_manager():
     bot1.risk.daily_stats.wins = 1
     bot1.risk.daily_stats.losses = 1
 
+    bot1.get_summary = lambda: {
+        "id": "bot1",
+        "symbol": "BTC/USDT",
+        "timeframe": "1h",
+        "running": True,
+        "strategy": "ema_volume",
+        "market_regime": "trending",
+        "daily_pnl": 100.0,
+        "daily_pnl_pct": 1.0,
+        "total_balance": 10000.0,
+        "leverage": 10,
+        "paper_mode": True,
+        "uptime_seconds": 3600,
+        "circuit_breaker_active": False,
+        "position": {"is_open": False},
+    }
+
     bot2 = AsyncMock(spec=OmniTrader)
+    bot2.bot_id = "bot2"
     bot2.config = Config(
         {
             "trading": {"symbol": "ETH/USDT", "timeframe": "15m"},
-            "exchange": {"paper_mode": True},
+            "exchange": {"paper_mode": True, "leverage": 10},
             "strategy": {"name": "ema_volume"},
         }
     )
@@ -71,6 +90,23 @@ def mock_bot_manager():
     bot2.risk.daily_stats.trades_count = 0
     bot2.risk.daily_stats.wins = 0
     bot2.risk.daily_stats.losses = 0
+
+    bot2.get_summary = lambda: {
+        "id": "bot2",
+        "symbol": "ETH/USDT",
+        "timeframe": "15m",
+        "running": False,
+        "strategy": "ema_volume",
+        "market_regime": "ranging",
+        "daily_pnl": 0.0,
+        "daily_pnl_pct": 0.0,
+        "total_balance": 10000.0,
+        "leverage": 10,
+        "paper_mode": True,
+        "uptime_seconds": 0,
+        "circuit_breaker_active": False,
+        "position": {"is_open": False},
+    }
 
     manager.bots = {"bot1": bot1, "bot2": bot2}
 

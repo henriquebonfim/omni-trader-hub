@@ -169,6 +169,9 @@ class OmniTrader:
         self._weekly_check_counter = 60
         self._funding_check_counter = 0
         self._last_regime = None
+        self._last_position = None
+        self._last_balance = 0.0
+        self._started_at = None
 
     def _get_notification_rules(self) -> dict[str, float | bool]:
         """Read alert rules from config with safe defaults."""
@@ -477,6 +480,8 @@ class OmniTrader:
             paper_mode=paper_mode,
         )
 
+        self._started_at = datetime.now(timezone.utc)
+
         # Connect to services
         await self.exchange.connect()
         await self.database.connect()
@@ -754,6 +759,33 @@ class OmniTrader:
         if isinstance(value, dict):
             return {k: self._sanitize_indicators(v) for k, v in value.items()}
         return value
+
+    def get_summary(self) -> dict:
+        """Get a summary of the bot's current state."""
+        uptime = 0
+        if self._started_at:
+            uptime = int((datetime.now(timezone.utc) - self._started_at).total_seconds())
+
+        return {
+            "id": self.bot_id,
+            "symbol": self.config.trading.symbol,
+            "timeframe": self.config.trading.timeframe,
+            "running": self._running,
+            "strategy": getattr(self.config.strategy, "name", "ema_volume"),
+            "market_regime": self._last_regime or "trending",
+            "daily_pnl": self.risk.daily_stats.realized_pnl,
+            "daily_pnl_pct": self.risk.daily_stats.pnl_pct,
+            "total_balance": self._last_balance,
+            "leverage": self.config.exchange.leverage,
+            "paper_mode": getattr(self.config.exchange, "paper_mode", True),
+            "uptime_seconds": uptime,
+            "circuit_breaker_active": self.risk.check_circuit_breaker(),
+            "position": (
+                self._last_position.to_dict()
+                if self._last_position
+                else {"is_open": False}
+            ),
+        }
 
     async def _fetch_market_context(self, symbol: str):
         """Fetch market data, resolve current price, and compute trend context."""
@@ -1271,6 +1303,9 @@ class OmniTrader:
             total_balance = preflight.total_balance
             position = preflight.position
             current_side = preflight.current_side
+
+            self._last_position = position
+            self._last_balance = total_balance
 
             market_context = await self._fetch_market_context(symbol)
             if market_context is None:

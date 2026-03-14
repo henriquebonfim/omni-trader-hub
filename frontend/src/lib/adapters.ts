@@ -21,34 +21,34 @@ function normalizeRegimeAffinity(value: unknown): Strategy['regime_affinity'] {
   return 'all';
 }
 
-export function adaptBotState(backendStatus: JsonObject, backendPosition: JsonObject, backendBalance: JsonObject): Bot {
+export function adaptBot(backendBot: JsonObject): Bot {
+  const bPosition = backendBot.position as JsonObject | undefined;
   let position: Position | null = null;
-  if (backendPosition && backendPosition.is_open) {
-    const side = String(backendPosition.side ?? 'long').toLowerCase();
+  if (bPosition && bPosition.is_open) {
     position = {
-      side: (side === 'short' ? 'short' : 'long') as 'long' | 'short',
-      entry_price: Number(backendPosition.entry_price ?? 0),
-      size: Number(backendPosition.size ?? 0),
-      unrealized_pnl: Number(backendPosition.unrealized_pnl ?? 0),
-      stop_loss: Number(backendPosition.stop_loss ?? 0),
-      take_profit: Number(backendPosition.take_profit ?? 0),
-      opened_at: backendPosition.opened_at ? new Date(String(backendPosition.opened_at)).getTime() : Date.now(),
+      side: (bPosition.side === 'short' ? 'short' : 'long') as 'long' | 'short',
+      entry_price: Number(bPosition.entry_price ?? 0),
+      size: Number(bPosition.size ?? 0),
+      unrealized_pnl: Number(bPosition.unrealized_pnl ?? 0),
+      stop_loss: Number(bPosition.stop_loss ?? 0),
+      take_profit: Number(bPosition.take_profit ?? 0),
+      opened_at: bPosition.timestamp ? new Date(String(bPosition.timestamp)).getTime() : Date.now(),
     };
   }
 
   return {
-    id: 'default',
-    symbol: String(backendStatus.symbol ?? 'BTC/USDT'),
-    status: backendStatus.running ? 'running' : 'stopped',
-    mode: 'auto', // default to auto as it's not currently tracked in backend status in this way
-    active_strategy: String(backendStatus.strategy ?? 'unknown'),
-    regime: (backendStatus.market_regime as Bot['regime']) ?? 'trending', // fallback
+    id: String(backendBot.id ?? 'unknown'),
+    symbol: String(backendBot.symbol ?? 'BTC/USDT'),
+    status: backendBot.running ? 'running' : 'stopped',
+    mode: (backendBot.mode as Bot['mode']) ?? 'auto',
+    active_strategy: String(backendBot.strategy ?? 'unknown'),
+    regime: (backendBot.market_regime as Bot['regime']) ?? 'trending',
     position,
-    daily_pnl: Number(backendBalance?.daily_pnl ?? 0),
-    daily_pnl_pct: Number(backendBalance?.daily_pnl_pct ?? 0),
-    balance_allocated: Number(backendBalance?.total ?? 0),
-    leverage: Number(backendPosition?.leverage ?? 1),
-    created_at: Date.now() - Number(backendStatus.uptime_seconds ?? 0) * 1000,
+    daily_pnl: Number(backendBot.daily_pnl ?? 0),
+    daily_pnl_pct: Number(backendBot.daily_pnl_pct ?? 0),
+    balance_allocated: Number(backendBot.total_balance ?? 0),
+    leverage: Number(backendBot.leverage ?? 1),
+    created_at: Date.now() - Number(backendBot.uptime_seconds ?? 0) * 1000,
   };
 }
 

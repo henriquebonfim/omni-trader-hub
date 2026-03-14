@@ -1,17 +1,11 @@
 import { request } from '@/core/api';
-import { adaptBotState } from '@/lib/adapters';
+import { adaptBot } from '@/lib/adapters';
 import type { Bot } from './types';
 
 export const fetchBots = async () => {
   try {
-    type ApiObject = Record<string, unknown>;
-    const [status, position, balance] = await Promise.all([
-      request<ApiObject>('/api/status'),
-      request<ApiObject>('/api/position'),
-      request<ApiObject>('/api/balance'),
-    ]);
-    const realBot = adaptBotState(status, position, balance);
-    return [realBot];
+    const bots = await request<Record<string, unknown>[]>('/api/bots');
+    return (bots || []).map(adaptBot);
   } catch (e) {
     console.error('fetchBots error', e);
     return [];

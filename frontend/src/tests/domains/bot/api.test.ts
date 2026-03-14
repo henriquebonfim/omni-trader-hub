@@ -9,7 +9,7 @@ vi.mock('@/core/api', () => ({ request: mockRequest }));
 
 // Simple adapter mock
 vi.mock('@/lib/adapters', () => ({
-  adaptBotState: vi.fn(() => ({ id: 'default', active_strategy: 'smc', config: { leverage: 1 } })),
+  adaptBot: vi.fn((bot) => ({ ...bot, id: bot.id || 'default' })),
 }));
 
 describe('bot api', () => {
@@ -17,14 +17,15 @@ describe('bot api', () => {
     mockRequest.mockClear();
   });
 
-  it('fetchBots should fetch status, position, and balance, then adapt', async () => {
-    mockRequest.mockResolvedValue({ ok: true }); // Mock all promises with empty objects or simple values
+  it('fetchBots should call /api/bots and adapt results', async () => {
+    mockRequest.mockResolvedValueOnce([{ id: 'bot-1', symbol: 'BTC/USDT' }]);
 
     const bots = await fetchBots();
     
-    expect(mockRequest).toHaveBeenCalledTimes(3);
+    expect(mockRequest).toHaveBeenCalledTimes(1);
+    expect(mockRequest).toHaveBeenCalledWith('/api/bots');
     expect(bots).toHaveLength(1);
-    expect(bots[0].id).toBe('default');
+    expect(bots[0].id).toBe('bot-1');
   });
 
   it('fetchBots should return empty array on error', async () => {
@@ -32,7 +33,7 @@ describe('bot api', () => {
     
     const bots = await fetchBots();
     
-    expect(mockRequest).toHaveBeenCalledTimes(3);
+    expect(mockRequest).toHaveBeenCalledTimes(1);
     expect(bots).toEqual([]);
   });
 
