@@ -14,15 +14,18 @@ from src.strategy.registry import get_all_strategies, get_strategy
 
 router = APIRouter(tags=["strategies"])
 
+
 class IndicatorConfig(BaseModel):
     function: str
     params: Dict[str, Any]
     output_name: str
 
+
 class ConditionConfig(BaseModel):
     indicator: str
     operator: str
     value: Any
+
 
 class CustomStrategyCreate(BaseModel):
     name: str
@@ -44,10 +47,11 @@ async def get_strategies_performance(request: Request):
     bot = request.app.state.bot
     if not hasattr(bot, "strategy_selector"):
         from src.strategy.selector import StrategySelector
+
         selector = StrategySelector(database=bot.database)
     else:
         selector = bot.strategy_selector
-        
+
     results = {}
     for regime in MarketRegime:
         scores = await selector.get_strategy_performance(regime)
@@ -58,11 +62,11 @@ async def get_strategies_performance(request: Request):
                 "sharpe": s.sharpe,
                 "profit_factor": s.profit_factor,
                 "win_rate": s.win_rate,
-                "composite_score": s.composite_score
+                "composite_score": s.composite_score,
             }
             for s in scores
         ]
-        
+
     return {"performance": results}
 
 
@@ -73,7 +77,7 @@ async def list_strategies(request: Request):
     active = getattr(bot.config.strategy, "name", "ema_volume")
 
     strategies = []
-    
+
     # Built-in strategies
     for name, cls in get_all_strategies().items():
         try:
@@ -84,7 +88,7 @@ async def list_strategies(request: Request):
         except Exception:
             meta = {}
             regimes = []
-            
+
         strategies.append(
             {
                 "name": name,
@@ -132,23 +136,35 @@ def validate_custom_strategy(strat: CustomStrategyCreate):
         try:
             talib.abstract.Function(ind.function)
         except Exception as e:
-            raise HTTPException(status_code=400, detail=f"Invalid TA-Lib function: {ind.function}") from e
+            raise HTTPException(
+                status_code=400, detail=f"Invalid TA-Lib function: {ind.function}"
+            ) from e
 
     # Check conditions
     all_conditions = (
-        strat.entry_long_json + strat.entry_short_json +
-        strat.exit_long_json + strat.exit_short_json
+        strat.entry_long_json
+        + strat.entry_short_json
+        + strat.exit_long_json
+        + strat.exit_short_json
     )
     for cond in all_conditions:
         if cond.operator not in valid_operators:
-            raise HTTPException(status_code=400, detail=f"Invalid operator: {cond.operator}")
+            raise HTTPException(
+                status_code=400, detail=f"Invalid operator: {cond.operator}"
+            )
         if cond.indicator not in indicator_outputs:
-            raise HTTPException(status_code=400, detail=f"Condition references unknown indicator: {cond.indicator}")
+            raise HTTPException(
+                status_code=400,
+                detail=f"Condition references unknown indicator: {cond.indicator}",
+            )
         if isinstance(cond.value, str) and cond.value not in indicator_outputs:
             try:
                 float(cond.value)
             except ValueError as e:
-                raise HTTPException(status_code=400, detail=f"Condition value must be number or valid indicator, got: {cond.value}") from e
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Condition value must be number or valid indicator, got: {cond.value}",
+                ) from e
 
 
 @router.get("/strategies/{name}")
@@ -196,16 +212,16 @@ async def get_strategy_detail(request: Request, name: str):
 
 @router.post("/strategies")
 async def create_custom_strategy(
-    request: Request,
-    strat: CustomStrategyCreate,
-    _: str = Depends(verify_api_key)
+    request: Request, strat: CustomStrategyCreate, _: str = Depends(verify_api_key)
 ):
     bot = request.app.state.bot
 
     # Check if name is taken by built-in
     try:
         get_strategy(strat.name)
-        raise HTTPException(status_code=400, detail="Name conflicts with built-in strategy")
+        raise HTTPException(
+            status_code=400, detail="Name conflicts with built-in strategy"
+        )
     except ValueError:
         pass
 
@@ -213,7 +229,9 @@ async def create_custom_strategy(
     if hasattr(bot.database, "get_custom_strategy"):
         existing = await bot.database.get_custom_strategy(strat.name)
         if existing:
-            raise HTTPException(status_code=400, detail="Custom strategy with this name already exists")
+            raise HTTPException(
+                status_code=400, detail="Custom strategy with this name already exists"
+            )
 
     validate_custom_strategy(strat)
 
@@ -238,13 +256,15 @@ async def update_custom_strategy(
     request: Request,
     name: str,
     strat: CustomStrategyCreate,
-    _: str = Depends(verify_api_key)
+    _: str = Depends(verify_api_key),
 ):
     bot = request.app.state.bot
 
     # Enforce name match
     if strat.name != name:
-        raise HTTPException(status_code=400, detail="Path name and body name must match")
+        raise HTTPException(
+            status_code=400, detail="Path name and body name must match"
+        )
 
     # Ensure it exists as a custom strategy
     existing = await bot.database.get_custom_strategy(name)
@@ -271,16 +291,16 @@ async def update_custom_strategy(
 
 @router.delete("/strategies/{name}")
 async def delete_custom_strategy(
-    request: Request,
-    name: str,
-    _: str = Depends(verify_api_key)
+    request: Request, name: str, _: str = Depends(verify_api_key)
 ):
     bot = request.app.state.bot
 
     # Cannot delete built-in
     try:
         get_strategy(name)
-        raise HTTPException(status_code=404, detail="Strategy not found") # Or 400? Prompt asks for 404 for built-in strategy deletion
+        raise HTTPException(
+            status_code=404, detail="Strategy not found"
+        )  # Or 400? Prompt asks for 404 for built-in strategy deletion
     except ValueError:
         pass
 

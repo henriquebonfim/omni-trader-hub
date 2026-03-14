@@ -133,9 +133,9 @@ class RiskManager:
 
         # Persistence
         from .database.factory import DatabaseFactory
+
         self.database = database or DatabaseFactory.get_database(config)
         self._state_key_prefix = f"omnitrader:risk:{bot_id}:"
-
 
     async def load_state(self):
         """Restore state from persistent database."""

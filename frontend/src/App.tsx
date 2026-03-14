@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Route, Routes } from "react-router-dom";
+import { BrowserRouter, Route, Routes, Navigate } from "react-router-dom";
 import { Toaster as Sonner } from "@/shared/ui/sonner";
 import { Toaster } from "@/shared/ui/toaster";
 import { TooltipProvider } from "@/shared/ui/tooltip";
@@ -13,9 +13,34 @@ import RiskMonitor from "./pages/RiskMonitor";
 import TradeHistory from "./pages/TradeHistory";
 import StrategyLab from "./pages/StrategyLab";
 import SettingsPage from "./pages/Settings";
+import Login from "./pages/Login";
 import NotFound from "./pages/NotFound";
+import { getStoredApiKey } from "@/core/api";
+import { useEffect, useState } from "react";
 
 const queryClient = new QueryClient();
+
+// Protected route component
+const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
+  const [isChecking, setIsChecking] = useState(true);
+  const [hasAuth, setHasAuth] = useState(false);
+
+  useEffect(() => {
+    const apiKey = getStoredApiKey();
+    setHasAuth(!!apiKey);
+    setIsChecking(false);
+  }, []);
+
+  if (isChecking) {
+    return <div className="flex items-center justify-center h-screen">Loading...</div>;
+  }
+
+  if (!hasAuth) {
+    return <Navigate to="/login" replace />;
+  }
+
+  return <Layout>{children}</Layout>;
+};
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
@@ -23,20 +48,28 @@ const App = () => (
       <Toaster />
       <Sonner />
       <BrowserRouter>
-        <Layout>
-          <Routes>
-            <Route path="/" element={<Dashboard />} />
-            <Route path="/bots" element={<BotsAssets />} />
-            <Route path="/intelligence" element={<Intelligence />} />
-            <Route path="/charts" element={<Charts />} />
-            <Route path="/backtesting" element={<Backtesting />} />
-            <Route path="/risk" element={<RiskMonitor />} />
-            <Route path="/history" element={<TradeHistory />} />
-            <Route path="/strategy-lab" element={<StrategyLab />} />
-            <Route path="/settings" element={<SettingsPage />} />
-            <Route path="*" element={<NotFound />} />
-          </Routes>
-        </Layout>
+        <Routes>
+          <Route path="/login" element={<Login />} />
+          <Route
+            path="/*"
+            element={
+              <ProtectedRoute>
+                <Routes>
+                  <Route path="/" element={<Dashboard />} />
+                  <Route path="/bots" element={<BotsAssets />} />
+                  <Route path="/intelligence" element={<Intelligence />} />
+                  <Route path="/charts" element={<Charts />} />
+                  <Route path="/backtesting" element={<Backtesting />} />
+                  <Route path="/risk" element={<RiskMonitor />} />
+                  <Route path="/history" element={<TradeHistory />} />
+                  <Route path="/strategy-lab" element={<StrategyLab />} />
+                  <Route path="/settings" element={<SettingsPage />} />
+                  <Route path="*" element={<NotFound />} />
+                </Routes>
+              </ProtectedRoute>
+            }
+          />
+        </Routes>
       </BrowserRouter>
     </TooltipProvider>
   </QueryClientProvider>

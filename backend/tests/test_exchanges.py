@@ -14,7 +14,7 @@ def test_factory_returns_ccxt_by_default():
         mock_config = MagicMock()
         mock_config.exchange.adapter = "ccxt"
         mock_get_config.return_value = mock_config
-        
+
         adapter = ExchangeFactory.create_exchange()
         assert isinstance(adapter, CCXTExchange)
 
@@ -24,7 +24,7 @@ def test_factory_returns_binance_direct_when_configured():
         mock_config = MagicMock()
         mock_config.exchange.adapter = "binance_direct"
         mock_get_config.return_value = mock_config
-        
+
         with patch("src.exchanges.factory.BinanceDirectExchange") as MockBinanceDirect:
             MockBinanceDirect.return_value = MagicMock(spec=BinanceDirectExchange)
             ExchangeFactory.create_exchange()
@@ -36,8 +36,11 @@ def test_factory_fallbacks_to_ccxt_on_error():
         mock_config = MagicMock()
         mock_config.exchange.adapter = "binance_direct"
         mock_get_config.return_value = mock_config
-        
-        with patch("src.exchanges.factory.BinanceDirectExchange", side_effect=Exception("Init failed")):
+
+        with patch(
+            "src.exchanges.factory.BinanceDirectExchange",
+            side_effect=Exception("Init failed"),
+        ):
             adapter = ExchangeFactory.create_exchange()
             assert isinstance(adapter, CCXTExchange)
 
@@ -56,8 +59,13 @@ def mock_config():
 
 @pytest.fixture
 def binance_direct(mock_config):
-    with patch("src.exchanges.binance_direct.get_config", return_value=mock_config), \
-         patch.dict("os.environ", {"BINANCE_API_KEY": "test_key", "BINANCE_SECRET": "test_secret"}):
+    with (
+        patch("src.exchanges.binance_direct.get_config", return_value=mock_config),
+        patch.dict(
+            "os.environ",
+            {"BINANCE_API_KEY": "test_key", "BINANCE_SECRET": "test_secret"},
+        ),
+    ):
         exchange = BinanceDirectExchange()
         return exchange
 
@@ -77,7 +85,9 @@ def test_binance_direct_sign(binance_direct):
 
 @pytest.mark.asyncio
 async def test_binance_direct_request_network_error(binance_direct):
-    with patch("aiohttp.ClientSession.get", side_effect=aiohttp.ClientError("Network timeout")):
+    with patch(
+        "aiohttp.ClientSession.get", side_effect=aiohttp.ClientError("Network timeout")
+    ):
         with pytest.raises(NetworkError) as excinfo:
             await binance_direct._request("GET", "/fapi/v1/exchangeInfo")
         assert "Network timeout" in str(excinfo.value)
@@ -92,6 +102,7 @@ async def test_binance_direct_request_exchange_error(binance_direct):
     class MockContextManager:
         async def __aenter__(self):
             return mock_response
+
         async def __aexit__(self, exc_type, exc_val, exc_tb):
             pass
 
@@ -99,4 +110,3 @@ async def test_binance_direct_request_exchange_error(binance_direct):
         with pytest.raises(ExchangeError) as excinfo:
             await binance_direct._request("GET", "/fapi/v1/exchangeInfo")
         assert "Invalid symbol." in str(excinfo.value)
-

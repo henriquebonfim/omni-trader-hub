@@ -19,7 +19,13 @@ class OllamaNLP:
     Ollama integration for NLP entity extraction from news events.
     """
 
-    def __init__(self, base_url: str = "http://ollama:11434", model: str = "llama3:8b", timeout: int = 30, redis_client: Optional[Any] = None):
+    def __init__(
+        self,
+        base_url: str = "http://ollama:11434",
+        model: str = "llama3:8b",
+        timeout: int = 30,
+        redis_client: Optional[Any] = None,
+    ):
         self.base_url = base_url.rstrip("/")
         self.model = model
         self.timeout = timeout
@@ -63,11 +69,13 @@ Rules:
             "model": self.model,
             "prompt": prompt,
             "stream": False,
-            "format": "json"
+            "format": "json",
         }
 
         try:
-            response = await self.client.post(f"{self.base_url}/api/generate", json=payload)
+            response = await self.client.post(
+                f"{self.base_url}/api/generate", json=payload
+            )
             if asyncio.iscoroutine(response):
                 response = await response
 
@@ -75,11 +83,11 @@ Rules:
             data = response.json()
             if asyncio.iscoroutine(data):
                 data = await data
-            
+
             # Parse the response JSON string returned by Ollama
             response_text = data.get("response", "{}")
             result = json.loads(response_text)
-            
+
             # Validation
             assets = result.get("assets", [])
             sectors = result.get("sectors", [])
@@ -89,18 +97,20 @@ Rules:
             # Clamp values
             sentiment = max(-1.0, min(1.0, sentiment))
             impact = max(0.0, min(1.0, impact))
-            
+
             await self._record_metric(success=True)
-            
+
             return {
                 "assets": [str(a).upper() for a in assets],
                 "sectors": [str(s) for s in sectors],
                 "sentiment": sentiment,
-                "impact": impact
+                "impact": impact,
             }
 
         except (httpx.RequestError, json.JSONDecodeError, ValueError) as e:
-            logger.warning(f"Ollama entity extraction failed: {e}. Falling back to default.")
+            logger.warning(
+                f"Ollama entity extraction failed: {e}. Falling back to default."
+            )
             await self._record_metric(success=False)
             return {}
 
@@ -111,14 +121,15 @@ Rules:
 
         try:
             import time
+
             current_hour = int(time.time() / 3600)
-            
+
             success_key = f"omnitrader:ollama:success:{current_hour}"
             fail_key = f"omnitrader:ollama:failure:{current_hour}"
 
             if success:
                 self.redis_client.incr(success_key)
-                self.redis_client.expire(success_key, 7200) # Expire in 2 hours
+                self.redis_client.expire(success_key, 7200)  # Expire in 2 hours
             else:
                 fails = self.redis_client.incr(fail_key)
                 self.redis_client.expire(fail_key, 7200)
@@ -126,10 +137,12 @@ Rules:
                 # Fetch successes
                 successes = self.redis_client.get(success_key)
                 successes = int(successes) if successes else 0
-                
+
                 total = successes + fails
                 if total >= 10 and (fails / total) > 0.5:
-                    logger.error(f"OLLAMA FAILURE ALERT: Failure rate is {fails/total:.1%} in the current hour ({fails}/{total}).")
+                    logger.error(
+                        f"OLLAMA FAILURE ALERT: Failure rate is {fails / total:.1%} in the current hour ({fails}/{total})."
+                    )
         except Exception as e:
             logger.warning(f"Failed to record Ollama metrics: {e}")
 
@@ -143,7 +156,7 @@ Rules:
             db: The MemgraphDatabase instance.
         """
         query_fetch = "MATCH (n:NewsEvent {id: $event_id}) RETURN n.raw_text AS raw_text, n.sentiment_score AS fallback_sentiment"
-        
+
         async with db._driver.session() as session:
             result = await session.run(query_fetch, event_id=event_id)
             records = [record async for record in result]
@@ -156,7 +169,7 @@ Rules:
             fallback_sentiment = record["fallback_sentiment"]
 
             entities = await self.extract_entities(raw_text)
-            
+
             if not entities:
                 logger.info(f"Using fallback sentiment for {event_id}")
                 # Degraded mode: fallback to the existing sentiment derived from vote_count
@@ -175,7 +188,9 @@ Rules:
             MATCH (n:NewsEvent {id: $event_id})
             SET n.sentiment_score = $sentiment, n.impact_level = $impact
             """
-            await session.run(query_update, event_id=event_id, sentiment=sentiment, impact=impact)
+            await session.run(
+                query_update, event_id=event_id, sentiment=sentiment, impact=impact
+            )
 
             # Create Asset nodes and IMPACTS relationships
             for asset in assets:
@@ -184,7 +199,9 @@ Rules:
                 MERGE (a:Asset {symbol: $symbol})
                 MERGE (n)-[:IMPACTS {magnitude: $impact}]->(a)
                 """
-                await session.run(query_asset, event_id=event_id, symbol=asset, impact=impact)
+                await session.run(
+                    query_asset, event_id=event_id, symbol=asset, impact=impact
+                )
 
             # Create Sector nodes and MENTIONS relationships
             for sector in sectors:

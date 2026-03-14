@@ -107,13 +107,13 @@ class BaseStrategy(ABC):
             bias_tf = getattr(self.config.strategy, "bias_timeframe", "4h")
             if bias_tf not in tfs:
                 tfs.append(bias_tf)
-                
+
         smc_enabled = getattr(self.config.strategy, "smc_confirmation", False)
         if smc_enabled:
             smc_tf = getattr(self.config.strategy, "smc_timeframe", "4h")
             if smc_tf not in tfs:
                 tfs.append(smc_tf)
-                
+
         return tfs
 
     @abstractmethod
@@ -276,12 +276,12 @@ class BaseStrategy(ABC):
             smc_tf = getattr(self.config.strategy, "smc_timeframe", "4h")
             smc_swing_window = getattr(self.config.strategy, "smc_swing_window", 5)
             smc_ohlcv = market_data.get(smc_tf)
-            
+
             if smc_ohlcv is not None and not smc_ohlcv.empty:
                 smc_analyzer = SMCAnalyzer(swing_window=smc_swing_window)
                 smc_results = smc_analyzer.analyze({smc_tf: smc_ohlcv})
                 smc_bias = smc_analyzer.get_bias(smc_results, bias_tf=smc_tf)
-                
+
                 # If neutral, we allow it (no confirmation available to block it)
                 if smc_bias != Trend.NEUTRAL:
                     if signal == Signal.LONG and smc_bias == Trend.BEARISH:

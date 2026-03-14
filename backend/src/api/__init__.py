@@ -8,8 +8,9 @@ that can be run alongside the trading loop via asyncio.gather().
 from datetime import datetime, timezone
 
 import structlog
-from fastapi import FastAPI
+from fastapi import FastAPI, Request, status
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
 from .routes import (
     bot,
@@ -21,7 +22,7 @@ from .routes import (
     indicators,
     markets,
     notifications,
-    status,
+    status as status_routes,
     strategies,
     stubs,
     system,
@@ -30,6 +31,9 @@ from .routes import (
 from .websocket import router as ws_router
 
 logger = structlog.get_logger()
+
+# Public routes that don't require authentication
+PUBLIC_PATHS = {"/api/health", "/api/status"}
 
 
 def create_api(bot_instance=None, bot_manager=None) -> FastAPI:
@@ -49,12 +53,36 @@ def create_api(bot_instance=None, bot_manager=None) -> FastAPI:
         version="0.1.0",
     )
 
+    @app.middleware("http")
+    async def auth_middleware(request: Request, call_next):
+        """
+        Global authentication middleware. 
+        Requires Authorization header with Bearer token for all routes except public ones.
+        """
+        path = request.url.path
+        
+        # Allow public paths without authentication
+        if path in PUBLIC_PATHS:
+            return await call_next(request)
+        
+        # Check Authorization header for all other paths
+        auth_header = request.headers.get("Authorization", "")
+        if not auth_header.startswith("Bearer "):
+            return JSONResponse(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                content={"detail": "Missing or invalid Authorization header"},
+            )
+        
+        return await call_next(request)
+
     # Store bot references
     app.state.bot_manager = bot_manager
     if bot_manager:
         # Provide fallback for legacy consumers
         bots_list = list(bot_manager.bots.values())
-        app.state.bot = bot_manager.get_bot("default") or (bots_list[0] if bots_list else bot_instance)
+        app.state.bot = bot_manager.get_bot("default") or (
+            bots_list[0] if bots_list else bot_instance
+        )
     else:
         app.state.bot = bot_instance
     app.state.started_at = datetime.now(timezone.utc)
@@ -88,7 +116,7 @@ def create_api(bot_instance=None, bot_manager=None) -> FastAPI:
             )
 
     # Mount routers
-    app.include_router(status.router, prefix="/api")
+    app.include_router(status_routes.router, prefix="/api")
     app.include_router(trades.router, prefix="/api")
     app.include_router(strategies.router, prefix="/api")
     app.include_router(config.router, prefix="/api")

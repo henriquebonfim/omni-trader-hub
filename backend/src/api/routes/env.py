@@ -48,6 +48,26 @@ SENSITIVE_KEYS = {
     "OMNITRADER_API_KEY",
 }
 
+ENV_METADATA = {
+    "BINANCE_API_KEY": ("Binance API Key", True),
+    "BINANCE_SECRET": ("Binance API Secret", True),
+    "MEMGRAPH_HOST": ("Memgraph Host", True),
+    "MEMGRAPH_PORT": ("Memgraph Port", True),
+    "MEMGRAPH_USERNAME": ("Memgraph Username", True),
+    "MEMGRAPH_PASSWORD": ("Memgraph Password", True),
+    "REDIS_HOST": ("Redis Host", True),
+    "REDIS_PORT": ("Redis Port", True),
+    "DISCORD_WEBHOOK_URL": ("Discord Webhook URL", False),
+    "OMNITRADER_API_KEY": ("OmniTrader API Key", False),
+}
+
+
+class EnvVarMetadata(BaseModel):
+    value: str
+    masked: bool
+    description: str
+    requires_restart: bool
+
 
 def mask_value(key: str, value: str) -> str:
     """Mask sensitive values."""
@@ -129,19 +149,26 @@ class EnvUpdate(BaseModel):
 
 
 @router.get("")
-async def get_env():
+async def get_env() -> Dict[str, Dict[str, EnvVarMetadata]]:
     """
     Get grouped and masked environment variables.
     Only whitelisted variables are exposed.
     """
     raw_env = read_env_file()
 
-    response_data = {}
+    response_data: Dict[str, Dict[str, EnvVarMetadata]] = {}
     for group, keys in ENV_WHITELIST.items():
         group_data = {}
         for key in keys:
             val = raw_env.get(key, "")
-            group_data[key] = mask_value(key, val)
+            masked_val = mask_value(key, val)
+            desc, restart = ENV_METADATA.get(key, ("No description available.", True))
+            group_data[key] = EnvVarMetadata(
+                value=masked_val,
+                masked=key in SENSITIVE_KEYS,
+                description=desc,
+                requires_restart=restart,
+            )
         response_data[group] = group_data
 
     return response_data

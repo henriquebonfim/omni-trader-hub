@@ -89,9 +89,7 @@ async def test_selector_query_matches_memgraph_schema(mock_db):
 @pytest.mark.asyncio
 async def test_selector_fallback(mock_db):
     # Setup mock to return empty
-    mock_db._driver.session.return_value.__aenter__.return_value.run.return_value.data.return_value = (
-        []
-    )
+    mock_db._driver.session.return_value.__aenter__.return_value.run.return_value.data.return_value = []
 
     selector = StrategySelector(database=mock_db)
     best = await selector.get_best_strategy(MarketRegime.TRENDING)

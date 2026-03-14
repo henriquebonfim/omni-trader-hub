@@ -30,9 +30,12 @@ class ExchangeFactory:
                 adapter = BinanceDirectExchange()
                 return adapter
             except Exception as e:
-                logger.error("binance_direct_initialization_failed_falling_back_to_ccxt", error=str(e))
+                logger.error(
+                    "binance_direct_initialization_failed_falling_back_to_ccxt",
+                    error=str(e),
+                )
                 return CCXTExchange()
-        
+
         # Default / Fallback
         logger.info("initializing_ccxt_adapter")
         return CCXTExchange()

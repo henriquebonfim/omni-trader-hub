@@ -1,16 +1,23 @@
 import { useAppStore } from '@/app/store/app-store';
 import { StatusBadge } from '@/shared/components/StatusBadge';
-import { Activity, Bell, ChevronDown, Settings, Wifi, WifiOff } from 'lucide-react';
+import { Activity, Bell, ChevronDown, Settings, Wifi, WifiOff, LogOut } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
+import { clearApiKey } from '@/core/api';
 
 export function Topbar() {
   const { wsStatus, bots, unreadAlerts, markAlertsRead, alerts } = useAppStore();
+  const navigate = useNavigate();
   const [showAlerts, setShowAlerts] = useState(false);
   const alertRef = useRef<HTMLDivElement>(null);
 
   const activeBots = bots.filter(b => b.status === 'running');
   const activeSymbols = activeBots.map(b => b.symbol);
+
+  const handleLogout = () => {
+    clearApiKey();
+    navigate('/login');
+  };
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -99,6 +106,10 @@ export function Topbar() {
         <Link to="/settings" className="p-1.5 rounded-md hover:bg-secondary transition-colors">
           <Settings className="h-4 w-4 text-muted-foreground" />
         </Link>
+
+        <button onClick={handleLogout} className="p-1.5 rounded-md hover:bg-secondary transition-colors" title="Logout">
+          <LogOut className="h-4 w-4 text-muted-foreground" />
+        </button>
       </div>
     </header>
   );

@@ -108,7 +108,9 @@ def analyze_strategy(
 
             cs_data = asyncio.run(_fetch_custom(strategy_name))
             if not cs_data:
-                raise ValueError(f"Strategy {strategy_name} not found in registry or DB") from None
+                raise ValueError(
+                    f"Strategy {strategy_name} not found in registry or DB"
+                ) from None
             strategy = CustomStrategyExecutor(config, cs_data)
 
         result = strategy.analyze(market_data, current_side, market_trend=market_trend)

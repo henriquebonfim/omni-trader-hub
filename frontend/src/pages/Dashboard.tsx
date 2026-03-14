@@ -64,13 +64,13 @@ export default function Dashboard() {
       {/* Global Stats */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
         <StatCard label="Portfolio Value" value={`$${totalValue.toLocaleString()}`} />
-        <StatCard label="Today's PnL" value={`$${totalPnl.toFixed(2)}`} suffix={` (${totalPnlPct.toFixed(2)}%)`} color={totalPnl >= 0 ? 'green' : 'red'} trend={totalPnl > 0 ? 'up' : totalPnl < 0 ? 'down' : 'neutral'} />
+        <StatCard label="Today's PnL" value={`$${(totalPnl ?? 0).toFixed(2)}`} suffix={` (${(totalPnlPct ?? 0).toFixed(2)}%)`} color={totalPnl >= 0 ? 'green' : 'red'} trend={totalPnl > 0 ? 'up' : totalPnl < 0 ? 'down' : 'neutral'} />
         <StatCard label="Active Bots" value={`${activeBots.length} / ${bots.length}`} color="accent" />
         <StatCard label="Open Positions" value={openPositions} color="accent" />
         <StatCard label="Circuit Breakers" value={circuitBreakerLabel} color={circuitBreakerColor} />
         <StatCard
           label="Sentiment"
-          value={sentimentScore.toFixed(2)}
+          value={(sentimentScore ?? 0).toFixed(2)}
           color={sentimentScore >= 0 ? 'green' : 'red'}
           trend={sentimentScore > 0 ? 'up' : sentimentScore < 0 ? 'down' : 'neutral'}
         />
@@ -116,14 +116,14 @@ export default function Dashboard() {
                     <div>
                       {bot.position ? (
                         <StatusBadge variant={bot.position.side === 'long' ? 'success' : 'danger'} size="sm">
-                          {bot.position.side.toUpperCase()} {bot.position.unrealized_pnl >= 0 ? '+' : ''}{bot.position.unrealized_pnl.toFixed(2)}
+                          {bot.position.side.toUpperCase()} {(bot.position.unrealized_pnl ?? 0) >= 0 ? '+' : ''}{(bot.position.unrealized_pnl ?? 0).toFixed(2)}
                         </StatusBadge>
                       ) : (
                         <span className="text-muted-foreground">FLAT</span>
                       )}
                     </div>
-                    <span className={cn('font-mono font-medium', bot.daily_pnl >= 0 ? 'text-success' : 'text-danger')}>
-                      {bot.daily_pnl >= 0 ? '+' : ''}${bot.daily_pnl.toFixed(2)} ({bot.daily_pnl_pct.toFixed(2)}%)
+                    <span className={cn('font-mono font-medium', (bot.daily_pnl ?? 0) >= 0 ? 'text-success' : 'text-danger')}>
+                      {(bot.daily_pnl ?? 0) >= 0 ? '+' : ''}${(bot.daily_pnl ?? 0).toFixed(2)} ({(bot.daily_pnl_pct ?? 0).toFixed(2)}%)
                     </span>
                   </div>
 

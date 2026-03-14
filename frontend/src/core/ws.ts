@@ -14,8 +14,9 @@ export function useLiveFeed() {
 
   const connect = useCallback(() => {
     try {
-      // Connect relative to current host via proxy, or use absolute URL
-      const wsUrl = import.meta.env.VITE_WS_URL || `ws://${window.location.host}/ws/live`;
+      // Use VITE_WS_URL from .env if set, otherwise use relative URL via Vite proxy
+      const wsProtocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
+      const wsUrl = import.meta.env.VITE_WS_URL || `${wsProtocol}://${window.location.host}/ws/live`;
       const ws = new WebSocket(wsUrl);
       wsRef.current = ws;
 

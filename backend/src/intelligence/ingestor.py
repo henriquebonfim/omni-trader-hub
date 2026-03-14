@@ -39,13 +39,17 @@ class NewsIngestor:
         # Free tier is ~100 requests / day => ~4 requests/hour => ~1 request / 15 mins
         # Use a safe rate limit. Here, we specify 1 request every 60 seconds (60 requests per hour).
         # We might need to reduce polling frequency to fit inside 100/day.
-        self.rate_limiter = LeakyBucketRateLimiter(capacity=100, refill_rate=0.001) # ~86/day
+        self.rate_limiter = LeakyBucketRateLimiter(
+            capacity=100, refill_rate=0.001
+        )  # ~86/day
 
-    async def _fetch_url(self, url: str, params: Optional[Dict] = None) -> Optional[httpx.Response]:
+    async def _fetch_url(
+        self, url: str, params: Optional[Dict] = None
+    ) -> Optional[httpx.Response]:
         """Fetch URL with basic error handling and rate limiting."""
         # Optional wait
         await self.rate_limiter.acquire()
-        
+
         async with httpx.AsyncClient() as client:
             try:
                 response = await client.get(url, params=params, timeout=30.0)
@@ -57,7 +61,7 @@ class NewsIngestor:
 
     def _generate_id(self, url: str, title: str) -> str:
         """Generate a deterministic 16-character hex ID based on url and title."""
-        content = f"{url}{title}".encode('utf-8')
+        content = f"{url}{title}".encode("utf-8")
         return hashlib.sha256(content).hexdigest()[:16]
 
     async def is_duplicate(self, event_id: str) -> bool:
@@ -71,7 +75,7 @@ class NewsIngestor:
     async def fetch_cryptopanic(self) -> List[str]:
         """
         Fetch the latest news from CryptoPanic API.
-        
+
         Returns:
             A list of new NewsEvent IDs that were inserted.
         """
@@ -102,14 +106,20 @@ class NewsIngestor:
 
             source = post.get("source", {}).get("domain", "CryptoPanic")
             published_at = post.get("published_at")
-            vote_count = post.get("votes", {}).get("positive", 0) - post.get("votes", {}).get("negative", 0)
-            
+            vote_count = post.get("votes", {}).get("positive", 0) - post.get(
+                "votes", {}
+            ).get("negative", 0)
+
             # Simple fallback sentiment derived from votes
             sentiment_score = vote_count / max(abs(vote_count), 100)
-            
+
             # Currencies mentioned
-            currencies = [curr.get("code") for curr in post.get("currencies", []) if "code" in curr]
-            
+            currencies = [
+                curr.get("code")
+                for curr in post.get("currencies", [])
+                if "code" in curr
+            ]
+
             await self.create_news_event(
                 event_id=event_id,
                 title=title,
@@ -118,7 +128,7 @@ class NewsIngestor:
                 published_at=published_at,
                 sentiment_score=sentiment_score,
                 raw_text=title,
-                currencies=currencies
+                currencies=currencies,
             )
             new_event_ids.append(event_id)
 
@@ -143,7 +153,7 @@ class NewsIngestor:
         value = int(current_fng.get("value", 50))
         # Alternative.me returns timestamp in seconds
         timestamp_sec = int(current_fng.get("timestamp", time.time()))
-        
+
         # We store timestamp as ISO string or ms epoch. Let's use ms epoch to be consistent with others
         timestamp_ms = timestamp_sec * 1000
 
@@ -177,9 +187,11 @@ class NewsIngestor:
         for source_name, url in feeds:
             try:
                 # Use default executor
-                feed = await asyncio.get_event_loop().run_in_executor(None, _parse_feed, url)
-                
-                for entry in feed.entries[:10]: # Limit to 10 most recent per feed
+                feed = await asyncio.get_event_loop().run_in_executor(
+                    None, _parse_feed, url
+                )
+
+                for entry in feed.entries[:10]:  # Limit to 10 most recent per feed
                     link = entry.get("link", "")
                     title = entry.get("title", "")
                     event_id = self._generate_id(link, title)
@@ -191,7 +203,9 @@ class NewsIngestor:
                     published_parsed = entry.get("published_parsed")
                     if published_parsed:
                         # feedparser returns a time.struct_time
-                        published_at = time.strftime("%Y-%m-%dT%H:%M:%S+00:00", published_parsed)
+                        published_at = time.strftime(
+                            "%Y-%m-%dT%H:%M:%S+00:00", published_parsed
+                        )
                     else:
                         published_at = datetime.now(timezone.utc).isoformat()
 
@@ -200,7 +214,9 @@ class NewsIngestor:
                     raw_text = f"{title}. {summary}"
 
                     # Regex match basic tickers as a fallback before Ollama
-                    tickers_found = re.findall(r'\b(BTC|ETH|SOL|ADA|XRP|DOT|DOGE|AVAX|MATIC|LINK)\b', raw_text)
+                    tickers_found = re.findall(
+                        r"\b(BTC|ETH|SOL|ADA|XRP|DOT|DOGE|AVAX|MATIC|LINK)\b", raw_text
+                    )
                     currencies = list(set(tickers_found))
 
                     await self.create_news_event(
@@ -209,9 +225,9 @@ class NewsIngestor:
                         url=link,
                         source=source_name,
                         published_at=published_at,
-                        sentiment_score=0.0, # Default, Ollama will update
+                        sentiment_score=0.0,  # Default, Ollama will update
                         raw_text=raw_text,
-                        currencies=currencies
+                        currencies=currencies,
                     )
                     new_event_ids.append(event_id)
             except Exception as e:
@@ -228,7 +244,7 @@ class NewsIngestor:
         published_at: str,
         sentiment_score: float,
         raw_text: str,
-        currencies: List[str]
+        currencies: List[str],
     ):
         """Create a NewsEvent node and its relations in Memgraph."""
         query_node = """
@@ -252,7 +268,7 @@ class NewsIngestor:
                 source=source,
                 published_at=published_at,
                 sentiment_score=sentiment_score,
-                raw_text=raw_text
+                raw_text=raw_text,
             )
 
             # Create basic relations for currencies if any
@@ -263,14 +279,14 @@ class NewsIngestor:
                 MERGE (n)-[:IMPACTS {magnitude: 0.5}]->(a)
                 """
                 await session.run(query_rel, id=event_id, symbol=currency.upper())
-                
+
         logger.info(f"Created NewsEvent: {event_id} from {source}")
 
     async def prune_old_news(self, days: int = 7):
         """Delete NewsEvent nodes older than `days` days."""
         # Calculate the cutoff date as ISO 8601 string
         cutoff_date = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
-        
+
         query = """
         MATCH (n:NewsEvent)
         WHERE n.published_at < $cutoff_date

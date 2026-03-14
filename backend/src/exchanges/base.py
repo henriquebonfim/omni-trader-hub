@@ -10,11 +10,13 @@ import pandas as pd
 
 class ExchangeError(Exception):
     """Base exception for exchange-related errors."""
+
     pass
 
 
 class NetworkError(ExchangeError):
     """Exception for network-related errors (e.g. timeouts, connection refused)."""
+
     pass
 
 
@@ -112,7 +114,9 @@ class BaseExchange(ABC):
         pass
 
     @abstractmethod
-    async def fetch_open_orders(self, symbol: Optional[str] = None) -> List[Dict[str, Any]]:
+    async def fetch_open_orders(
+        self, symbol: Optional[str] = None
+    ) -> List[Dict[str, Any]]:
         """Get all open orders for symbol."""
         pass
 
@@ -131,7 +135,9 @@ class BaseExchange(ABC):
         pass
 
     @abstractmethod
-    async def close_position(self, symbol: Optional[str] = None) -> Optional[Dict[str, Any]]:
+    async def close_position(
+        self, symbol: Optional[str] = None
+    ) -> Optional[Dict[str, Any]]:
         """Close the current position."""
         pass
 
@@ -156,7 +162,9 @@ class BaseExchange(ABC):
         pass
 
     @abstractmethod
-    async def cancel_all_orders(self, symbol: Optional[str] = None) -> List[Dict[str, Any]]:
+    async def cancel_all_orders(
+        self, symbol: Optional[str] = None
+    ) -> List[Dict[str, Any]]:
         """Cancel all open orders for symbol."""
         pass
 
