@@ -28,10 +28,6 @@ Next-sprint candidates (`T55-T62`) are now parked in `TODO.md` with explicit lab
 	- Details: Endpoint is implemented but has no frontend consumer.
 	- Possible solutions: Check if forntend has Daily Sumary, them implement this feature;
 
-- `T67` - Decide fate of `GET /api/strategies/{name}`
-	- Details: Strategy detail route exists but UI only uses list/performance and save/update/delete.
-	- Possible solutions: use detail route when opening strategy editor. avoid duplicated srategies with same name;
-
 - `T68` - Decide fate of `GET /api/graph/news/{symbol}`
 	- Details: Symbol-scoped news exists but Intelligence page currently pulls only global feed.
 	- Possible solutions: add symbol filter panel using this endpoint;

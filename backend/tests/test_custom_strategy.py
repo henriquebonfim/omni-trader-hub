@@ -108,16 +108,8 @@ async def test_custom_strategy_crud():
     assert res.status_code == 200
     assert res.json()["name"] == "test_custom_rsi"
 
-    # 2. Retrieve via GET
-    res = client.get("/api/strategies/test_custom_rsi")
-    assert res.status_code == 200
-    data = res.json()
-    assert data["name"] == "test_custom_rsi"
-    assert data["type"] == "custom"
-    assert len(data["indicators"]) == 1
-
     # 3. List combined
-    res = client.get("/api/strategies")
+    res = client.get("/api/strategies", headers=headers)
     assert res.status_code == 200
     strats = res.json()["strategies"]
     names = [s["name"] for s in strats]

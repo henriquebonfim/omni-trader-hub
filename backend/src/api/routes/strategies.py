@@ -167,49 +167,6 @@ def validate_custom_strategy(strat: CustomStrategyCreate):
                 ) from e
 
 
-@router.get("/strategies/{name}")
-async def get_strategy_detail(request: Request, name: str):
-    bot = request.app.state.bot
-
-    # Check built-in
-    try:
-        cls = get_strategy(name)
-        instance = cls(bot.config)
-        return {
-            "name": name,
-            "type": "built-in",
-            "description": instance.metadata.get("description", ""),
-            "regime_affinity": [r.value for r in instance.valid_regimes],
-            "editable": False,
-        }
-    except ValueError:
-        pass
-
-    # Check custom
-    if hasattr(bot.database, "get_custom_strategy"):
-        cs = await bot.database.get_custom_strategy(name)
-        if cs:
-            return {
-                "name": cs["name"],
-                "type": "custom",
-                "description": cs.get("description", ""),
-                "regime_affinity": cs.get("regime_affinity", []),
-                "conditions": {
-                    "entry_long": cs.get("entry_long_json", []),
-                    "entry_short": cs.get("entry_short_json", []),
-                    "exit_long": cs.get("exit_long_json", []),
-                    "exit_short": cs.get("exit_short_json", []),
-                },
-                "indicators": cs.get("indicators_json", []),
-                "stop_loss_atr_mult": cs.get("stop_loss_atr_mult"),
-                "take_profit_atr_mult": cs.get("take_profit_atr_mult"),
-                "min_bars_between_entries": cs.get("min_bars_between_entries", 10),
-                "editable": True,
-            }
-
-    raise HTTPException(status_code=404, detail="Strategy not found")
-
-
 @router.post("/strategies")
 async def create_custom_strategy(
     request: Request, strat: CustomStrategyCreate, _: str = Depends(verify_api_key)
