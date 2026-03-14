@@ -63,7 +63,6 @@ describe('market api (real endpoints, no stubs)', () => {
 
   it('fetchMarkets falls back to stub on error', async () => {
     mockRequest.mockRejectedValueOnce(new Error('network error'));
-    const result = await fetchMarkets();
-    expect(Array.isArray(result)).toBe(true);
+    await expect(fetchMarkets()).rejects.toThrow('network error');
   });
 });
