@@ -22,13 +22,9 @@ Next-sprint candidates (`T55-T62`) are now parked in `TODO.md` with explicit lab
 
 #### Broken Contract
 
-- `T65` - Align `PUT /api/bots/{bot_id}` update schema
-	- Details: Backend route binds `ConfigUpdate` while frontend sends a generic partial bot object; accepted fields are not guaranteed to map cleanly and can silently drift.
-	- Possible solutions: (1) introduce `BotUpdateRequest` schema and update frontend payload adapter, add E2E test that updates real bot config fields from UI payload.
-
 #### No Frontend Caller
 
-- `T66` - Decide fate of `GET /api/daily-summary/{date}`
+- ~~`T66` - Decide fate of `GET /api/daily-summary/{date}`~~ (Removed unused endpoint)
 	- Details: Endpoint is implemented but has no frontend consumer.
 	- Possible solutions: Check if forntend has Daily Sumary, them implement this feature;
 

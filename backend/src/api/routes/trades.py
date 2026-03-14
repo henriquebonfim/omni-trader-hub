@@ -25,18 +25,6 @@ async def get_trades(
     return {"trades": trades, "count": len(trades)}
 
 
-@router.get("/daily-summary/{date}")
-async def get_daily_summary(date: str, request: Request):
-    """Daily performance summary for a given date (YYYY-MM-DD)."""
-    bot = request.app.state.bot
-    summary = await bot.database.get_daily_summary(date)
-    if summary is None:
-        from fastapi import HTTPException
-
-        raise HTTPException(status_code=404, detail=f"No summary found for {date}")
-    return summary
-
-
 @router.get("/equity")
 async def get_equity(
     request: Request,
