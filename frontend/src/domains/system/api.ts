@@ -46,8 +46,8 @@ export const fetchEnvVars = async () => {
 };
 export const updateEnvVars = async (vars: EnvVariable[]) => {
   try {
-    const payload = Object.fromEntries(vars.map(v => [v.key, v.value]));
-    return await request<{ requires_restart: boolean }>('/api/env', { method: 'PUT', body: JSON.stringify(payload) });
+    const updates = Object.fromEntries(vars.map(v => [v.key, v.value]));
+    return await request<{ requires_restart: boolean }>('/api/env', { method: 'PUT', body: JSON.stringify({ updates }) });
   } catch (e) {
     console.warn('updateEnvVars stubbed', e);
     return { requires_restart: true };
