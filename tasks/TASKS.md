@@ -28,10 +28,6 @@ Next-sprint candidates (`T55-T62`) are now parked in `TODO.md` with explicit lab
 	- Details: Endpoint is implemented but has no frontend consumer.
 	- Possible solutions: Check if forntend has Daily Sumary, them implement this feature;
 
-- `T68` - Decide fate of `GET /api/graph/news/{symbol}`
-	- Details: Symbol-scoped news exists but Intelligence page currently pulls only global feed.
-	- Possible solutions: add symbol filter panel using this endpoint;
-
 - `T69` - Decide fate of indicators API (`GET /api/indicators`, `POST /api/indicators/compute`)
 	- Details: Full TA-Lib catalog/compute backend exists, but frontend has no indicator explorer or compute caller.
 	- Possible solutions: add Indicator Lab UI, use compute endpoint in Strategy Lab condition builder;
