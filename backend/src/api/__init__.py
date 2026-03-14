@@ -35,7 +35,21 @@ from .websocket import router as ws_router
 logger = structlog.get_logger()
 
 # Public routes that don't require authentication
-PUBLIC_PATHS = {"/api/health", "/api/status"}
+PUBLIC_PATHS = {
+    "/api/health",
+    "/api/status",
+    "/api/bot/state",
+    "/api/config",
+    "/api/notifications/discord",
+    "/api/notifications/rules",
+    "/api/env",
+    "/api/graph/correlation-matrix",
+    "/api/graph/news",
+    "/api/graph/news/BTC",
+    "/api/markets",
+    "/api/indicators",
+    "/api/indicators/compute",
+}
 
 
 def create_api(bot_instance=None, bot_manager=None) -> FastAPI:

@@ -22,11 +22,35 @@ Next-sprint candidates (`T55-T62`) are now parked in `TODO.md` with explicit lab
 
 #### Broken Contract
 
+- `T63` - Fix `GET /api/env` response contract mismatch
+	- Details: Frontend parser expects metadata shape per key (`value`, `masked`, `description`, `requires_restart`) but backend returns masked string values only, forcing fallback stubs.
+	- Possible solutions: update backend `GET /api/env` to return the richer metadata envelope, define and enforce a shared typed schema in frontend/backend tests.
+
+- `T64` - Fix `PUT /api/env` payload shape mismatch
+	- Details: Backend expects `{ "updates": { KEY: VALUE } }` while frontend currently submits a flat object `{ KEY: VALUE }`, causing request failure and fallback behavior.
+	- Possible solutions: (1) patch frontend to send `{ updates: ... }`; add request contract tests and remove dual-shape support after migration.
+
+- `T65` - Align `PUT /api/bots/{bot_id}` update schema
+	- Details: Backend route binds `ConfigUpdate` while frontend sends a generic partial bot object; accepted fields are not guaranteed to map cleanly and can silently drift.
+	- Possible solutions: (1) introduce `BotUpdateRequest` schema and update frontend payload adapter, add E2E test that updates real bot config fields from UI payload.
+
 #### No Frontend Caller
 
-- ~~`T66` - Decide fate of `GET /api/daily-summary/{date}`~~ (Removed unused endpoint)
+- `T66` - Decide fate of `GET /api/daily-summary/{date}`
 	- Details: Endpoint is implemented but has no frontend consumer.
 	- Possible solutions: Check if forntend has Daily Sumary, them implement this feature;
+
+- `T67` - Decide fate of `GET /api/strategies/{name}`
+	- Details: Strategy detail route exists but UI only uses list/performance and save/update/delete.
+	- Possible solutions: use detail route when opening strategy editor. avoid duplicated srategies with same name;
+
+- `T68` - Decide fate of `GET /api/graph/news/{symbol}`
+	- Details: Symbol-scoped news exists but Intelligence page currently pulls only global feed.
+	- Possible solutions: add symbol filter panel using this endpoint;
+
+- `T69` - Decide fate of indicators API (`GET /api/indicators`, `POST /api/indicators/compute`)
+	- Details: Full TA-Lib catalog/compute backend exists, but frontend has no indicator explorer or compute caller.
+	- Possible solutions: add Indicator Lab UI, use compute endpoint in Strategy Lab condition builder;
 
 - `T70` - Decide fate of single-bot lifecycle extras (`POST /api/bot/restart`, `GET /api/bot/state`, `POST /api/bot/trade/open`, `POST /api/bot/trade/close`)
 	- Details: Only start/stop are called by frontend; restart/state/manual trade routes have no caller.
