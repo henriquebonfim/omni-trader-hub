@@ -22,10 +22,6 @@ Next-sprint candidates (`T55-T62`) are now parked in `TODO.md` with explicit lab
 
 #### Broken Contract
 
-- `T63` - Fix `GET /api/env` response contract mismatch
-	- Details: Frontend parser expects metadata shape per key (`value`, `masked`, `description`, `requires_restart`) but backend returns masked string values only, forcing fallback stubs.
-	- Possible solutions: update backend `GET /api/env` to return the richer metadata envelope, define and enforce a shared typed schema in frontend/backend tests.
-
 - `T64` - Fix `PUT /api/env` payload shape mismatch
 	- Details: Backend expects `{ "updates": { KEY: VALUE } }` while frontend currently submits a flat object `{ KEY: VALUE }`, causing request failure and fallback behavior.
 	- Possible solutions: (1) patch frontend to send `{ updates: ... }`; add request contract tests and remove dual-shape support after migration.
