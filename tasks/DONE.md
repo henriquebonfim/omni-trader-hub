@@ -695,4 +695,11 @@
 - [x] Implemented `GET /api/signals` route in `backend/src/api/routes/trades.py` with symbol and limit filtering
 - [x] Added database infrastructure test in `tests/infrastructure/test_database.py`
 - [x] Added API integration test in `tests/integration/test_api_signals.py`
+
+### T69. Enhance backtest metrics to institutional standard ✅ **COMPLETED 2026-03-15**
+- [x] Added Calmar Ratio, Portfolio Turnover, and T-Stat to `calculate_metrics`
+- [x] Implemented Information Coefficient (IC) and its decay curve
+- [x] Implemented Factor Attribution (Alpha/Beta) against market returns
+- [x] Added `scipy` dependency for advanced statistical calculations
+- [x] Added unit tests for all new metrics in `test_backtest_enhanced_metrics.py`
 ---

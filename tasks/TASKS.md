@@ -10,7 +10,6 @@ Active execution queue only. Completed work is archived in DONE.md. Use `TODO.md
 
 ### MEDIUM — Backtest & Metrics Gaps
 
-- `T69` - [IMPROVEMENT] Enhance backtest metrics to institutional standard
 - `T70` - [IMPROVEMENT] Add explicit slippage/spread model to backtest engine
 - `T75` - [IMPROVEMENT] Add executable walk-forward runner
 - `T76` - [IMPROVEMENT] Improve runtime reporting surface

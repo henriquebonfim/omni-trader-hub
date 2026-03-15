@@ -21,6 +21,9 @@ numpy==2.4.2
 # Pandas pin aligned to the latest stable release.
 pandas==3.0.1
 
+# Scipy: Required for advanced statistical metrics (IC, Factor Attribution)
+scipy==1.15.2
+
 # TA-Lib: Technical analysis library (requires C library installed)
 TA-Lib==0.6.8
 

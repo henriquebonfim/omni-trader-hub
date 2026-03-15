@@ -4,7 +4,11 @@ from typing import Any, Dict, List, Optional
 
 import pandas as pd
 
-from src.backtest.metrics import calculate_metrics
+from src.backtest.metrics import (
+    calculate_factor_attribution,
+    calculate_information_coefficient,
+    calculate_metrics,
+)
 from src.config import Config
 from src.strategy.base import BaseStrategy, Signal
 
@@ -277,10 +281,14 @@ class BacktestEngine:
                 "end_of_backtest",
             )
 
-        metrics = calculate_metrics(self.trades, self.initial_balance)
+        metrics = calculate_metrics(self.trades, self.initial_balance, self.equity_curve)
+
+        # Institutional additions: IC and Factor Attribution
+        ic_data = calculate_information_coefficient(self.signals, sorted_candles)
+        factor_data = calculate_factor_attribution(self.equity_curve, sorted_candles)
 
         return {
-            "metrics": metrics,
+            "metrics": {**metrics, **ic_data, "factor_attribution": factor_data},
             "trades": self.trades,
             "signals": self.signals,
             "equity_curve": self.equity_curve,

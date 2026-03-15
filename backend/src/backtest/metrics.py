@@ -1,17 +1,127 @@
 from typing import Any, Dict, List
 
 import numpy as np
+import pandas as pd
+
+
+def calculate_factor_attribution(
+    equity_curve: List[Dict[str, Any]], market_candles: List[Dict[str, Any]]
+) -> Dict[str, Any]:
+    """
+    Calculate strategy Alpha and Beta relative to the market.
+    For crypto, market is usually BTC/USDT.
+    """
+    if not equity_curve or not market_candles:
+        return {"alpha": 0.0, "beta": 0.0, "r_squared": 0.0}
+
+    # Align data
+    eq_df = pd.DataFrame(equity_curve).set_index("timestamp")
+    mkt_df = pd.DataFrame(market_candles).set_index("timestamp")
+
+    # Resample or reindex to align
+    combined = pd.concat([eq_df["equity"], mkt_df["close"]], axis=1).dropna()
+    combined.columns = ["equity", "market"]
+    # Calculate returns
+    combined["strat_ret"] = combined["equity"].pct_change()
+    combined["mkt_ret"] = combined["market"].pct_change()
+    combined = combined.dropna()
+
+    if len(combined) < 5:
+        return {"alpha": 0.0, "beta": 0.0, "r_squared": 0.0}
+
+    # Linear regression: strat_ret = alpha + beta * mkt_ret
+    from scipy import stats
+
+    beta, alpha, r_value, p_value, std_err = stats.linregress(
+        combined["mkt_ret"], combined["strat_ret"]
+    )
+
+    return {
+        "alpha": float(alpha),
+        "beta": float(beta),
+        "r_squared": float(r_value**2),
+        "p_value": float(p_value),
+    }
+
+
+def calculate_information_coefficient(
+    signals: List[Dict[str, Any]],
+    candles: List[Dict[str, Any]],
+    horizons: List[int] = [1, 5, 10, 20],
+) -> Dict[str, Any]:
+    """
+    Calculate Information Coefficient (IC) and its decay over different horizons.
+    IC is the correlation between signal strength and subsequent returns.
+
+    signals: List of {"timestamp": int, "signal": str, "price": float}
+    candles: List of OHLCV dicts
+    horizons: List of number of bars to look ahead
+    """
+    if not signals or not candles:
+        return {"ic_mean": 0.0, "ic_decay": {}}
+
+    # Convert candles to dataframe for easy lookahead returns
+    df = pd.DataFrame(candles)
+    if "timestamp" not in df.columns:
+        return {"ic_mean": 0.0, "ic_decay": {}}
+
+    df = df.sort_values("timestamp")
+    df.set_index("timestamp", inplace=True)
+
+    ic_results = {}
+
+    # Signal mapping: LONG=1, SHORT=-1, HOLD=0 (usually only non-hold are logged)
+    signal_map = {"long": 1.0, "short": -1.0, "hold": 0.0}
+
+    sig_times = [s["timestamp"] for s in signals]
+    sig_values = [signal_map.get(s["signal"].lower(), 0.0) for s in signals]
+
+    for h in horizons:
+        returns = []
+        valid_sigs = []
+
+        for i, (ts, val) in enumerate(zip(sig_times, sig_values)):
+            if ts in df.index:
+                # Find the index of the current timestamp
+                idx = df.index.get_loc(ts)
+                if idx + h < len(df):
+                    # h-bar forward return
+                    future_price = df.iloc[idx + h]["close"]
+                    current_price = df.iloc[idx]["close"]
+                    fwd_return = (future_price - current_price) / current_price
+                    returns.append(fwd_return)
+                    valid_sigs.append(val)
+
+        if len(returns) > 5:
+            # Spearman rank correlation is more robust for IC
+            from scipy.stats import spearmanr
+
+            correlation, _ = spearmanr(valid_sigs, returns)
+            ic_results[f"ic_{h}_bar"] = float(correlation)
+        else:
+            ic_results[f"ic_{h}_bar"] = 0.0
+
+    ic_values = [v for k, v in ic_results.items()]
+    return {
+        "ic_mean": float(np.mean(ic_values)) if ic_values else 0.0,
+        "ic_decay": ic_results,
+    }
 
 
 def calculate_metrics(
-    trades: List[Dict[str, Any]], initial_balance: float
+    trades: List[Dict[str, Any]],
+    initial_balance: float,
+    equity_curve: List[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     """
-    Calculate performance metrics from a list of trades.
+    Calculate performance metrics from a list of trades and equity curve.
 
     trades: List of dicts, each containing:
         - "pnl": float (Absolute PnL of the trade)
         - "pnl_pct": float (Percentage PnL of the trade)
+        - "size": float (Size of the trade)
+        - "price": float (Entry price)
+    equity_curve: Optional list of {"timestamp": int, "equity": float}
     """
     if not trades:
         return {
@@ -21,6 +131,9 @@ def calculate_metrics(
             "max_drawdown": 0.0,
             "sharpe_ratio": 0.0,
             "sortino_ratio": 0.0,
+            "calmar_ratio": 0.0,
+            "portfolio_turnover": 0.0,
+            "t_stat": 0.0,
             "avg_win": 0.0,
             "avg_loss": 0.0,
             "max_win_streak": 0,
@@ -29,8 +142,8 @@ def calculate_metrics(
             "final_balance": initial_balance,
         }
 
-    pnls = [t.get("pnl", 0.0) for t in trades]
-    pnl_pcts = [t.get("pnl_pct", 0.0) for t in trades]
+    pnls = [t.get("pnl", 0.0) for t in trades if "pnl" in t]
+    pnl_pcts = [t.get("pnl_pct", 0.0) for t in trades if "pnl_pct" in t]
 
     total_trades = len(pnls)
     wins = [p for p in pnls if p > 0]
@@ -51,24 +164,48 @@ def calculate_metrics(
     final_balance = initial_balance + net_profit
 
     # Drawdown calculation
-    cumulative_profit = np.cumsum(pnls)
-    equity_curve = initial_balance + cumulative_profit
-    peak = np.maximum.accumulate(equity_curve)
-    drawdowns = (peak - equity_curve) / peak
-    max_drawdown = np.max(drawdowns) if len(drawdowns) > 0 else 0.0
+    max_drawdown = 0.0
+    if equity_curve:
+        equities = np.array([e["equity"] for e in equity_curve])
+        peaks = np.maximum.accumulate(equities)
+        drawdowns = (peaks - equities) / peaks
+        max_drawdown = np.max(drawdowns) if len(drawdowns) > 0 else 0.0
+    else:
+        # Fallback to trade-based drawdown if equity curve not provided
+        cumulative_profit = np.cumsum(pnls)
+        trade_equities = initial_balance + cumulative_profit
+        peaks = np.maximum.accumulate(trade_equities)
+        drawdowns = (peaks - trade_equities) / peaks
+        max_drawdown = np.max(drawdowns) if len(drawdowns) > 0 else 0.0
 
     # Ratios
-    # Assuming risk free rate is 0
-    mean_return = np.mean(pnl_pcts)
-    std_return = np.std(pnl_pcts)
+    mean_return = np.mean(pnl_pcts) if pnl_pcts else 0.0
+    std_return = np.std(pnl_pcts) if pnl_pcts else 0.0
 
-    # annualized factor (assuming trades are somewhat distributed, but let's just use raw per trade for now or typical 252 factor if daily)
-    # Since we don't have time strictly tied here, we'll calculate per-trade Sharpe
     sharpe_ratio = (mean_return / std_return) if std_return > 0 else 0.0
 
     downside_returns = [r for r in pnl_pcts if r < 0]
     downside_std = np.std(downside_returns) if downside_returns else 0.0
     sortino_ratio = (mean_return / downside_std) if downside_std > 0 else 0.0
+
+    # Calmar Ratio: Net Profit % / Max Drawdown
+    total_return_pct = net_profit / initial_balance
+    calmar_ratio = (
+        (total_return_pct / max_drawdown)
+        if max_drawdown > 0
+        else (float("inf") if total_return_pct > 0 else 0.0)
+    )
+
+    # Portfolio Turnover (Simplistic: Sum of |size * price| / avg_balance)
+    # This represents how much of the portfolio was 'replaced'
+    total_volume = sum(abs(t.get("size", 0.0) * t.get("price", 0.0)) for t in trades)
+    avg_balance = (initial_balance + final_balance) / 2
+    portfolio_turnover = total_volume / avg_balance if avg_balance > 0 else 0.0
+
+    # T-Stat of returns (mean / (std / sqrt(n)))
+    t_stat = 0.0
+    if std_return > 0 and total_trades > 0:
+        t_stat = mean_return / (std_return / np.sqrt(total_trades))
 
     # Streaks
     max_win_streak = 0
@@ -95,6 +232,9 @@ def calculate_metrics(
         "max_drawdown": float(max_drawdown),
         "sharpe_ratio": float(sharpe_ratio),
         "sortino_ratio": float(sortino_ratio),
+        "calmar_ratio": float(calmar_ratio),
+        "portfolio_turnover": float(portfolio_turnover),
+        "t_stat": float(t_stat),
         "avg_win": float(avg_win),
         "avg_loss": float(avg_loss),
         "max_win_streak": max_win_streak,
