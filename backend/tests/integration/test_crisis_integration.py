@@ -1,10 +1,11 @@
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, patch, MagicMock
 
 import pytest
 
 from src.config import Config
 from src.intelligence.crisis import CrisisManager
 from src.main import OmniTrader
+from src.risk import RiskManager
 
 
 @pytest.fixture
@@ -44,8 +45,29 @@ def bot(mock_config):
             b = OmniTrader()
             b.exchange = AsyncMock()
             b.database = AsyncMock()
-            b.risk = AsyncMock()
-            b.notifier = AsyncMock()
+            
+            # Setup RiskManager mock with proper sync/async separation
+            b.risk = MagicMock(spec=RiskManager)
+            # Sync methods
+            b.risk.check_circuit_breaker = MagicMock(return_value=False)
+            b.risk.check_black_swan = MagicMock(return_value=False)
+            b.risk.validate_trade = MagicMock()
+            b.risk._weekly_circuit_breaker_active = False
+            b.risk.check_liquidation_risk = MagicMock(return_value=False)
+            b.risk.calculate_trailing_stop = MagicMock()
+            # Async methods
+            b.risk.check_weekly_circuit_breaker = AsyncMock(return_value=False)
+            b.risk.initialize_daily_stats = AsyncMock()
+            b.risk.load_state = AsyncMock()
+            b.risk.record_trade = AsyncMock()
+            
+            from src.notifier import Notifier
+            b.notifier = MagicMock(spec=Notifier)
+            b.notifier.error = AsyncMock()
+            b.notifier.trade_opened = AsyncMock()
+            b.notifier.trade_closed = AsyncMock()
+            b.notifier.circuit_breaker = AsyncMock()
+            
             b.crisis_manager = AsyncMock(spec=CrisisManager)
             b.ws_manager = AsyncMock()
             return b
@@ -54,8 +76,6 @@ def bot(mock_config):
 @pytest.mark.asyncio
 async def test_crisis_mode_gates_entries(bot):
     # Setup state
-    bot.risk.check_circuit_breaker.return_value = False
-    bot.risk._weekly_circuit_breaker_active = False
 
     position_mock = AsyncMock()
     position_mock.is_open = False

@@ -1,0 +1,38 @@
+T77 - Fix unawaited AsyncMock warning in crisis integration tests
+
+## Task Description
+Fix the RuntimeWarning about unawaited AsyncMock in the crisis integration tests. The issue occurs because the test mocks the entire `bot.risk` object as an `AsyncMock()`, but the code calls `check_circuit_breaker()` synchronously, causing a warning when the AsyncMock coroutine is not awaited.
+
+## Current State Analysis
+- Test file: `backend/tests/integration/test_crisis_integration.py`
+- Warning: `RuntimeWarning: coroutine 'AsyncMockMixin._execute_mock_call' was never awaited`
+- Location: `if self.risk.check_circuit_breaker():` in `main.py:_cycle_preflight()`
+- Root cause: `bot.risk = AsyncMock()` makes all risk methods async, but code calls them synchronously
+
+## Required Implementation
+1. **Fix test mocking strategy**: Replace blanket `AsyncMock()` for risk object with selective mocking
+2. **Identify async vs sync methods**: 
+   - `check_circuit_breaker()` is synchronous (returns bool)
+   - Other risk methods may be async
+3. **Proper mock setup**: Use `MagicMock()` for sync methods, `AsyncMock()` for async methods
+4. **Maintain test coverage**: Ensure all mocked methods behave correctly for test scenarios
+
+## Implementation Details
+- Review all risk method calls in the test to determine sync vs async
+- Replace `bot.risk = AsyncMock()` with individual method mocks
+- Use `spec` parameter to maintain method signatures
+- Ensure mocked methods return appropriate test data
+- Verify test still passes after fixing mocks
+
+## Testing Requirements
+- Fix the RuntimeWarning (no more unawaited coroutine warnings)
+- All existing test assertions still pass
+- Test runs cleanly on Docker with `make test`
+- No regression in test coverage or behavior
+- Add comments explaining the mocking strategy
+
+## Acceptance Criteria
+- No RuntimeWarning in test output
+- Test passes consistently
+- Code is more maintainable with explicit mocking
+- Clear documentation of mock setup
