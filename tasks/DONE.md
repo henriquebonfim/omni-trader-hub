@@ -707,4 +707,9 @@
 - [x] Added `slippage_bps` and `spread_bps` to backtest configuration
 - [x] Applied slippage and spread to fill prices in `_open_position` and `_close_position`
 - [x] Added `test_backtest_slippage_model.py` to verify correct application of costs
+
+### T75. Add executable walk-forward runner ✅ **COMPLETED 2026-03-15**
+- [x] Implemented `WalkForwardRunner` in `backend/src/backtest/walk_forward.py`
+- [x] Added methods for data fetching, split generation, backtest execution, and results aggregation
+- [x] Added unit test `test_walk_forward.py` to verify the runner's functionality
 ---
