@@ -64,11 +64,22 @@ class BacktestEngine:
         return trade
 
     def _open_position(self, side: str, price: float, timestamp: int, reason: str):
-        # Simplistic sizing based on fixed percentage of balance or pure absolute
-        # using config default if applicable
+        # Slippage & Spread Model
+        slippage_bps = getattr(self.config.backtest, "slippage_bps", 0.0) / 10000.0
+        spread_bps = getattr(self.config.backtest, "spread_bps", 0.0) / 10000.0
+
+        if side == "long":
+            # Worse fill price: buy higher
+            price_after_spread = price * (1 + spread_bps / 2)
+            fill_price = price_after_spread * (1 + slippage_bps)
+        else:
+            # Worse fill price: sell lower
+            price_after_spread = price * (1 - spread_bps / 2)
+            fill_price = price_after_spread * (1 - slippage_bps)
+
         risk_pct = getattr(self.config.risk, "max_position_size_pct", 10.0) / 100.0
         notional = self.balance * risk_pct
-        size = notional / price
+        size = notional / fill_price
 
         sl_pct = getattr(self.config.risk, "stop_loss_pct", 0.0) / 100.0
         tp_pct = getattr(self.config.risk, "take_profit_pct", 0.0) / 100.0
@@ -77,13 +88,21 @@ class BacktestEngine:
         tp_price = None
 
         if sl_pct > 0:
-            sl_price = price * (1 - sl_pct) if side == "long" else price * (1 + sl_pct)
+            sl_price = (
+                fill_price * (1 - sl_pct)
+                if side == "long"
+                else fill_price * (1 + sl_pct)
+            )
         if tp_pct > 0:
-            tp_price = price * (1 + tp_pct) if side == "long" else price * (1 - tp_pct)
+            tp_price = (
+                fill_price * (1 + tp_pct)
+                if side == "long"
+                else fill_price * (1 - tp_pct)
+            )
 
         self.current_position = {
             "side": side,
-            "entry_price": price,
+            "entry_price": fill_price,
             "size": size,
             "entry_time": timestamp,
             "sl_price": sl_price,
@@ -91,22 +110,32 @@ class BacktestEngine:
             "notional": notional,
         }
 
-        self._execute_trade(side, price, timestamp, size, reason)
+        self._execute_trade(side, fill_price, timestamp, size, reason)
 
     def _close_position(self, price: float, timestamp: int, reason: str):
         if not self.current_position:
             return
+
+        # Slippage & Spread Model on close
+        slippage_bps = getattr(self.config.backtest, "slippage_bps", 0.0) / 10000.0
+        spread_bps = getattr(self.config.backtest, "spread_bps", 0.0) / 10000.0
 
         side = self.current_position["side"]
         entry_price = self.current_position["entry_price"]
         size = self.current_position["size"]
 
         if side == "long":
-            pnl = (price - entry_price) * size
-            pnl_pct = (price - entry_price) / entry_price
+            # Worse fill price on close: sell lower
+            price_after_spread = price * (1 - spread_bps / 2)
+            fill_price = price_after_spread * (1 - slippage_bps)
+            pnl = (fill_price - entry_price) * size
+            pnl_pct = (fill_price - entry_price) / entry_price
         else:
-            pnl = (entry_price - price) * size
-            pnl_pct = (entry_price - price) / entry_price
+            # Worse fill price on close: buy higher
+            price_after_spread = price * (1 + spread_bps / 2)
+            fill_price = price_after_spread * (1 + slippage_bps)
+            pnl = (entry_price - fill_price) * size
+            pnl_pct = (entry_price - fill_price) / entry_price
 
         # Deduct fees
         fee_rate = getattr(self.config.trading, "fee_rate", 0.001)  # 0.1% default

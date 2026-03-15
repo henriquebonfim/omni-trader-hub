@@ -5,6 +5,9 @@ database:
   port: ${MEMGRAPH_PORT}
   type: memgraph
   username: ${MEMGRAPH_USERNAME}
+backtest:
+  slippage_bps: 2.0  # 2 bps = 0.02%
+  spread_bps: 1.0    # 1 bps = 0.01%
 exchange:
   adapter: ccxt
   leverage: 3

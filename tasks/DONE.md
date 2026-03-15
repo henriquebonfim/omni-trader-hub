@@ -702,4 +702,9 @@
 - [x] Implemented Factor Attribution (Alpha/Beta) against market returns
 - [x] Added `scipy` dependency for advanced statistical calculations
 - [x] Added unit tests for all new metrics in `test_backtest_enhanced_metrics.py`
+
+### T70. Add explicit slippage/spread model to backtest engine ✅ **COMPLETED 2026-03-15**
+- [x] Added `slippage_bps` and `spread_bps` to backtest configuration
+- [x] Applied slippage and spread to fill prices in `_open_position` and `_close_position`
+- [x] Added `test_backtest_slippage_model.py` to verify correct application of costs
 ---
