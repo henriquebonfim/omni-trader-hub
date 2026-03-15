@@ -43,6 +43,7 @@ class OpenPositionUseCase:
         ohlcv=None,
         reason: str = "signal",
         use_atr_stops: bool = False,
+        signal_id: Optional[str] = None,
     ) -> None:
         """
         Open a position with full risk validation and event emission.
@@ -55,6 +56,7 @@ class OpenPositionUseCase:
             ohlcv: OHLCV DataFrame for ATR calculation (optional)
             reason: Reason for opening (e.g., 'signal', 'manual')
             use_atr_stops: Whether to calculate SL/TP using ATR
+            signal_id: ID of the triggering signal (optional)
         """
         # Fetch current positions count from exchange
         try:
@@ -213,6 +215,7 @@ class OpenPositionUseCase:
                 slippage=slippage,
                 fee=total_fee,
                 fee_currency=fee_currency,
+                signal_id=signal_id,
             )
 
             # Emit domain event (notifications handled by subscribers)

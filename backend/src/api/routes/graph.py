@@ -95,7 +95,7 @@ async def get_news_feed(request: Request, limit: int = 20) -> List[Dict[str, Any
 
     query = """
     MATCH (n:NewsEvent)
-    OPTIONAL MATCH (n)-[:IMPACTS]->(a:Asset)
+    OPTIONAL MATCH (n)-[:MENTIONS]->(a:Asset)
     OPTIONAL MATCH (n)-[:MENTIONS]->(s:Sector)
     RETURN
       coalesce(n.id, toString(id(n))) as id,
@@ -143,13 +143,13 @@ async def get_asset_news(
     bot = request.app.state.bot
 
     query = """
-    MATCH (n:NewsEvent)-[r:IMPACTS]->(a:Asset {symbol: $symbol})
+    MATCH (n:NewsEvent)-[r:MENTIONS]->(a:Asset {symbol: $symbol})
     RETURN
         n.title as title,
-        n.timestamp as timestamp,
-        r.magnitude as sentiment,
+        coalesce(n.published_at, n.timestamp, 0) as timestamp,
+        r.sentiment as sentiment,
         n.source as source
-    ORDER BY n.timestamp DESC
+    ORDER BY timestamp DESC
     LIMIT $limit
     """
 

@@ -8,6 +8,7 @@ import asyncio
 import os
 import time
 import uuid
+from typing import Any, Dict, List, Optional
 
 import ccxt.async_support as ccxt
 import pandas as pd

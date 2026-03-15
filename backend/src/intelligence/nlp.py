@@ -192,15 +192,15 @@ Rules:
                 query_update, event_id=event_id, sentiment=sentiment, impact=impact
             )
 
-            # Create Asset nodes and IMPACTS relationships
+            # Create Asset nodes and MENTIONS relationships
             for asset in assets:
                 query_asset = """
                 MATCH (n:NewsEvent {id: $event_id})
                 MERGE (a:Asset {symbol: $symbol})
-                MERGE (n)-[:IMPACTS {magnitude: $impact}]->(a)
+                MERGE (n)-[:MENTIONS {sentiment: $sentiment}]->(a)
                 """
                 await session.run(
-                    query_asset, event_id=event_id, symbol=asset, impact=impact
+                    query_asset, event_id=event_id, symbol=asset, sentiment=sentiment
                 )
 
             # Create Sector nodes and MENTIONS relationships

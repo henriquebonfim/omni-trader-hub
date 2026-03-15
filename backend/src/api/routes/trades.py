@@ -25,6 +25,20 @@ async def get_trades(
     return {"trades": trades, "count": len(trades)}
 
 
+@router.get("/signals")
+async def get_signals(
+    request: Request,
+    limit: int = Query(default=20, ge=1, le=100),
+    symbol: str | None = Query(
+        None, description="Filter signals by trading pair, e.g. BTC/USDT"
+    ),
+):
+    """Recent strategy signals, optionally filtered by symbol."""
+    bot = request.app.state.bot
+    signals = await bot.database.get_recent_signals(symbol=symbol, limit=limit)
+    return {"signals": signals, "count": len(signals)}
+
+
 @router.get("/equity")
 async def get_equity(
     request: Request,

@@ -8,20 +8,6 @@ Active execution queue only. Completed work is archived in DONE.md. Use `TODO.md
 
 ## Active Queue
 
-### HIGH — Logic / Schema Bugs
-
-- `T66` - [BUG] Fix strategy selector Cypher schema mismatch
-        - Details: `selector.py` queries non-existent relationships/fields in Memgraph.
-        - Files: `backend/src/strategy/selector.py`, `backend/src/database/memgraph.py`
-
-- `T67` - [BUG] Standardize graph relationship name `:IMPACTS` vs `:MENTIONS`
-        - Details: Ingestor uses `:IMPACTS`, route queries use `:MENTIONS`. Resulting in empty news feeds.
-        - Files: `backend/src/intelligence/ingestor.py`, `backend/src/api/routes/graph.py`
-
-- `T74` - [FEATURE] Add a live signals API endpoint
-        - Details: No `/api/signals` route to retrieve recent signal history.
-        - Files: `backend/src/api/__init__.py`, `backend/src/api/routes`, `backend/src/database/memgraph.py`
-
 ### MEDIUM — Backtest & Metrics Gaps
 
 - `T69` - [IMPROVEMENT] Enhance backtest metrics to institutional standard

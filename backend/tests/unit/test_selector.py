@@ -21,16 +21,18 @@ def mock_db():
             {
                 "name": "ema_volume",
                 "sample_size": 30,
-                "sharpe": 1.5,
-                "profit_factor": 1.2,
-                "win_rate": 0.55,
+                "winning_trades": 16,
+                "gross_profit": 1500.0,
+                "gross_loss": 1250.0,
+                "returns": [0.01, -0.005, 0.02], # simplified for mock
             },
             {
                 "name": "breakout",
                 "sample_size": 25,
-                "sharpe": 2.0,
-                "profit_factor": 1.5,
-                "win_rate": 0.60,
+                "winning_trades": 15,
+                "gross_profit": 2000.0,
+                "gross_loss": 1333.0,
+                "returns": [0.03, -0.01, 0.04], # simplified for mock
             },
         ]
     )
@@ -82,8 +84,9 @@ async def test_selector_query_matches_memgraph_schema(mock_db):
         mock_db._driver.session.return_value.__aenter__.return_value.run.call_args
     )
     query = run_call[0][0]
-    assert "Trade {action: 'CLOSE'}" in query
-    assert "latest_signal.strategy_name" in query
+    assert "Trade {action: 'OPEN'}" in query
+    assert "[:TRIGGERED_BY]" in query
+    assert "Trade {action: 'CLOSE', symbol: t_open.symbol}" in query
 
 
 @pytest.mark.asyncio

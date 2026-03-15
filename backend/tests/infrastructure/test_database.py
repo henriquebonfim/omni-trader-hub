@@ -212,3 +212,19 @@ async def test_log_signal(db):
     assert record["price"] == 52000.0
     assert record["signal"] == "SELL"
     assert json.loads(record["indicators"]) == indicators
+
+
+@pytest.mark.asyncio
+async def test_get_recent_signals(db):
+    await db.log_signal("BTC/USDT", 50000.0, "BUY", "trending", "test1", "ema_volume")
+    await asyncio.sleep(0.01)
+    await db.log_signal("ETH/USDT", 3000.0, "SELL", "ranging", "test2", "ema_volume")
+
+    signals = await db.get_recent_signals(limit=10)
+    assert len(signals) == 2
+    assert signals[0]["symbol"] == "ETH/USDT"
+    assert signals[1]["symbol"] == "BTC/USDT"
+
+    btc_signals = await db.get_recent_signals(symbol="BTC/USDT")
+    assert len(btc_signals) == 1
+    assert btc_signals[0]["symbol"] == "BTC/USDT"

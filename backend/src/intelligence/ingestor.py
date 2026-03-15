@@ -276,9 +276,14 @@ class NewsIngestor:
                 query_rel = """
                 MATCH (n:NewsEvent {id: $id})
                 MERGE (a:Asset {symbol: $symbol})
-                MERGE (n)-[:IMPACTS {magnitude: 0.5}]->(a)
+                MERGE (n)-[:MENTIONS {sentiment: $sentiment}]->(a)
                 """
-                await session.run(query_rel, id=event_id, symbol=currency.upper())
+                await session.run(
+                    query_rel,
+                    id=event_id,
+                    symbol=currency.upper(),
+                    sentiment=sentiment_score,
+                )
 
         logger.info(f"Created NewsEvent: {event_id} from {source}")
 

@@ -13,6 +13,7 @@ import signal
 import sys
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta, timezone
+from typing import Optional
 
 import structlog
 import uvicorn
@@ -370,6 +371,7 @@ class OmniTrader:
         balance: float,
         reason: str = "signal",
         ohlcv=None,
+        signal_id: Optional[str] = None,
     ) -> None:
         """Open a position through the use case (fresh instance for late collaborator binding)."""
         # Sync max_positions so tests and live config changes are respected
@@ -388,6 +390,7 @@ class OmniTrader:
             reason=reason,
             ohlcv=ohlcv,
             use_atr_stops=getattr(self.risk, "use_atr_stops", False),
+            signal_id=signal_id,
         )
 
     async def _close_position(
@@ -1066,7 +1069,7 @@ class OmniTrader:
         )
 
         await self.database.log_equity_snapshot(balance_total)
-        await self.database.log_signal(
+        signal_id = await self.database.log_signal(
             symbol=symbol,
             price=current_price,
             signal=result.signal.value,
@@ -1075,6 +1078,18 @@ class OmniTrader:
             strategy_name=getattr(self.config.strategy, "name", ""),
             indicators=sanitized_indicators,
         )
+
+        # Trigger trades if needed
+        if result.signal in (Signal.LONG, Signal.SHORT) and not current_side:
+            side = "long" if result.signal == Signal.LONG else "short"
+            await self._open_position(
+                side, current_price, balance_total, reason=result.reason, signal_id=signal_id
+            )
+        elif result.signal == Signal.EXIT and current_side:
+            # We don't necessarily need signal_id for close, but could be useful
+            from .exchanges.base import Position
+            fake_pos = Position({"symbol": symbol, "side": current_side}) # Close logic will fetch real one anyway
+            await self._close_position(fake_pos, current_price, reason=result.reason)
 
         time_in_trade_s = 0
         if current_side:

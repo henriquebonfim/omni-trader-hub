@@ -676,4 +676,23 @@
 ### T68. Run Celery Beat in the deployed stack ✅ **COMPLETED 2026-03-14**
 - [x] Added `celery-beat` service to `compose.yml` and `compose.dev.yml`
 - [x] Verified `ingest_news_cycle` task is scheduled hourly in Celery configuration
+
+### T66. Fix strategy selector Cypher schema mismatch ✅ **COMPLETED 2026-03-15**
+- [x] Updated `Signal` nodes to return their ID upon creation
+- [x] Implemented `:TRIGGERED_BY` relationship from `Trade` to `Signal` in `log_trade_open`
+- [x] Refactored `StrategySelector` query to use the new relationship and perform calculations in Python (avoiding Memgraph Cypher limitations like `stDev`)
+- [x] Added comprehensive integration test `tests/integration/test_selector_schema.py` verifying real-schema performance queries
+- [x] Fixed several `NameError` issues in `ccxt_adapter.py` and `main.py`
+
+### T67. Standardize graph relationship name `:IMPACTS` vs `:MENTIONS` ✅ **COMPLETED 2026-03-15**
+- [x] Standardized all News-to-Asset relationships to `:MENTIONS` across `ingestor.py`, `nlp.py`, and `graph.py`
+- [x] Standardized relationship property name to `sentiment` instead of `magnitude`
+- [x] Updated `analytics.py` to use `published_at` instead of non-existent `timestamp` for time-filtering
+- [x] Added integration test `tests/integration/test_news_graph_schema.py` verifying end-to-end news ingestion and standardized retrieval
+
+### T74. Add a live signals API endpoint ✅ **COMPLETED 2026-03-15**
+- [x] Added `get_recent_signals` to `BaseDatabase` and implemented it in `MemgraphDatabase`
+- [x] Implemented `GET /api/signals` route in `backend/src/api/routes/trades.py` with symbol and limit filtering
+- [x] Added database infrastructure test in `tests/infrastructure/test_database.py`
+- [x] Added API integration test in `tests/integration/test_api_signals.py`
 ---

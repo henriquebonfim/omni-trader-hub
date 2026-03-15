@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any, Dict
 
 import structlog
@@ -24,13 +24,13 @@ class GraphAnalytics:
         Calculates aggregate sentiment for a specific asset over a given lookback period.
         Assumes nodes: (:NewsEvent)-[:MENTIONS {sentiment: float}]->(:Asset {symbol: str})
         """
-        timestamp_threshold = int(
-            (datetime.now(timezone.utc).timestamp() - (hours_lookback * 3600)) * 1000
-        )
+        cutoff_date = (
+            datetime.now(timezone.utc) - timedelta(hours=hours_lookback)
+        ).isoformat()
 
         query = """
         MATCH (n:NewsEvent)-[r:MENTIONS]->(a:Asset {symbol: $symbol})
-        WHERE n.timestamp >= $timestamp_threshold
+        WHERE n.published_at >= $cutoff_date
         RETURN
             avg(r.sentiment) as avg_sentiment,
             count(n) as mention_count,
@@ -41,7 +41,7 @@ class GraphAnalytics:
         try:
             async with self.db._driver.session() as session:
                 result = await session.run(
-                    query, symbol=symbol, timestamp_threshold=timestamp_threshold
+                    query, symbol=symbol, cutoff_date=cutoff_date
                 )
                 record = await result.single()
 
@@ -74,14 +74,14 @@ class GraphAnalytics:
         Analyzes negative sentiment spread within the asset's sector.
         Assumes: (:Asset)-[:BELONGS_TO]->(:Sector) and (:NewsEvent)-[:MENTIONS]->(:Asset)
         """
-        timestamp_threshold = int(
-            (datetime.now(timezone.utc).timestamp() - (hours_lookback * 3600)) * 1000
-        )
+        cutoff_date = (
+            datetime.now(timezone.utc) - timedelta(hours=hours_lookback)
+        ).isoformat()
 
         query = """
         MATCH (target:Asset {symbol: $symbol})-[:BELONGS_TO]->(s:Sector)<-[:BELONGS_TO]-(peer:Asset)
         MATCH (n:NewsEvent)-[r:MENTIONS]->(peer)
-        WHERE target <> peer AND n.timestamp >= $timestamp_threshold AND r.sentiment < -0.3
+        WHERE target <> peer AND n.published_at >= $cutoff_date AND r.sentiment < -0.3
         RETURN
             s.name as sector_name,
             count(distinct peer) as peers_in_distress,

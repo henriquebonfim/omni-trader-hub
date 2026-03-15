@@ -46,29 +46,29 @@ class StrategySelector:
     ) -> List[StrategyScore]:
         """
         Query the database for strategy performance metrics filtered by regime.
-        This queries trades linked to signals to calculate sharpe, profit_factor, and win_rate.
+        This queries closed trades linked via TRIGGERED_BY to signals.
         """
+        # Memgraph doesn't have stDev, so we fetch raw pnl_pct list and gross profit/loss
         query = """
-           MATCH (t:Trade {action: 'CLOSE'})
-           MATCH (s:Signal {symbol: t.symbol, regime: $regime})
-           WHERE s.timestamp <= t.timestamp AND s.strategy_name IS NOT NULL
-           WITH t, s
-           ORDER BY t.timestamp, s.timestamp DESC
-           WITH t, head(collect(s)) AS latest_signal
-           WITH latest_signal.strategy_name AS name,
-             count(t) AS total_trades,
-             sum(CASE WHEN t.pnl > 0 THEN 1 ELSE 0 END) AS winning_trades,
-             sum(CASE WHEN t.pnl > 0 THEN t.pnl ELSE 0 END) AS gross_profit,
-             abs(sum(CASE WHEN t.pnl < 0 THEN t.pnl ELSE 0 END)) AS gross_loss,
-             avg(t.pnl_pct) AS avg_return,
-             stDev(t.pnl_pct) AS std_return
-           WHERE name IS NOT NULL AND total_trades >= $min_sample
+           MATCH (s:Signal {regime: $regime})<-[:TRIGGERED_BY]-(t_open:Trade {action: 'OPEN'})
+           MATCH (t_close:Trade {action: 'CLOSE', symbol: t_open.symbol})
+           WHERE t_close.timestamp > t_open.timestamp
+           WITH s.strategy_name AS name, t_close
+           ORDER BY t_close.timestamp ASC
+           WITH name,
+             count(t_close) AS total_trades,
+             sum(CASE WHEN t_close.pnl > 0 THEN 1 ELSE 0 END) AS winning_trades,
+             sum(CASE WHEN t_close.pnl > 0 THEN t_close.pnl ELSE 0 END) AS gross_profit,
+             abs(sum(CASE WHEN t_close.pnl < 0 THEN t_close.pnl ELSE 0 END)) AS gross_loss,
+             collect(t_close.pnl_pct) AS returns
+           WHERE name IS NOT NULL AND name <> "" AND total_trades >= $min_sample
 
         RETURN name,
                total_trades as sample_size,
-               CASE WHEN std_return > 0 THEN (avg_return * sqrt(total_trades)) / std_return ELSE 0.0 END AS sharpe,
-               CASE WHEN gross_loss > 0 THEN gross_profit / gross_loss ELSE gross_profit END AS profit_factor,
-               toFloat(winning_trades) / total_trades AS win_rate
+               winning_trades,
+               gross_profit,
+               gross_loss,
+               returns
         """
 
         scores = []
@@ -85,10 +85,36 @@ class StrategySelector:
                     query, regime=regime.value, min_sample=self.min_sample_size
                 )
 
+            import math
+
             for r in records:
-                sharpe = r["sharpe"] or 0.0
-                profit_factor = r["profit_factor"] or 0.0
-                win_rate = r["win_rate"] or 0.0
+                name = r["name"]
+                sample_size = r["sample_size"]
+                winning_trades = r["winning_trades"]
+                gross_profit = r["gross_profit"]
+                gross_loss = r["gross_loss"]
+                returns = r["returns"]
+
+                # Calculate Win Rate
+                win_rate = winning_trades / sample_size if sample_size > 0 else 0.0
+
+                # Calculate Profit Factor
+                profit_factor = (
+                    gross_profit / gross_loss if gross_loss > 0 else gross_profit
+                )
+
+                # Calculate Sharpe (Python side)
+                sharpe = 0.0
+                if sample_size > 1:
+                    avg_return = sum(returns) / sample_size
+                    # Sample standard deviation
+                    variance = (
+                        sum((x - avg_return) ** 2 for x in returns) / (sample_size - 1)
+                    )
+                    std_return = math.sqrt(variance)
+                    if std_return > 0:
+                        # Annualized-style or just sample-based sharpe
+                        sharpe = (avg_return * math.sqrt(sample_size)) / std_return
 
                 # Normalize values for composite score
                 norm_sharpe = min(
@@ -105,8 +131,8 @@ class StrategySelector:
 
                 scores.append(
                     StrategyScore(
-                        name=r["name"],
-                        sample_size=r["sample_size"],
+                        name=name,
+                        sample_size=sample_size,
                         sharpe=sharpe,
                         profit_factor=profit_factor,
                         win_rate=win_rate,

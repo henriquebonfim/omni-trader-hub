@@ -41,6 +41,7 @@ class BaseDatabase(ABC):
         slippage: Optional[float] = None,
         fee: Optional[float] = None,
         fee_currency: Optional[str] = None,
+        signal_id: Optional[str] = None,
     ) -> int:
         """Log a trade open event."""
         pass
@@ -90,6 +91,11 @@ class BaseDatabase(ABC):
         pass
 
     @abstractmethod
+    async def get_recent_signals(self, symbol: Optional[str] = None, limit: int = 20) -> list:
+        """Get recent strategy signals."""
+        pass
+
+    @abstractmethod
     async def get_last_trade(self, symbol: str) -> Optional[dict]:
         """Get the most recent trade for a symbol."""
         pass
@@ -124,8 +130,8 @@ class BaseDatabase(ABC):
         reason: str,
         strategy_name: str = "",
         indicators: Optional[dict] = None,
-    ) -> None:
-        """Log a strategy signal with indicator snapshot."""
+    ) -> str:
+        """Log a strategy signal with indicator snapshot. Returns signal ID."""
         pass
 
     @abstractmethod

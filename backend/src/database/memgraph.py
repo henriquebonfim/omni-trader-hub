@@ -174,6 +174,7 @@ class MemgraphDatabase(BaseDatabase):
         slippage: Optional[float] = None,
         fee: Optional[float] = None,
         fee_currency: Optional[str] = None,
+        signal_id: Optional[str] = None,
     ) -> int:
         """Log a OPEN trade event."""
         timestamp = int(time.time() * 1000)  # ms epoch
@@ -195,6 +196,37 @@ class MemgraphDatabase(BaseDatabase):
             fee: $fee,
             fee_currency: $fee_currency
         })
+        WITH t
+        UNWIND (CASE WHEN $signal_id IS NOT NULL THEN [1] ELSE [] END) AS exists
+        MATCH (s:Signal) WHERE id(s) = toInteger($signal_id)
+        MERGE (t)-[:TRIGGERED_BY]->(s)
+        RETURN id(t) as trade_id
+        """
+
+        # If signal_id is None, uvicorn/neo4j might complain about returning early if WITH t is used
+        # So we use a more robust query that returns trade_id regardless
+        query = """
+        CREATE (t:Trade {
+            timestamp: $timestamp,
+            symbol: $symbol,
+            side: $side,
+            action: 'OPEN',
+            price: $price,
+            size: $size,
+            notional: $notional,
+            stop_loss: $stop_loss,
+            take_profit: $take_profit,
+            reason: $reason,
+            expected_price: $expected_price,
+            slippage: $slippage,
+            fee: $fee,
+            fee_currency: $fee_currency
+        })
+        WITH t
+        OPTIONAL MATCH (s:Signal) WHERE id(s) = toInteger($signal_id)
+        FOREACH (ignore IN CASE WHEN s IS NOT NULL THEN [1] ELSE [] END |
+            CREATE (t)-[:TRIGGERED_BY]->(s)
+        )
         RETURN id(t) as trade_id
         """
 
@@ -214,6 +246,7 @@ class MemgraphDatabase(BaseDatabase):
                 slippage=slippage,
                 fee=fee,
                 fee_currency=fee_currency,
+                signal_id=signal_id,
             )
             record = await result.single()
             trade_id = record["trade_id"] if record else 0
@@ -223,6 +256,7 @@ class MemgraphDatabase(BaseDatabase):
                 symbol=symbol,
                 side=side,
                 price=price,
+                signal_id=signal_id,
             )
             return trade_id
 
@@ -561,6 +595,57 @@ class MemgraphDatabase(BaseDatabase):
 
     # ==================== SIGNALS ====================
 
+    async def get_recent_signals(
+        self, symbol: Optional[str] = None, limit: int = 20
+    ) -> list:
+        """Get recent strategy signals."""
+        where_clause = ""
+        if symbol:
+            where_clause = "WHERE s.symbol = $symbol"
+
+        query = f"""
+        MATCH (s:Signal)
+        {where_clause}
+        RETURN
+            id(s) as id,
+            s.timestamp as timestamp,
+            s.symbol as symbol,
+            s.price as price,
+            s.signal as signal,
+            s.regime as regime,
+            s.reason as reason,
+            s.strategy_name as strategy_name,
+            s.indicators as indicators
+        ORDER BY s.timestamp DESC
+        LIMIT $limit
+        """
+
+        async with self._driver.session() as session:
+            result = await session.run(query, symbol=symbol, limit=limit)
+            records = await result.fetch(limit)
+
+            signals = []
+            for record in records:
+                signals.append(
+                    {
+                        "id": record["id"],
+                        "timestamp": record["timestamp"],
+                        "symbol": record["symbol"],
+                        "price": record["price"],
+                        "signal": record["signal"],
+                        "regime": record["regime"],
+                        "reason": record["reason"],
+                        "strategy_name": record["strategy_name"],
+                        "indicators": (
+                            json.loads(record["indicators"])
+                            if record["indicators"]
+                            else {}
+                        ),
+                    }
+                )
+
+            return signals
+
     async def log_signal(
         self,
         symbol: str,
@@ -570,8 +655,8 @@ class MemgraphDatabase(BaseDatabase):
         reason: str,
         strategy_name: str = "",
         indicators: Optional[dict] = None,
-    ) -> None:
-        """Log a strategy signal with indicator snapshot."""
+    ) -> str:
+        """Log a strategy signal with indicator snapshot. Returns signal ID."""
         timestamp = int(time.time() * 1000)  # ms epoch
         indicators = indicators or {}
 
@@ -586,10 +671,11 @@ class MemgraphDatabase(BaseDatabase):
             strategy_name: $strategy_name,
             indicators: $indicators
         })
+        RETURN id(s) as signal_id
         """
 
         async with self._driver.session() as session:
-            await session.run(
+            result = await session.run(
                 query,
                 timestamp=timestamp,
                 symbol=symbol,
@@ -600,13 +686,17 @@ class MemgraphDatabase(BaseDatabase):
                 strategy_name=strategy_name,
                 indicators=json.dumps(indicators),
             )
+            record = await result.single()
+            signal_id = str(record["signal_id"]) if record else ""
             logger.info(
                 "signal_logged",
+                signal_id=signal_id,
                 symbol=symbol,
                 signal=signal,
                 regime=regime,
                 price=price,
             )
+            return signal_id
 
     # ==================== FUNDING PAYMENTS ====================
 
