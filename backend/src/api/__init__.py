@@ -49,6 +49,9 @@ PUBLIC_PATHS = {
     "/api/markets",
     "/api/indicators",
     "/api/indicators/compute",
+    "/api/metrics",
+    "/api/runtime/logs",
+    "/api/runtime/performance",
 }
 
 
@@ -147,6 +150,13 @@ def create_api(bot_instance=None, bot_manager=None) -> FastAPI:
     app.include_router(env.router, prefix="/api")
     app.include_router(system.router, prefix="/api")
     app.include_router(stubs.router, prefix="/api")
+    
+    from .routes.metrics import router as metrics_router
+    app.include_router(metrics_router, prefix="/api")
+    
+    from .routes.runtime import router as runtime_router
+    app.include_router(runtime_router, prefix="/api")
+    
     app.include_router(ws_router)
 
     @app.get("/api/health")

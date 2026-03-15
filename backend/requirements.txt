@@ -56,6 +56,10 @@ celery[redis]==5.6.2
 # httpx: Async HTTP for Discord webhooks and external APIs
 httpx==0.28.1
 
+# System Monitoring
+# ----------------------------------------------------------------------------
+psutil==7.0.0
+
 # Web API
 # ----------------------------------------------------------------------------
 fastapi==0.135.1

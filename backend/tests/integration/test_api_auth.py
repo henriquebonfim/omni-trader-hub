@@ -127,6 +127,22 @@ def test_other_routes_unprotected(mock_bot, monkeypatch):
     response = client.get("/api/notifications/rules")
     assert response.status_code == 200
 
+    # GET /api/env should be unprotected
+    response = client.get("/api/env")
+    assert response.status_code == 200
+
+    # GET /api/metrics should be unprotected
+    response = client.get("/api/metrics")
+    assert response.status_code == 200
+
+    # GET /api/runtime/logs should be unprotected
+    response = client.get("/api/runtime/logs")
+    assert response.status_code == 200
+
+    # GET /api/runtime/performance should be unprotected
+    response = client.get("/api/runtime/performance")
+    assert response.status_code == 200
+
 
 def test_mutation_routes_protected_when_key_set(mock_bot, monkeypatch):
     monkeypatch.setenv("OMNITRADER_API_KEY", "test-secret")

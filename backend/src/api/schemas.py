@@ -100,3 +100,42 @@ class ConfigUpdate(BaseModel):
     strategy: Optional[StrategyConfig] = None
     risk: Optional[RiskConfig] = None
     notifications: Optional[NotificationsConfig] = None
+
+class StatusResponse(BaseModel):
+    running: bool
+    running_count: Optional[int] = None
+    total_bots: Optional[int] = None
+    symbol: str
+    paper_mode: bool
+    strategy: str
+    uptime_seconds: int
+    circuit_breaker_active: bool
+    ws_clients: int
+    
+    # New fields
+    last_trade: Optional[dict] = None
+    position: Optional[dict] = None
+    risk_metrics: Optional[dict] = None
+    strategy_indicators: Optional[dict] = None
+
+class MetricsResponse(BaseModel):
+    # Trade performance
+    win_rate: float
+    total_pnl: float
+    total_volume: float
+    total_trades: int
+    
+    # System performance
+    cpu_usage_pct: float
+    memory_usage_mb: float
+    memory_usage_pct: float
+    
+    # Exchange connectivity
+    exchange_status: str
+    exchange_latency_ms: float
+    
+    # Error rates
+    error_count: int
+    
+    # Queue depths
+    queue_depths: dict
