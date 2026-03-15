@@ -658,4 +658,22 @@
 ### T72. Multi-Bot Detail & Manual Trade Wiring ✅ **COMPLETED 2026-03-14**
 - [x] Wired `GET /api/bots/{bot_id}` as source of truth for bot details
 - [x] Added per-bot manual trade (Long/Short/Close) and restart controls in `BotDetailDrawer` and `Dashboard`
+
+### T63. Normalize OHLCV contract between exchange adapters and backtest engine ✅ **COMPLETED 2026-03-14**
+- [x] Added `fetch_candles()` to `BaseExchange` returning list of dictionaries with integer timestamps
+- [x] Implemented `fetch_candles()` in `CCXTExchange` and `BinanceDirectExchange`
+- [x] Ensured `BacktestEngine.run()` remains compatible with the new contract
+
+### T64. Fix shutdown cleanup for WebSocket and CCXT client resources ✅ **COMPLETED 2026-03-14**
+- [x] Improved `main.py` shutdown logic to await `bot_manager.stop_all()`
+- [x] Refactored signal handling to use an `asyncio.Event` for deterministic termination
+- [x] Verified `WsFeed.stop()` and `CCXTExchange.close()` correctly close underlying clients
+
+### T65. Stop printing full auto-generated API keys to logs/stdout ✅ **COMPLETED 2026-03-14**
+- [x] Verified `backend/src/api/auth.py` already masks the generated key in logs
+- [x] Ensured full key is still accessible via `/api/auth/key` in dev mode for operator convenience
+
+### T68. Run Celery Beat in the deployed stack ✅ **COMPLETED 2026-03-14**
+- [x] Added `celery-beat` service to `compose.yml` and `compose.dev.yml`
+- [x] Verified `ingest_news_cycle` task is scheduled hourly in Celery configuration
 ---

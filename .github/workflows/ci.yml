@@ -25,22 +25,22 @@ jobs:
           python -m pip install --upgrade pip
           pip install uv
           uv pip install --system -r requirements.txt -r requirements-dev.txt
+          pip install pytest-xdist
 
       - name: Lint with Ruff
         run: |
           cd backend
           ruff check .
 
-      - name: Run tests
+      - name: Run tests (Parallelized)
         env:
           POSTGRES_PASSWORD: omnitrader_password
         run: |
-          echo "POSTGRES_PASSWORD=omnitrader_password" > .env
           cd backend
-          POSTGRES_PASSWORD=omnitrader_password python -m pytest tests/ -v
+          python -m pytest tests/ -n auto -v
 
-  frontend-build:
-    name: Frontend Build & Type Check
+  frontend-test:
+    name: Frontend Tests & Lint
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -54,6 +54,16 @@ jobs:
         run: |
           cd frontend
           bun install
+
+      - name: Lint
+        run: |
+          cd frontend
+          bun run lint
+
+      - name: Run Unit & Component Tests
+        run: |
+          cd frontend
+          bun run test
 
       - name: Build and Type Check
         run: |

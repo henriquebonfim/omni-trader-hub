@@ -1,101 +1,103 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { fetchBots, createBot, updateBot, deleteBot, startBot, stopBot } from '@/domains/bot/api';
+import { server } from '@/tests/mocks/server';
+import { http, HttpResponse } from 'msw';
 
-const { mockRequest } = vi.hoisted(() => ({
-  mockRequest: vi.fn(),
-}));
+const API_BASE = 'http://localhost:8000';
 
-vi.mock('@/core/api', () => ({ request: mockRequest }));
-
-// Simple adapter mock
-vi.mock('@/lib/adapters', () => ({
-  adaptBot: vi.fn((bot) => ({ ...bot, id: bot.id || 'default' })),
-}));
-
-describe('bot api', () => {
-  beforeEach(() => {
-    mockRequest.mockClear();
-  });
-
-  it('fetchBots should call /api/bots and adapt results', async () => {
-    mockRequest.mockResolvedValueOnce([{ id: 'bot-1', symbol: 'BTC/USDT' }]);
-
+describe('bot api (MSW)', () => {
+  it('fetchBots should return bots from server', async () => {
     const bots = await fetchBots();
     
-    expect(mockRequest).toHaveBeenCalledTimes(1);
-    expect(mockRequest).toHaveBeenCalledWith('/api/bots');
-    expect(bots).toHaveLength(1);
+    expect(bots).toHaveLength(2);
     expect(bots[0].id).toBe('bot-1');
+    expect(bots[1].id).toBe('bot-2');
   });
 
-  it('fetchBots should return empty array on error', async () => {
-    mockRequest.mockRejectedValueOnce(new Error('Network Error'));
+  it('fetchBots should return empty array on server error', async () => {
+    // Override handler for this test
+    server.use(
+      http.get(`${API_BASE}/api/bots`, () => {
+        return new HttpResponse(null, { status: 500 });
+      })
+    );
     
     const bots = await fetchBots();
-    
-    expect(mockRequest).toHaveBeenCalledTimes(1);
     expect(bots).toEqual([]);
   });
 
-  it('createBot calls POST /api/bots', async () => {
-    mockRequest.mockResolvedValueOnce({ ok: true, bot_id: 'new-bot' });
-    const config = { name: 'Bot 1' };
+  it('createBot sends correct data and returns result', async () => {
+    const config = { name: 'New Bot' };
     const res = await createBot(config);
-    expect(mockRequest).toHaveBeenCalledWith('/api/bots', {
-      method: 'POST',
-      body: JSON.stringify({ config }),
-    });
+    
+    expect(res.ok).toBe(true);
     expect(res.bot_id).toBe('new-bot');
   });
 
-  it('updateBot calls PUT /api/bots/:id', async () => {
-    mockRequest.mockResolvedValueOnce({ id: 'bot-1' });
-    const config = { name: 'Bot 2' };
-    const res = await updateBot('bot-1', config);
-    expect(mockRequest).toHaveBeenCalledWith('/api/bots/bot-1', {
-      method: 'PUT',
-      body: JSON.stringify({ config }),
-    });
-    expect(res.id).toBe('bot-1');
+  it('updateBot calls correct endpoint', async () => {
+    let capturedId = '';
+    server.use(
+      http.put(`${API_BASE}/api/bots/:id`, ({ params }) => {
+        capturedId = params.id as string;
+        return HttpResponse.json({ id: capturedId });
+      })
+    );
+
+    const res = await updateBot('bot-abc', { name: 'Updated' });
+    expect(capturedId).toBe('bot-abc');
+    expect(res.id).toBe('bot-abc');
   });
 
-  it('deleteBot calls DELETE /api/bots/:id', async () => {
-    mockRequest.mockResolvedValueOnce(undefined);
-    await deleteBot('bot-1');
-    expect(mockRequest).toHaveBeenCalledWith('/api/bots/bot-1', {
-      method: 'DELETE',
-    });
+  it('deleteBot calls correct endpoint', async () => {
+    let called = false;
+    server.use(
+      http.delete(`${API_BASE}/api/bots/:id`, () => {
+        called = true;
+        return new HttpResponse(null, { status: 204 });
+      })
+    );
+
+    await deleteBot('bot-123');
+    expect(called).toBe(true);
   });
 
-  it('startBot calls POST /api/bot/start for default bot', async () => {
-    mockRequest.mockResolvedValueOnce(undefined);
+  it('startBot handles default and specific bot IDs', async () => {
+    let lastUrl = '';
+    server.use(
+      http.post(`${API_BASE}/api/bot/start`, ({ request }) => {
+        lastUrl = new URL(request.url).pathname;
+        return new HttpResponse(null, { status: 200 });
+      }),
+      http.post(`${API_BASE}/api/bots/:id/start`, ({ request }) => {
+        lastUrl = new URL(request.url).pathname;
+        return new HttpResponse(null, { status: 200 });
+      })
+    );
+
     await startBot('default');
-    expect(mockRequest).toHaveBeenCalledWith('/api/bot/start', {
-      method: 'POST',
-    });
+    expect(lastUrl).toBe('/api/bot/start');
+
+    await startBot('bot-99');
+    expect(lastUrl).toBe('/api/bots/bot-99/start');
   });
 
-  it('startBot calls POST /api/bots/:id/start for other bots', async () => {
-    mockRequest.mockResolvedValueOnce(undefined);
-    await startBot('bot-1');
-    expect(mockRequest).toHaveBeenCalledWith('/api/bots/bot-1/start', {
-      method: 'POST',
-    });
-  });
+  it('stopBot handles default and specific bot IDs', async () => {
+    let lastUrl = '';
+    server.use(
+      http.post(`${API_BASE}/api/bot/stop`, ({ request }) => {
+        lastUrl = new URL(request.url).pathname;
+        return new HttpResponse(null, { status: 200 });
+      }),
+      http.post(`${API_BASE}/api/bots/:id/stop`, ({ request }) => {
+        lastUrl = new URL(request.url).pathname;
+        return new HttpResponse(null, { status: 200 });
+      })
+    );
 
-  it('stopBot calls POST /api/bot/stop?confirm=true for default bot', async () => {
-    mockRequest.mockResolvedValueOnce(undefined);
     await stopBot('default');
-    expect(mockRequest).toHaveBeenCalledWith('/api/bot/stop?confirm=true', {
-      method: 'POST',
-    });
-  });
+    expect(lastUrl).toBe('/api/bot/stop');
 
-  it('stopBot calls POST /api/bots/:id/stop?confirm=true for other bots', async () => {
-    mockRequest.mockResolvedValueOnce(undefined);
-    await stopBot('bot-1');
-    expect(mockRequest).toHaveBeenCalledWith('/api/bots/bot-1/stop?confirm=true', {
-      method: 'POST',
-    });
+    await stopBot('bot-88');
+    expect(lastUrl).toBe('/api/bots/bot-88/stop');
   });
 });

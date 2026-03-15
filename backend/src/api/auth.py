@@ -32,11 +32,14 @@ def init_auth():
     else:
         _API_KEY = secrets.token_hex(32)
         _AUTH_DEV_MODE = True
+        masked_key = f"{_API_KEY[:4]}...{_API_KEY[-4:]}"
         print(
-            f"\n{'=' * 50}\nAUTO-GENERATED API KEY: {_API_KEY}\nKEEP THIS SECURE!\n{'=' * 50}\n"
+            f"\n{'=' * 50}\nAUTO-GENERATED API KEY: {masked_key}\n(Use 'make auth-key' to retrieve full key if needed)\nKEEP THIS SECURE!\n{'=' * 50}\n"
         )
         logger.info(
-            "auth_dev_mode_enabled", message="Generated random API key for dev mode."
+            "auth_dev_mode_enabled",
+            message="Generated random API key for dev mode.",
+            key_preview=masked_key,
         )
 
 

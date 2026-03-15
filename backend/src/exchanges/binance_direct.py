@@ -399,6 +399,40 @@ class BinanceDirectExchange(BaseExchange):
 
         return df
 
+    async def fetch_candles(
+        self,
+        symbol: Optional[str] = None,
+        timeframe: Optional[str] = None,
+        limit: int = 100,
+    ) -> List[Dict[str, Any]]:
+        symbol = symbol or self.config.trading.symbol
+        b_symbol = symbol.split(":")[0].replace("/", "")
+        timeframe = timeframe or self.config.trading.timeframe
+
+        data = await self._request(
+            "GET",
+            "/fapi/v1/klines",
+            params={"symbol": b_symbol, "interval": timeframe, "limit": limit},
+        )
+
+        result = []
+        for candle in data:
+            result.append(
+                {
+                    "timestamp": int(candle[0]),
+                    "open": float(candle[1]),
+                    "high": float(candle[2]),
+                    "low": float(candle[3]),
+                    "close": float(candle[4]),
+                    "volume": float(candle[5]),
+                }
+            )
+
+        if self.paper_mode and result:
+            self._check_paper_orders(result[-1]["close"])
+
+        return result
+
     async def get_ticker(self, symbol: Optional[str] = None) -> Dict[str, Any]:
         symbol = symbol or self.config.trading.symbol
         b_symbol = symbol.split(":")[0].replace("/", "")

@@ -12,7 +12,7 @@ COMPOSE_PROD = docker compose -f compose.yml
 SETUP_CMD  = cp -n .env.example .env 2>/dev/null || true && $(COMPOSE_DEV) build
 START_CMD  = $(COMPOSE_DEV) up -d
 STOP_CMD   = $(COMPOSE_DEV) down
-TEST_CMD   = $(COMPOSE_DEV) run --rm -e PYTHONPATH=/app omnitrader pytest -q tests/ && $(COMPOSE_DEV) --profile test run --rm frontend-test bun test --pass-with-no-tests
+TEST_CMD   = $(COMPOSE_DEV) run --rm -e PYTHONPATH=/app omnitrader pytest -q tests/ && $(COMPOSE_DEV) --profile test run --rm frontend-test bun run test --pass-with-no-tests
 LINT_CMD   = $(COMPOSE_DEV) run --rm -e PYTHONPATH=/app omnitrader ruff check src/ && $(COMPOSE_DEV) run --rm frontend-test bun run lint
 TYPE_CMD   = $(COMPOSE_DEV) run --rm -e PYTHONPATH=/app omnitrader mypy src/ && $(COMPOSE_DEV) run --rm frontend-test bun run typecheck
 BUILD_CMD  = $(COMPOSE_DEV) build

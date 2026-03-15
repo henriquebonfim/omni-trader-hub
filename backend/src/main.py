@@ -1419,15 +1419,12 @@ async def main():
 
     # Setup signal handlers for graceful shutdown
     loop = asyncio.get_event_loop()
+    stop_event = asyncio.Event()
 
     def handle_shutdown(signum):
         sig_name = signal.Signals(signum).name
         logger.info("shutdown_signal_received", signal=sig_name)
-
-        # Stop all bots concurrently
-        asyncio.create_task(bot_manager.stop_all())
-
-        # Stop uvicorn server
+        stop_event.set()
         server.should_exit = True
 
     for sig in (signal.SIGTERM, signal.SIGINT):
@@ -1440,7 +1437,20 @@ async def main():
         await bot_manager.start_bot(bot_id)
 
     # Run the API server
-    await server.serve()
+    server_task = asyncio.create_task(server.serve())
+
+    # Wait for shutdown signal
+    await stop_event.wait()
+
+    logger.info("shutting_down_system")
+
+    # Stop all bots gracefully and await
+    await bot_manager.stop_all()
+
+    # Wait for server to finish
+    await server_task
+
+    logger.info("omnitrader_system_stopped")
 
 
 if __name__ == "__main__":

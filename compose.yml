@@ -50,6 +50,19 @@ services:
       retries: 3
       start_period: 20s
 
+  celery-beat:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: omnitrader-celery-beat
+    command: celery -A src.workers beat --loglevel=info
+    env_file:
+      - .env
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
   frontend:
     build:
       context: ./frontend

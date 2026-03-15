@@ -107,7 +107,17 @@ class BaseExchange(ABC):
         timeframe: Optional[str] = None,
         limit: int = 100,
     ) -> pd.DataFrame:
-        """Fetch OHLCV candle data."""
+        """Fetch OHLCV candle data as a DataFrame."""
+        pass
+
+    @abstractmethod
+    async def fetch_candles(
+        self,
+        symbol: Optional[str] = None,
+        timeframe: Optional[str] = None,
+        limit: int = 100,
+    ) -> List[Dict[str, Any]]:
+        """Fetch OHLCV candle data as a list of dictionaries with integer millisecond timestamps."""
         pass
 
     @abstractmethod

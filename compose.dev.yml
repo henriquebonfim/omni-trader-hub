@@ -15,6 +15,11 @@ services:
       - ./backend/config:/app/config
       - ./backend/src:/app/src
 
+  celery-beat:
+    volumes:
+      - ./backend/config:/app/config
+      - ./backend/src:/app/src
+
   frontend:
     volumes:
       - ./frontend/src:/app/src

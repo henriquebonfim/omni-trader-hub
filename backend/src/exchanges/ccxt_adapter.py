@@ -317,6 +317,44 @@ class CCXTExchange(BaseExchange):
 
         return df
 
+    async def fetch_candles(
+        self, symbol: str | None = None, timeframe: str | None = None, limit: int = 100
+    ) -> list[dict[str, Any]]:
+        """
+        Fetch OHLCV candle data as a list of dictionaries.
+
+        Args:
+            symbol: Trading pair
+            timeframe: Candle timeframe
+            limit: Number of candles to fetch
+
+        Returns:
+            List of dicts: [{'timestamp': int, 'open': float, ...}]
+        """
+        await self._rate_limiter.acquire("fetch_ohlcv")
+        symbol = symbol or self.config.trading.symbol
+        timeframe = timeframe or self.config.trading.timeframe
+
+        ohlcv = await self.client.fetch_ohlcv(symbol, timeframe, limit=limit)
+
+        result = []
+        for candle in ohlcv:
+            result.append(
+                {
+                    "timestamp": int(candle[0]),
+                    "open": float(candle[1]),
+                    "high": float(candle[2]),
+                    "low": float(candle[3]),
+                    "close": float(candle[4]),
+                    "volume": float(candle[5]),
+                }
+            )
+
+        if self.paper_mode and result:
+            self._check_paper_orders(result[-1]["close"])
+
+        return result
+
     async def get_ticker(self, symbol: str | None = None) -> dict:
         """Get current ticker for symbol."""
         await self._rate_limiter.acquire("fetch_ticker")
