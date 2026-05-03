@@ -1,7 +1,7 @@
 import pytest
 from unittest.mock import AsyncMock
-from src.backtest.walk_forward import WalkForwardRunner
-from src.strategy.base import BaseStrategy
+from src.application.backtest.walk_forward import WalkForwardRunner
+from src.domain.strategy.base import BaseStrategy
 from src.config import Config
 
 class MockStrategy(BaseStrategy):

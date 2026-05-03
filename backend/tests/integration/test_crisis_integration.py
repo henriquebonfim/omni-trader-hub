@@ -3,9 +3,9 @@ from unittest.mock import AsyncMock, patch, MagicMock
 import pytest
 
 from src.config import Config
-from src.intelligence.crisis import CrisisManager
+from src.domain.intelligence.crisis import CrisisManager
 from src.main import OmniTrader
-from src.risk import RiskManager
+from src.domain.risk import RiskManager
 
 
 @pytest.fixture
@@ -61,12 +61,15 @@ def bot(mock_config):
             b.risk.load_state = AsyncMock()
             b.risk.record_trade = AsyncMock()
             
-            from src.notifier import Notifier
-            b.notifier = MagicMock(spec=Notifier)
-            b.notifier.error = AsyncMock()
-            b.notifier.trade_opened = AsyncMock()
-            b.notifier.trade_closed = AsyncMock()
-            b.notifier.circuit_breaker = AsyncMock()
+            b.notifier = MagicMock()
+            
+            async def async_noop(*args, **kwargs):
+                return None
+            b.notifier.error = async_noop
+            b.notifier.trade_opened = async_noop
+            b.notifier.trade_closed = async_noop
+            b.notifier.circuit_breaker = async_noop
+            b.notifier.send = async_noop
             
             b.crisis_manager = AsyncMock(spec=CrisisManager)
             b.ws_manager = AsyncMock()

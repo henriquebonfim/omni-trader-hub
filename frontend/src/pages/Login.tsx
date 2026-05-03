@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Button } from '@/shared/ui/button';
-import { Input } from '@/shared/ui/input';
-import { Card } from '@/shared/ui/card';
+import { Button } from '@/shared/ui/atoms/button';
+import { Input } from '@/shared/ui/atoms/input';
+import { Card } from '@/shared/ui/atoms/card';
 import { setApiKey, getStoredApiKey } from '@/core/api';
 
 export default function Login() {

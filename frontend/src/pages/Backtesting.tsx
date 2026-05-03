@@ -3,7 +3,7 @@ import { fetchMarkets } from '@/domains/market/api';
 import type { MarketPair } from '@/domains/market/types';
 import { fetchStrategies } from '@/domains/strategy/api';
 import { mockBacktestResults } from '@/domains/trade/mocks';
-import { Panel } from '@/shared/components/Panel';
+import { Panel } from '@/shared/ui/molecules/Panel';
 import { Download, Play } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { Area, AreaChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';

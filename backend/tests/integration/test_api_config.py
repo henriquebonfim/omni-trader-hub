@@ -3,7 +3,7 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 from fastapi.testclient import TestClient
 
-from src.api import create_api
+from src.interfaces.api import create_api
 
 
 @pytest.fixture
@@ -25,7 +25,7 @@ def mock_bot():
 
 def test_config_validation(mock_bot, monkeypatch):
     # Reset auth module globals and set a test API key
-    import src.api.auth as auth_module
+    import src.interfaces.api.auth as auth_module
 
     auth_module._API_KEY = None
     auth_module._AUTH_DEV_MODE = False

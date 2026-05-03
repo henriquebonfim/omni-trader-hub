@@ -1,8 +1,14 @@
 # Build stage
 FROM python:3.12-slim AS builder
 
+# Install uv
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
+
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
+ENV UV_COMPILE_BYTECODE=1
+ENV UV_LINK_MODE=copy
+
 ARG TALIB_VERSION=0.6.4
 ARG TALIB_SHA256=aa04066d17d69c73b1baaef0883414d3d56ab3775872d82916d1cdb376a3ae86
 
@@ -20,11 +26,12 @@ RUN curl -fSL "https://github.com/TA-Lib/ta-lib/releases/download/v${TALIB_VERSI
     make install && \
     rm -rf /tmp/ta-lib*
 
-RUN pip install --no-cache-dir --upgrade pip setuptools wheel
+WORKDIR /app
 
-COPY requirements.txt requirements-dev.txt ./
-RUN pip install --no-cache-dir --prefix=/install -r requirements-dev.txt
-RUN pip install --no-cache-dir --prefix=/install --ignore-installed packaging==26.0
+# Install dependencies first for better caching
+COPY pyproject.toml uv.lock README.md ./
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv pip install --prefix=/install .[dev]
 
 
 # Runtime image
@@ -45,7 +52,6 @@ COPY --from=builder /usr/lib/libta-lib* /usr/lib/
 COPY --from=builder /install /usr/local
 
 COPY src/ ./src/
-COPY config/ ./config/
 
 RUN mkdir -p data && \
     useradd -m appuser && \

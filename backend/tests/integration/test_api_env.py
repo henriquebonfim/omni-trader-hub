@@ -3,8 +3,8 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 from fastapi.testclient import TestClient
 
-from src.api import create_api
-from src.api.routes.env import mask_value
+from src.interfaces.api import create_api
+from src.interfaces.api.routes.env import mask_value
 
 
 @pytest.fixture
@@ -47,7 +47,7 @@ def client(mock_bot, monkeypatch):
     monkeypatch.setenv("OMNITRADER_API_KEY", "test-secret")
 
     # Reset the singleton in auth.py for testing
-    import src.api.auth as auth
+    import src.interfaces.api.auth as auth
 
     auth._API_KEY = None
     auth._AUTH_DEV_MODE = False
@@ -76,7 +76,7 @@ MEMGRAPH_PASSWORD="password123"
     env_file.write_text(env_content)
 
     # Monkeypatch the ENV_FILE to use our tmp file
-    import src.api.routes.env as env_route
+    import src.interfaces.api.routes.env as env_route
 
     monkeypatch.setattr(env_route, "ENV_FILE", env_file)
 
@@ -113,7 +113,7 @@ NOT_WHITELISTED=hidden
     env_file = tmp_path / ".env"
     env_file.write_text(env_content)
 
-    import src.api.routes.env as env_route
+    import src.interfaces.api.routes.env as env_route
 
     monkeypatch.setattr(env_route, "ENV_FILE", env_file)
 
@@ -140,7 +140,7 @@ NOT_WHITELISTED=hidden
 def test_put_env_validation(client, monkeypatch, tmp_path):
     env_file = tmp_path / ".env"
     env_file.write_text("")
-    import src.api.routes.env as env_route
+    import src.interfaces.api.routes.env as env_route
 
     monkeypatch.setattr(env_route, "ENV_FILE", env_file)
 

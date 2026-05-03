@@ -3,15 +3,15 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from src.backtest.engine import BacktestEngine
-from src.backtest.metrics import (
+from src.application.backtest.engine import BacktestEngine
+from src.application.backtest.metrics import (
     bootstrap_confidence_intervals,
     calculate_metrics,
     generate_walk_forward_splits,
 )
 from src.config import Config
-from src.database.memgraph import MemgraphDatabase
-from src.strategy.bollinger_bands import BollingerBandsStrategy
+from src.infrastructure.database.memgraph import MemgraphDatabase
+from src.domain.strategy.bollinger_bands import BollingerBandsStrategy
 
 
 def test_metrics_calculation():
@@ -60,6 +60,7 @@ def test_backtest_engine():
             "take_profit_pct": 5.0,
         },
         "strategy": {"type": "bollinger_bands"},
+        "backtest": {"slippage_bps": 0.0, "spread_bps": 0.0},
     }
     config = Config(config_data)
     strategy = BollingerBandsStrategy(config)

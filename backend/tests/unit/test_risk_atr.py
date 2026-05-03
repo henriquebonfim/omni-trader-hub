@@ -8,7 +8,7 @@ import pandas as pd
 import pytest
 
 from src.config import Config
-from src.risk import RiskManager
+from src.domain.risk import RiskManager
 
 
 @pytest.fixture

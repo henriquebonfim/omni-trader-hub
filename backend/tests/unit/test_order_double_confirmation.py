@@ -3,7 +3,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from src.config import Config
-from src.exchanges import ExchangeFactory
+from src.infrastructure.exchanges import ExchangeFactory
 from src.main import OmniTrader
 
 
@@ -18,8 +18,8 @@ async def test_order_fill_confirmation_success():
     config = Config(config_data)
 
     with (
-        patch("src.exchanges.ccxt_adapter.ccxt.binance"),
-        patch("src.exchanges.ccxt_adapter.get_config", return_value=config),
+        patch("src.infrastructure.exchanges.ccxt_adapter.ccxt.binance"),
+        patch("src.infrastructure.exchanges.ccxt_adapter.get_config", return_value=config),
     ):
         exchange = ExchangeFactory.create_exchange()
         exchange.paper_mode = False  # Force non-paper mode for trade fetching logic
@@ -60,8 +60,8 @@ async def test_order_fill_confirmation_timeout():
     config = Config(config_data)
 
     with (
-        patch("src.exchanges.ccxt_adapter.ccxt.binance"),
-        patch("src.exchanges.ccxt_adapter.get_config", return_value=config),
+        patch("src.infrastructure.exchanges.ccxt_adapter.ccxt.binance"),
+        patch("src.infrastructure.exchanges.ccxt_adapter.get_config", return_value=config),
     ):
         exchange = ExchangeFactory.create_exchange()
         exchange.paper_mode = False

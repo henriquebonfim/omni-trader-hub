@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import pandas as pd
 
-from src.shared.domain.value_objects import Leverage, Percentage, Price, Side
-from src.trading.domain.services.risk_validator import (
+from src.domain.shared.value_objects import Leverage, Percentage, Price, Side
+from src.domain.trading.services.risk_validator import (
     calculate_position_size,
     detect_black_swan,
     validate_trade,

@@ -2,7 +2,7 @@ import pytest
 from fastapi.testclient import TestClient
 from unittest.mock import MagicMock, AsyncMock
 
-from src.api import create_api
+from src.interfaces.api import create_api
 
 @pytest.fixture
 def mock_bot():
@@ -22,7 +22,7 @@ def test_get_signals_authorized(client, monkeypatch):
     monkeypatch.setenv("OMNITRADER_API_KEY", "test-secret")
     
     # We need to re-initialize auth or bypass it
-    import src.api.auth as auth
+    import src.interfaces.api.auth as auth
     auth._API_KEY = "test-secret"
     auth._AUTH_DEV_MODE = False
 

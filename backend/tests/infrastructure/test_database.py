@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 import pytest
 import pytest_asyncio
 
-from src.database import Database
+from src.infrastructure.database import Database
 
 
 def is_memgraph_available() -> bool:

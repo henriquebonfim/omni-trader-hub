@@ -2,8 +2,8 @@ import pytest
 import pytest_asyncio
 from datetime import datetime, timezone
 
-from src.database import Database
-from src.intelligence.ingestor import NewsIngestor
+from src.infrastructure.database import Database
+from src.domain.intelligence.ingestor import NewsIngestor
 
 def is_memgraph_available() -> bool:
     """Check if Memgraph is available for integration tests."""
@@ -55,18 +55,18 @@ async def test_news_ingestion_and_retrieval_standardized(db):
         raw_text="BTC is mooning today!"
     )
     
-    # 2. Verify MENTIONS relationship exists with sentiment property
+    # 2. Verify IMPACTS relationship exists with magnitude property
     async with db._driver.session() as session:
         res = await session.run(
-            "MATCH (n:NewsEvent {id: $id})-[r:MENTIONS]->(a:Asset {symbol: 'BTC'}) RETURN r.sentiment as sentiment",
+            "MATCH (n:NewsEvent {id: $id})-[r:IMPACTS]->(a:Asset {symbol: 'BTC'}) RETURN r.magnitude as magnitude",
             id=event_id
         )
         record = await res.single()
         assert record is not None
-        assert record["sentiment"] == sentiment_score
+        assert record["magnitude"] == sentiment_score
         
     # 3. Test Graph Analytics aggregate query
-    from src.intelligence.analytics import GraphAnalytics
+    from src.domain.intelligence.analytics import GraphAnalytics
     ga = GraphAnalytics(database=db)
     sentiment_data = await ga.get_asset_sentiment("BTC")
     assert sentiment_data["mention_count"] == 1

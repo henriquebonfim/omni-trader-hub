@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from src.shared.domain.events import DomainEvent, EventBus
+from src.domain.shared.events import DomainEvent, EventBus
 
 
 @pytest.mark.asyncio

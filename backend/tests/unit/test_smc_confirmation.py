@@ -1,7 +1,7 @@
 import pandas as pd
 
 from src.config import Config
-from src.strategy.base import BaseStrategy, Signal
+from src.domain.strategy.base import BaseStrategy, Signal
 
 
 class DummyStrategy(BaseStrategy):

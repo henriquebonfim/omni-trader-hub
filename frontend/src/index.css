@@ -1,61 +1,72 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
+
+@theme {
+  --color-border: hsl(var(--border));
+  --color-background: hsl(var(--background));
+  --color-foreground: hsl(var(--foreground));
+  --color-primary: hsl(var(--primary));
+  --color-secondary: hsl(var(--secondary));
+  --color-accent: hsl(var(--accent));
+  --color-muted: hsl(var(--muted));
+  --color-success: hsl(var(--success));
+  --color-danger: hsl(var(--danger));
+  --color-warning: hsl(var(--warning));
+  --color-destructive: hsl(var(--destructive));
+  --color-popover: hsl(var(--popover));
+  --color-card: hsl(var(--card));
+  
+  --radius-lg: var(--radius);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-sm: calc(var(--radius) - 4px);
+}
 
 @layer base {
   :root {
-    --bg-base: 220 20% 6%;
-    --bg-panel: 216 18% 11%;
-    --bg-hover: 215 14% 16%;
-    --bg-input: 220 20% 5%;
-    --border: 215 10% 22%;
-    --text-primary: 210 30% 92%;
-    --text-secondary: 215 8% 57%;
-    --text-muted: 215 7% 31%;
-    --accent: 212 100% 67%;
-    --accent-dim: 213 52% 25%;
-    --green: 140 50% 49%;
-    --red: 3 90% 63%;
-    --yellow: 38 70% 49%;
-    --orange: 24 85% 59%;
-    --purple: 270 100% 77%;
-    --cyan: 168 55% 52%;
+    --bg-base: 240 10% 4%;
+    --bg-panel: 240 10% 6%;
+    --bg-hover: 240 10% 12%;
+    --bg-input: 240 10% 3%;
+    --border: 240 5% 15%;
+    --text-primary: 0 0% 98%;
+    --text-secondary: 240 5% 65%;
+    --text-muted: 240 5% 40%;
+    
+    --primary: 210 100% 50%;
+    --success: 142 70% 45%;
+    --danger: 0 84% 60%;
+    --warning: 38 92% 50%;
+    
+    --glass-bg: white / 0.03;
+    --glass-border: white / 0.08;
+    --glass-blur: 12px;
 
-    --background: 220 20% 6%;
-    --foreground: 210 30% 92%;
-    --card: 216 18% 11%;
-    --card-foreground: 210 30% 92%;
-    --popover: 216 18% 11%;
-    --popover-foreground: 210 30% 92%;
-    --primary: 212 100% 67%;
-    --primary-foreground: 220 20% 6%;
-    --secondary: 215 14% 16%;
-    --secondary-foreground: 210 30% 92%;
-    --muted: 215 14% 16%;
-    --muted-foreground: 215 8% 57%;
-    --accent: 212 100% 67%;
-    --accent-foreground: 220 20% 6%;
-    --destructive: 3 90% 63%;
-    --destructive-foreground: 210 30% 92%;
-    --border: 215 10% 22%;
-    --input: 220 20% 5%;
-    --ring: 212 100% 67%;
+    --background: 240 10% 4%;
+    --foreground: 0 0% 98%;
+    --card: 240 10% 6%;
+    --card-foreground: 0 0% 98%;
+    --popover: 240 10% 6%;
+    --popover-foreground: 0 0% 98%;
+    --primary-foreground: 240 10% 4%;
+    --secondary: 240 10% 12%;
+    --secondary-foreground: 0 0% 98%;
+    --muted: 240 10% 12%;
+    --muted-foreground: 240 5% 65%;
+    --accent: 210 100% 50%;
+    --accent-foreground: 240 10% 4%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 98%;
+    --input: 240 10% 3%;
+    --ring: 210 100% 50%;
     --radius: 0.5rem;
 
-    --sidebar-background: 216 18% 9%;
-    --sidebar-foreground: 210 30% 92%;
-    --sidebar-primary: 212 100% 67%;
-    --sidebar-primary-foreground: 220 20% 6%;
-    --sidebar-accent: 215 14% 16%;
-    --sidebar-accent-foreground: 210 30% 92%;
-    --sidebar-border: 215 10% 22%;
-    --sidebar-ring: 212 100% 67%;
-
-    --chart-1: 212 100% 67%;
-    --chart-2: 140 50% 49%;
-    --chart-3: 3 90% 63%;
-    --chart-4: 270 100% 77%;
-    --chart-5: 168 55% 52%;
+    --sidebar-background: 240 10% 5%;
+    --sidebar-foreground: 240 5% 65%;
+    --sidebar-primary: 210 100% 50%;
+    --sidebar-primary-foreground: 0 0% 98%;
+    --sidebar-accent: 240 10% 12%;
+    --sidebar-accent-foreground: 0 0% 98%;
+    --sidebar-border: 240 5% 15%;
+    --sidebar-ring: 210 100% 50%;
 
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
   }
@@ -69,6 +80,14 @@
     @apply bg-background text-foreground antialiased;
     font-size: 14px;
     line-height: 1.5;
+  }
+}
+
+@layer utilities {
+  .bg-glass {
+    background: hsla(var(--bg-panel) / 0.4);
+    backdrop-filter: blur(var(--glass-blur));
+    border: 1px solid hsla(var(--text-primary) / 0.1);
   }
 }
 
@@ -95,14 +114,14 @@
 
 /* Pulse animation for crisis/active states */
 @keyframes pulse-border {
-  0%, 100% { border-color: hsl(var(--red)); }
-  50% { border-color: hsl(var(--red) / 0.3); }
+  0%, 100% { border-color: hsl(var(--danger)); }
+  50% { border-color: hsl(var(--danger) / 0.3); }
 }
 .animate-pulse-border {
   animation: pulse-border 2s ease-in-out infinite;
 }
 
 /* Regime colors */
-.regime-trending { color: hsl(var(--green)); }
+.regime-trending { color: hsl(var(--success)); }
 .regime-ranging { color: hsl(var(--accent)); }
-.regime-volatile { color: hsl(var(--orange)); }
+.regime-volatile { color: hsl(var(--warning)); }

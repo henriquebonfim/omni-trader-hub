@@ -3,7 +3,7 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 from fastapi.testclient import TestClient
 
-from src.api import create_api
+from src.interfaces.api import create_api
 
 
 @pytest.fixture
@@ -46,7 +46,7 @@ def test_trades_protected_when_no_key_set_uses_generated_key(mock_bot, monkeypat
     monkeypatch.delenv("OMNITRADER_API_KEY", raising=False)
 
     # Reset the singleton in auth.py for testing
-    import src.api.auth as auth
+    import src.interfaces.api.auth as auth
 
     auth._API_KEY = None
     auth._AUTH_DEV_MODE = False
@@ -71,7 +71,7 @@ def test_trades_protected_when_key_set(mock_bot, monkeypatch):
     monkeypatch.setenv("OMNITRADER_API_KEY", "test-secret")
 
     # Reset the singleton in auth.py for testing
-    import src.api.auth as auth
+    import src.interfaces.api.auth as auth
 
     auth._API_KEY = None
     auth._AUTH_DEV_MODE = False
@@ -99,7 +99,7 @@ def test_other_routes_unprotected(mock_bot, monkeypatch):
     monkeypatch.setenv("OMNITRADER_API_KEY", "test-secret")
 
     # Reset the singleton in auth.py for testing
-    import src.api.auth as auth
+    import src.interfaces.api.auth as auth
 
     auth._API_KEY = None
     auth._AUTH_DEV_MODE = False
@@ -148,7 +148,7 @@ def test_mutation_routes_protected_when_key_set(mock_bot, monkeypatch):
     monkeypatch.setenv("OMNITRADER_API_KEY", "test-secret")
 
     # Reset the singleton in auth.py for testing
-    import src.api.auth as auth
+    import src.interfaces.api.auth as auth
 
     auth._API_KEY = None
     auth._AUTH_DEV_MODE = False

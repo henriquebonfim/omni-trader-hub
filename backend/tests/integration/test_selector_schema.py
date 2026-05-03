@@ -3,9 +3,9 @@ import pytest
 import pytest_asyncio
 from datetime import datetime, timezone
 
-from src.database import Database
-from src.strategy.selector import StrategySelector
-from src.intelligence.regime import MarketRegime
+from src.infrastructure.database import Database
+from src.domain.strategy.selector import StrategySelector
+from src.domain.intelligence.regime import MarketRegime
 
 def is_memgraph_available() -> bool:
     """Check if Memgraph is available for integration tests."""

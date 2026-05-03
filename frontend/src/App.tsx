@@ -1,8 +1,8 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Route, Routes, Navigate } from "react-router-dom";
-import { Toaster as Sonner } from "@/shared/ui/sonner";
-import { Toaster } from "@/shared/ui/toaster";
-import { TooltipProvider } from "@/shared/ui/tooltip";
+import { Toaster as Sonner } from "@/shared/ui/molecules/sonner";
+import { Toaster } from "@/shared/ui/molecules/toaster";
+import { TooltipProvider } from "@/shared/ui/molecules/tooltip";
 import { Layout } from "@/app/layout/Layout";
 import Dashboard from "./pages/Dashboard";
 import BotsAssets from "./pages/BotsAssets";
@@ -13,6 +13,7 @@ import RiskMonitor from "./pages/RiskMonitor";
 import TradeHistory from "./pages/TradeHistory";
 import StrategyLab from "./pages/StrategyLab";
 import SettingsPage from "./pages/Settings";
+import { AnalyticsPage } from "./features/analytics/pages/AnalyticsPage";
 import Login from "./pages/Login";
 import NotFound from "./pages/NotFound";
 import { getStoredApiKey } from "@/core/api";
@@ -62,6 +63,7 @@ const App = () => (
                   <Route path="/backtesting" element={<Backtesting />} />
                   <Route path="/risk" element={<RiskMonitor />} />
                   <Route path="/history" element={<TradeHistory />} />
+                  <Route path="/analytics" element={<AnalyticsPage />} />
                   <Route path="/strategy-lab" element={<StrategyLab />} />
                   <Route path="/settings" element={<SettingsPage />} />
                   <Route path="*" element={<NotFound />} />

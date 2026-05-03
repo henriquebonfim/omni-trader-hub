@@ -2,7 +2,7 @@
 
 Self-hosted BTC/USDT Futures trading system with pluggable strategies, regime detection, risk management, and a real-time React dashboard. Built on Python asyncio, FastAPI, Celery, Redis, PostgreSQL, and Docker Compose.
 
-> **⚠️ DO NOT DEPLOY LIVE CAPITAL.** An institutional-grade audit (2026-03-03) identified critical bugs in stop-loss handling, paper mode simulation, and API security. See [TASKS.md](TASKS.md) for the full findings. Additionally, the current geopolitical environment (US-Israeli/Iran conflict, Hormuz closure) creates extreme macro volatility that this system has no mechanism to detect or respond to.
+> **⚠️ DISCLAIMER: Use at your own risk.** Trading cryptocurrencies involves significant risk of loss. This software is provided "as is" for educational and research purposes. Never trade with capital you cannot afford to lose.
 
 ## Features
 
@@ -42,7 +42,7 @@ make logs
 make stop
 ```
 
-- **Dashboard**: http://localhost:3000
+- **Dashboard**: http://localhost:3333
 - **API**: http://localhost:8000/api/health
 - **API Docs**: http://localhost:8000/docs
 
@@ -51,7 +51,7 @@ make stop
 ```bash
 cd backend
 uv venv && source .venv/bin/activate
-uv pip install -r requirements.txt
+uv pip install .
 python -m src.main
 ```
 
@@ -68,11 +68,6 @@ make dev        # Start in foreground with live logs
 make lint       # Run linters (ruff)
 make typecheck  # Run type checking (mypy)
 ```
-make lint       # Ruff + frontend lint
-make build      # Build all Docker images
-make dev        # Start in development mode
-```
-
 
 ## Discord Alerts
 
@@ -96,4 +91,4 @@ make dev        # Start in development mode
 
 ## License
 
-Personal project — not for commercial use.
+MIT License. See [LICENSE](LICENSE) for details.

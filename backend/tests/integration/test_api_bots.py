@@ -3,8 +3,8 @@ from unittest.mock import AsyncMock
 import pytest
 from fastapi.testclient import TestClient
 
-from src.api import create_api
-from src.bot_manager import BotManager
+from src.interfaces.api import create_api
+from src.application.bot_manager import BotManager
 from src.config import Config
 from src.main import OmniTrader
 
@@ -126,7 +126,7 @@ def client(mock_bot_manager):
 
 @pytest.fixture
 def auth_headers():
-    from src.api.auth import get_api_key
+    from src.interfaces.api.auth import get_api_key
 
     key = get_api_key()
     return {"Authorization": f"Bearer {key}"}

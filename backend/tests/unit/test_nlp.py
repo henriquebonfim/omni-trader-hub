@@ -3,7 +3,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import httpx
 import pytest
 
-from src.intelligence.nlp import OllamaNLP
+from src.domain.intelligence.nlp import OllamaNLP
 
 
 @pytest.fixture

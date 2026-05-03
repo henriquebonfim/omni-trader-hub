@@ -4,10 +4,10 @@ import { fetchCorrelationMatrix } from '@/domains/market/api';
 import type { CorrelationMatrixData } from '@/domains/market/types';
 import { fetchEquitySnapshots, fetchTradeHistory } from '@/domains/trade/api';
 import type { EquitySnapshot, Trade } from '@/domains/trade/types';
-import { CorrelationHeatmap } from '@/shared/components/CorrelationHeatmap';
-import { Panel } from '@/shared/components/Panel';
-import { StatCard } from '@/shared/components/StatCard';
-import { StatusBadge } from '@/shared/components/StatusBadge';
+import { CorrelationHeatmap } from '@/shared/ui/organisms/CorrelationHeatmap';
+import { Panel } from '@/shared/ui/molecules/Panel';
+import { StatCard } from '@/shared/ui/molecules/StatCard';
+import { StatusBadge } from '@/shared/ui/molecules/StatusBadge';
 import { AlertCircle, Loader2 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 

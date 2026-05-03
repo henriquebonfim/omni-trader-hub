@@ -5,7 +5,7 @@ import pytest
 import yaml
 from fastapi.testclient import TestClient
 
-from src.api import create_api
+from src.interfaces.api import create_api
 
 
 @pytest.fixture
@@ -47,7 +47,7 @@ def mock_bot():
 def client(mock_bot, monkeypatch):
     monkeypatch.setenv("OMNITRADER_API_KEY", "test-secret")
 
-    import src.api.auth as auth
+    import src.interfaces.api.auth as auth
 
     auth._API_KEY = None
     auth._AUTH_DEV_MODE = False
@@ -75,7 +75,7 @@ def test_update_notification_rules_persists_to_config(
     config_file = tmp_path / "config.yaml"
     config_file.write_text(yaml.safe_dump({"notifications": {"enabled": True}}))
 
-    import src.api.routes.notifications as notifications_route
+    import src.interfaces.api.routes.notifications as notifications_route
 
     monkeypatch.setattr(notifications_route, "_CONFIG_PATH", Path(config_file))
 

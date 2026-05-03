@@ -4,11 +4,11 @@ from unittest.mock import AsyncMock, patch
 import pandas as pd
 import pytest
 
-from src.risk import RiskManager
+from src.domain.risk import RiskManager
 
 
 @pytest.mark.asyncio
-@patch("src.database.factory.DatabaseFactory.get_database")
+@patch("src.infrastructure.database.factory.DatabaseFactory.get_database")
 async def test_weekly_circuit_breaker_triggered(mock_get_store):
     mock_get_store.return_value = AsyncMock()
     # Setup
@@ -26,7 +26,7 @@ async def test_weekly_circuit_breaker_triggered(mock_get_store):
 
 
 @pytest.mark.asyncio
-@patch("src.database.factory.DatabaseFactory.get_database")
+@patch("src.infrastructure.database.factory.DatabaseFactory.get_database")
 async def test_weekly_circuit_breaker_not_triggered(mock_get_store):
     mock_get_store.return_value = AsyncMock()
     risk = RiskManager()
@@ -87,7 +87,7 @@ def test_black_swan_detector_normal():
 
 
 @pytest.mark.asyncio
-@patch("src.database.factory.DatabaseFactory.get_database")
+@patch("src.infrastructure.database.factory.DatabaseFactory.get_database")
 async def test_auto_deleverage_drawdown_across_days(mock_get_store):
     mock_get_store.return_value = AsyncMock()
     risk = RiskManager()
@@ -152,7 +152,7 @@ async def test_auto_deleverage_drawdown_across_days(mock_get_store):
 
 
 @pytest.mark.asyncio
-@patch("src.database.factory.DatabaseFactory.get_database")
+@patch("src.infrastructure.database.factory.DatabaseFactory.get_database")
 async def test_consecutive_losses_carry_across_days(mock_get_store):
     mock_get_store.return_value = AsyncMock()
     risk = RiskManager()

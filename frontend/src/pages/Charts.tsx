@@ -1,8 +1,8 @@
 import { cn } from '@/core/utils';
 import { fetchMarkets } from '@/domains/market/api';
 import type { MarketPair } from '@/domains/market/types';
-import { Panel } from '@/shared/components/Panel';
-import { StatusBadge } from '@/shared/components/StatusBadge';
+import { Panel } from '@/shared/ui/molecules/Panel';
+import { StatusBadge } from '@/shared/ui/molecules/StatusBadge';
 import { CandlestickSeries, ColorType, createChart, HistogramSeries, UTCTimestamp } from 'lightweight-charts';
 import { Maximize2, Minimize2 } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';

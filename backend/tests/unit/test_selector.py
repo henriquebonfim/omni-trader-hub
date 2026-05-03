@@ -5,9 +5,9 @@ import pandas as pd
 import pytest
 
 from src.config import get_config
-from src.intelligence.regime import MarketRegime
+from src.domain.intelligence.regime import MarketRegime
 from src.main import OmniTrader
-from src.strategy.selector import StrategySelector
+from src.domain.strategy.selector import StrategySelector
 
 
 @pytest.fixture
@@ -121,7 +121,7 @@ async def test_omnitrader_strategy_auto_selection():
 
     # Mock regimet classifier/celery
     import src.main as main_module
-    from src.workers.tasks import (
+    from src.interfaces.workers.tasks import (
         analyze_knowledge_graph,
         analyze_regime,
         analyze_strategy,
@@ -173,7 +173,7 @@ async def test_omnitrader_strategy_manual_override():
     bot.crisis_manager.is_crisis_active = AsyncMock(return_value=False)
 
     import src.main as main_module
-    from src.workers.tasks import (
+    from src.interfaces.workers.tasks import (
         analyze_knowledge_graph,
         analyze_regime,
         analyze_strategy,

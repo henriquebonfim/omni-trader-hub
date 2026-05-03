@@ -1,5 +1,5 @@
 import { useAppStore } from '@/app/store/app-store';
-import { StatusBadge } from '@/shared/components/StatusBadge';
+import { StatusBadge } from '@/shared/ui/molecules/StatusBadge';
 import { Activity, Bell, ChevronDown, Settings, Wifi, WifiOff, LogOut } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';

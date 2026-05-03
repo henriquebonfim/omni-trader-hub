@@ -8,17 +8,17 @@ import pandas as pd
 import pytest
 
 from src.config import Config
-from src.risk import RiskManager
-from src.strategy import (
+from src.domain.risk import RiskManager
+from src.domain.strategy import (
     get_strategy,
     list_strategies,
 )
-from src.strategy.adx_trend import ADXTrendStrategy
-from src.strategy.base import BaseStrategy, Signal
-from src.strategy.bollinger_bands import BollingerBandsStrategy
-from src.strategy.breakout import BreakoutStrategy
-from src.strategy.ema_volume import EMAVolumeStrategy
-from src.strategy.z_score import ZScoreStrategy
+from src.domain.strategy.adx_trend import ADXTrendStrategy
+from src.domain.strategy.base import BaseStrategy, Signal
+from src.domain.strategy.bollinger_bands import BollingerBandsStrategy
+from src.domain.strategy.breakout import BreakoutStrategy
+from src.domain.strategy.ema_volume import EMAVolumeStrategy
+from src.domain.strategy.z_score import ZScoreStrategy
 
 
 @pytest.fixture
@@ -293,9 +293,9 @@ def test_trailing_stop():
             self.exchange.leverage = 1
 
     # Mock get_config
-    import src.risk
+    import src.domain.risk
 
-    src.risk.get_config = lambda: FakeConfig()
+    src.domain.risk.get_config = lambda: FakeConfig()
 
     risk = RiskManager()
 

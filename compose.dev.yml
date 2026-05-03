@@ -3,28 +3,62 @@ services:
     volumes:
       - ./backend/config:/app/config
       - ./backend/data:/app/data
-      - ./backend/src:/app/src
       - ./backend/tests:/app/tests
+      - ./.env:/app/.env
+    develop:
+      watch:
+        - path: ./backend/src
+          action: sync+restart
+          target: /app/src
+        - path: ./backend/pyproject.toml
+          action: rebuild
 
   watchdog:
     volumes:
       - ./backend/config:/app/config
+    develop:
+      watch:
+        - path: ./backend/src
+          action: sync+restart
+          target: /app/src
 
   celery-worker:
     volumes:
       - ./backend/config:/app/config
-      - ./backend/src:/app/src
+    develop:
+      watch:
+        - path: ./backend/src
+          action: sync+restart
+          target: /app/src
 
   celery-beat:
     volumes:
       - ./backend/config:/app/config
-      - ./backend/src:/app/src
+    develop:
+      watch:
+        - path: ./backend/src
+          action: sync+restart
+          target: /app/src
 
   frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      target: builder
+    command: bun run dev --host
+    ports:
+      - "9000:8080"
     volumes:
-      - ./frontend/src:/app/src
-      - ./frontend/package.json:/app/package.json
       - ./frontend/bun.lockb:/app/bun.lockb
+    environment:
+      - VITE_API_TARGET=http://omnitrader:8000
+    develop:
+      watch:
+        - path: ./frontend/src
+          action: sync
+          target: /app/src
+        - path: ./frontend/package.json
+          action: rebuild
 
   frontend-test:
     build:

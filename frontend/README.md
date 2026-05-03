@@ -1,73 +1,60 @@
-# Welcome to your Lovable project
+# OmniTrader Frontend
 
-## Project info
+Real-time trading dashboard for the OmniTrader system.
 
-**URL**: https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID
+## Features
 
-## How can I edit this code?
+- **Live Market Monitoring**: Real-time price charts and order books.
+- **Bot Management**: Create, start, stop, and monitor multiple trading bot instances.
+- **Risk Monitor**: Visual circuit breaker status and daily/weekly PnL tracking.
+- **Strategy Lab**: Backtesting interface and parameter optimization (Work in Progress).
+- **Intelligence Dashboard**: News feed and sentiment analysis visualization.
 
-There are several ways of editing your application.
+## Tech Stack
 
-**Use Lovable**
+- **React + Vite**: Fast development and optimized build.
+- **TypeScript**: Type safety across the dashboard.
+- **Tailwind CSS + shadcn/ui**: Modern, responsive UI components.
+- **TanStack Query**: Efficient data fetching and caching.
+- **Lucide React**: Clean and consistent iconography.
+- **TradingView Lightweight Charts**: High-performance financial charting.
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and start prompting.
+## Getting Started
 
-Changes made via Lovable will be committed automatically to this repo.
+### Prerequisites
 
-**Use your preferred IDE**
+- Node.js 20+
+- Bun (recommended) or npm/yarn.
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+### Setup
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+```bash
+# Install dependencies
+bun install
 
-Follow these steps:
-
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
-
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
-
-# Step 3: Install the necessary dependencies.
-npm i
-
-# Step 4: Start the development server with auto-reloading and an instant preview.
-npm run dev
+# Configure environment
+cp .env.example .env.local
 ```
 
-**Edit a file directly in GitHub**
+### Development
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+```bash
+# Start development server
+bun dev
+```
 
-**Use GitHub Codespaces**
+### Build
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+```bash
+# Create production build
+bun run build
+```
 
-## What technologies are used for this project?
+## Project Structure
 
-This project is built with:
-
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
-
-## How can I deploy this project?
-
-Simply open [Lovable](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and click on Share -> Publish.
-
-## Can I connect a custom domain to my Lovable project?
-
-Yes, you can!
-
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
-
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+- `src/app/`: Layout and global state.
+- `src/core/`: API client and WebSocket management.
+- `src/domains/`: Domain-specific logic, components, and types (Bot, Market, Risk, etc.).
+- `src/pages/`: Top-level page components.
+- `src/shared/`: Reusable UI components and hooks.
+- `src/tests/`: Unit, integration, and E2E tests.

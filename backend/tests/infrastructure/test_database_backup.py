@@ -4,7 +4,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from src.database.memgraph import MemgraphDatabase
+from src.infrastructure.database.memgraph import MemgraphDatabase
 
 
 @pytest.mark.asyncio

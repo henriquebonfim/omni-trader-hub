@@ -1,8 +1,8 @@
 import pytest
 
-from src.database.memgraph import MemgraphDatabase
-from src.intelligence.analytics import GraphAnalytics
-from src.intelligence.crisis import CrisisManager
+from src.infrastructure.database.memgraph import MemgraphDatabase
+from src.domain.intelligence.analytics import GraphAnalytics
+from src.domain.intelligence.crisis import CrisisManager
 
 
 class MockSession:

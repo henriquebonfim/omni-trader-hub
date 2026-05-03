@@ -1,6 +1,6 @@
 import pytest
 import numpy as np
-from src.backtest.metrics import (
+from src.application.backtest.metrics import (
     calculate_metrics,
     calculate_information_coefficient,
     calculate_factor_attribution

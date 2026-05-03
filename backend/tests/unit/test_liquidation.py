@@ -2,14 +2,14 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from src.exchanges.base import Position
+from src.infrastructure.exchanges.base import Position
 from src.main import OmniTrader
-from src.risk import RiskManager
-from src.strategy.base import Signal
+from src.domain.risk import RiskManager
+from src.domain.strategy.base import Signal
 
 
 @pytest.mark.asyncio
-@patch("src.database.factory.DatabaseFactory.get_database")
+@patch("src.infrastructure.database.factory.DatabaseFactory.get_database")
 async def test_liquidation_risk_trigger(mock_get_store):
     mock_get_store.return_value = AsyncMock()
     # Setup
@@ -112,7 +112,7 @@ async def test_liquidation_risk_trigger(mock_get_store):
 
 
 @pytest.mark.asyncio
-@patch("src.database.factory.DatabaseFactory.get_database")
+@patch("src.infrastructure.database.factory.DatabaseFactory.get_database")
 async def test_liquidation_risk_safe(mock_get_store):
     mock_get_store.return_value = AsyncMock()
     # Setup

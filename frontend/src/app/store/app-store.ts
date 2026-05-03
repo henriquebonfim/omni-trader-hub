@@ -61,6 +61,8 @@ interface AppState {
 
   // Prices from WS
   livePrices: Record<string, number>;
+  setLivePrice: (symbol: string, price: number) => void;
+  setLivePrices: (prices: Record<string, number>) => void;
 }
 
 export const useAppStore = create<AppState>((set) => ({
@@ -113,4 +115,7 @@ export const useAppStore = create<AppState>((set) => ({
   setSelectedSymbol: (selectedSymbol) => set({ selectedSymbol }),
 
   livePrices: {},
+  setLivePrice: (symbol, price) =>
+    set((state) => ({ livePrices: { ...state.livePrices, [symbol]: price } })),
+  setLivePrices: (livePrices) => set({ livePrices }),
 }));

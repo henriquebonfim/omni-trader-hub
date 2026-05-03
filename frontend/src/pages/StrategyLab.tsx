@@ -1,8 +1,8 @@
 import { cn } from '@/core/utils';
 import type { IndicatorCondition, Strategy, StrategyPerformanceEntry } from '@/domains/strategy/types';
-import { EmptyState } from '@/shared/components/EmptyState';
-import { Panel } from '@/shared/components/Panel';
-import { StatusBadge } from '@/shared/components/StatusBadge';
+import { EmptyState } from '@/shared/ui/molecules/EmptyState';
+import { Panel } from '@/shared/ui/molecules/Panel';
+import { StatusBadge } from '@/shared/ui/molecules/StatusBadge';
 import { Copy, Edit2, FlaskConical, Plus, Search, Target, Trash2, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';

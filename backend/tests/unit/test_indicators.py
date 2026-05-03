@@ -4,8 +4,8 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 from fastapi.testclient import TestClient
 
-from src.api import create_api
-from src.api.routes import indicators
+from src.interfaces.api import create_api
+from src.interfaces.api.routes import indicators
 
 
 # Reset rate limiter before each test

@@ -2,12 +2,13 @@ import { cn } from '@/core/utils';
 import { fetchCorrelationMatrix, fetchCrisisStatus, fetchMacroIndicators, fetchNews, fetchSentiment, toggleCrisisMode } from '@/domains/market/api';
 import type { CorrelationMatrixData, NewsItem, SentimentData } from '@/domains/market/types';
 import type { CrisisStatus } from '@/domains/system/types';
-import { CorrelationHeatmap } from '@/shared/components/CorrelationHeatmap';
-import { EmptyState } from '@/shared/components/EmptyState';
-import { Panel } from '@/shared/components/Panel';
-import { StatusBadge } from '@/shared/components/StatusBadge';
+import { CorrelationHeatmap } from '@/shared/ui/organisms/CorrelationHeatmap';
+import { EmptyState } from '@/shared/ui/molecules/EmptyState';
+import { Panel } from '@/shared/ui/molecules/Panel';
+import { StatusBadge } from '@/shared/ui/molecules/StatusBadge';
 import { AlertCircle, AlertTriangle, Loader2, Newspaper, TrendingDown, TrendingUp } from 'lucide-react';
 import { useEffect, useState } from 'react';
+import { AIOverviewCard } from '@/features/intelligence/AIOverview';
 
 export default function Intelligence() {
   const [newsFilter, setNewsFilter] = useState<'all' | 'high' | 'asset'>('all');
@@ -80,90 +81,8 @@ export default function Intelligence() {
       <h1 className="text-lg font-semibold">Intelligence</h1>
 
       {/* Top row */}
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
-        {/* Sentiment */}
-        <Panel title="Market Sentiment">
-          {loadingSentiment ? (
-            <div className="flex items-center justify-center h-[72px]">
-              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-            </div>
-          ) : errorSentiment ? (
-            <div className="flex items-center justify-center h-[72px] text-muted-foreground">
-              <AlertCircle className="h-5 w-5 mr-2 text-warning" />
-              <span className="text-sm">Sentiment unavailable</span>
-            </div>
-          ) : (
-            <div className="flex items-center gap-4">
-              <span className="text-4xl">{sentimentEmoji}</span>
-              <div>
-                <p className="text-lg font-semibold font-mono">{sentiment.toFixed(2)}</p>
-                <p className="text-xs text-muted-foreground">{sentimentLabel}</p>
-                <p className="text-[11px] text-muted-foreground mt-1">{sentimentData?.article_count || 0} articles (24h)</p>
-              </div>
-            </div>
-          )}
-        </Panel>
-
-        {/* Crisis Mode */}
-        <Panel title="Crisis Mode">
-          {loadingCrisis ? (
-            <div className="flex items-center justify-center h-[96px]">
-              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-            </div>
-          ) : errorCrisis ? (
-            <div className="flex flex-col items-center justify-center h-[96px] text-muted-foreground">
-              <AlertCircle className="h-5 w-5 mb-1 text-warning" />
-              <span className="text-sm">Crisis status unavailable</span>
-            </div>
-          ) : (
-            <>
-              <div className={cn(
-                'rounded-md p-3 border',
-                crisisActive ? 'border-danger animate-pulse-border bg-danger/5' : 'border-success/30 bg-success/5'
-              )}>
-                <p className={cn('text-sm font-semibold', crisisActive ? 'text-danger' : 'text-success')}>
-                  {crisisActive ? '🚨 CRISIS MODE ACTIVE' : '✅ NORMAL TRADING'}
-                </p>
-                {crisisActive && (
-                  <p className="text-[11px] text-muted-foreground mt-1">Leverage: 1×, Position: 0.5%, ADX Trend only</p>
-                )}
-              </div>
-              <button
-                onClick={() => toggleCrisisMode(!crisisActive).then(() => fetchCrisisStatus().then(setCrisisStatus)).catch(console.error)}
-                className="mt-3 w-full py-2 rounded-md border border-border text-xs font-medium hover:bg-secondary/50 transition-colors"
-              >
-                {crisisActive ? 'Deactivate Crisis Mode' : 'Activate Crisis Mode'}
-              </button>
-            </>
-          )}
-        </Panel>
-
-        {/* Fear & Greed */}
-        <Panel title="Fear & Greed Index">
-          <div className="flex items-center gap-3">
-            <div className="relative h-16 w-16">
-              <svg viewBox="0 0 36 36" className="h-16 w-16 -rotate-90">
-                <circle cx="18" cy="18" r="15" fill="none" stroke="hsl(var(--border))" strokeWidth="3" />
-                <circle cx="18" cy="18" r="15" fill="none" stroke="hsl(var(--yellow))" strokeWidth="3"
-                  strokeDasharray={`${fearGreedValue * 94.2 / 100} 94.2`} strokeLinecap="round" />
-              </svg>
-              <span className="absolute inset-0 flex items-center justify-center text-sm font-bold font-mono">{Math.round(fearGreedValue)}</span>
-            </div>
-            <div>
-              <p className="text-sm font-semibold text-warning">{fearGreedLabel}</p>
-              <p className="text-[11px] text-muted-foreground">{fearGreed !== null ? 'Live from graph macro feed' : 'Fallback value'}</p>
-            </div>
-          </div>
-        </Panel>
-
-        {/* Macro */}
-        <Panel title="Macro Indicators">
-          <div className="space-y-2">
-            <MacroRow label="DXY" value="104.2" change={-0.3} />
-            <MacroRow label="Oil (WTI)" value="$78.4" change={1.2} />
-            <MacroRow label="BTC.D" value="54.8%" change={0.5} />
-          </div>
-        </Panel>
+      <div className="grid grid-cols-1 gap-4">
+        <AIOverviewCard />
       </div>
 
       {/* Divergence alert banner */}
@@ -262,8 +181,10 @@ export default function Intelligence() {
                     <span className="text-[10px]">
                       {item.sentiment_score > 0 ? '🙂' : item.sentiment_score < 0 ? '😟' : '😐'} {item.sentiment_score.toFixed(2)}
                     </span>
-                    {item.assets.map(a => (
-                      <StatusBadge key={a} variant="neutral" size="sm">{a}</StatusBadge>
+                    {item.assets.map((a, idx) => (
+                      <span key={`${item.id}-${a}-${idx}`}>
+                        <StatusBadge variant="neutral" size="sm">{a}</StatusBadge>
+                      </span>
                     ))}
                     <span className="text-[10px] text-muted-foreground ml-auto">
                       {Math.floor((Date.now() - item.published_at) / 3600000)}h ago

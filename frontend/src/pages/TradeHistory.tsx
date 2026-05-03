@@ -1,9 +1,9 @@
 import { cn } from '@/core/utils';
 import type { Trade } from '@/domains/trade/types';
 import { exportToCSV, exportToExcel, exportToPDF } from '@/lib/export';
-import { Panel } from '@/shared/components/Panel';
-import { StatCard } from '@/shared/components/StatCard';
-import { StatusBadge } from '@/shared/components/StatusBadge';
+import { Panel } from '@/shared/ui/molecules/Panel';
+import { StatCard } from '@/shared/ui/molecules/StatCard';
+import { StatusBadge } from '@/shared/ui/molecules/StatusBadge';
 import { ChevronDown, ChevronUp, Download, Search } from 'lucide-react';
 import { Fragment, useState } from 'react';
 

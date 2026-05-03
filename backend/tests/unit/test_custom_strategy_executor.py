@@ -2,7 +2,7 @@ import pandas as pd
 import pytest
 
 from src.config import Config
-from src.strategy.custom_executor import CustomStrategyExecutor
+from src.domain.strategy.custom_executor import CustomStrategyExecutor
 
 
 @pytest.fixture

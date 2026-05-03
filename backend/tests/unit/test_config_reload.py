@@ -13,14 +13,11 @@ async def test_reload_config_updates_components(monkeypatch):
     bot.strategy = MagicMock()
     bot.notifier = MagicMock()
 
-    # Mock reload_config to return a new config object
-    new_config = MagicMock()
-    # We need to ensure this matches the currently loaded config to avoid strategy switch
-    # Or we force the current config to match this one
-    bot.config.strategy.name = "ema_volume"
-    new_config.strategy.name = "ema_volume"
+    # Mock load_config_from_db to return a new config object
+    async def mock_load_from_db(db):
+        return new_config
 
-    monkeypatch.setattr("src.main.reload_config", lambda: new_config)
+    monkeypatch.setattr("src.main.load_config_from_db", mock_load_from_db)
 
     await bot.reload_config()
 
@@ -46,13 +43,17 @@ async def test_reload_config_switches_strategy(monkeypatch):
     new_config = MagicMock()
     new_config.strategy.name = "adx_trend"
 
+    # Mock load_config_from_db
+    async def mock_load_from_db(db):
+        return new_config
+
     # Mock get_strategy
     NewStrategyClass = MagicMock()
     # Ensure instantiation returns a unique mock
     NewStrategyInstance = MagicMock()
     NewStrategyClass.return_value = NewStrategyInstance
 
-    monkeypatch.setattr("src.main.reload_config", lambda: new_config)
+    monkeypatch.setattr("src.main.load_config_from_db", mock_load_from_db)
     monkeypatch.setattr("src.main.get_strategy", lambda name: NewStrategyClass)
 
     await bot.reload_config()

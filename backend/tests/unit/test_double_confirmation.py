@@ -2,8 +2,8 @@ import pandas as pd
 import pytest
 
 from src.config import Config
-from src.intelligence.regime import MarketRegime
-from src.strategy.base import BaseStrategy, Signal
+from src.domain.intelligence.regime import MarketRegime
+from src.domain.strategy.base import BaseStrategy, Signal
 
 
 class MockStrategy(BaseStrategy):

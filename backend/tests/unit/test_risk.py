@@ -3,7 +3,7 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from src.risk import RiskManager
+from src.domain.risk import RiskManager
 
 
 def test_drawdown_sizing():
@@ -21,7 +21,7 @@ def test_drawdown_sizing():
 
 @pytest.mark.asyncio
 async def test_consecutive_losses_reset():
-    with patch("src.database.factory.DatabaseFactory.get_database") as mock_get_store:
+    with patch("src.infrastructure.database.factory.DatabaseFactory.get_database") as mock_get_store:
         mock_get_store.return_value = AsyncMock()
 
         risk = RiskManager()
@@ -39,7 +39,7 @@ async def test_consecutive_losses_reset():
 @pytest.mark.asyncio
 async def test_daily_reset_preserves_streak(monkeypatch):
     """T17: Consecutive loss streak should persist across day boundaries, not reset on daily_stats reset."""
-    with patch("src.database.factory.DatabaseFactory.get_database") as mock_get_store:
+    with patch("src.infrastructure.database.factory.DatabaseFactory.get_database") as mock_get_store:
         mock_get_store.return_value = AsyncMock()
 
         risk = RiskManager()
@@ -56,9 +56,9 @@ async def test_daily_reset_preserves_streak(monkeypatch):
             # Allow creating date objects from date(Y, M, D) calls inside RiskManager if needed
             # But RiskManager uses date.today() which we patched on the class.
             # However, datetime.date is immutable type, so we need care.
-            # But the monkeypatch below targets src.risk.date which is imported as 'date'.
+            # But the monkeypatch below targets src.domain.risk.date which is imported as 'date'.
 
-        monkeypatch.setattr("src.risk.date", MockDate)
+        monkeypatch.setattr("src.domain.risk.date", MockDate)
         await risk.initialize_daily_stats(10000.0)
 
         # T17: consecutive_losses should persist across day boundaries

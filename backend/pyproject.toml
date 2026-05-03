@@ -1,66 +1,61 @@
-[tool.ruff]
-# Exclude a variety of commonly ignored directories.
-exclude = [
-    ".bzr",
-    ".direnv",
-    ".eggs",
-    ".git",
-    ".git-rewrite",
-    ".hg",
-    ".ipynb_checkpoints",
-    ".mypy_cache",
-    ".nox",
-    ".pants.d",
-    ".pyenv",
-    ".pytest_cache",
-    ".pytype",
-    ".ruff_cache",
-    ".svn",
-    ".tox",
-    ".venv",
-    ".vscode",
-    "__pypackages__",
-    "_build",
-    "buck-out",
-    "build",
-    "dist",
-    "node_modules",
-    "site-packages",
-    "venv",
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "omnitrader-backend"
+version = "0.1.0"
+description = "OmniTrader Backend"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "ccxt==4.5.42",
+    "aiohttp==3.13.3",
+    "numpy==2.4.2",
+    "pandas==3.0.1",
+    "scipy==1.15.2",
+    "TA-Lib==0.6.8",
+    "pyyaml==6.0.3",
+    "python-dotenv==1.2.2",
+    "packaging==26.0",
+    "structlog==25.5.0",
+    "neo4j==6.1.0",
+    "redis==6.4.0",
+    "celery[redis]==5.6.2",
+    "httpx==0.28.1",
+    "psutil==7.0.0",
+    "fastapi==0.135.1",
+    "uvicorn[standard]==0.41.0",
+    "feedparser>=6.0.0",
+    "llama-index==0.12.21",
+    "llama-index-llms-ollama==0.5.1",
 ]
 
-# Same as Black.
-line-length = 88
-indent-width = 4
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0,<10.0.0",
+    "pytest-asyncio>=0.21.0,<1.4.0",
+    "ruff>=0.3.0,<1.0.0",
+    "mypy>=1.0.0,<2.0.0",
+    "pre-commit>=3.6.0,<4.0.0",
+    "testcontainers>=3.0.0,<5.0.0",
+]
 
-# Assume Python 3.12
+[tool.ruff]
+line-length = 88
 target-version = "py312"
+exclude = [".git", ".venv", "__pycache__", "build", "dist"]
 
 [tool.ruff.lint]
-# Enable Pyflakes (`F`) and a subset of the pycodestyle (`E`)  codes by default.
-# Unlike Flake8, Ruff doesn't enable pycodestyle warnings (`W`) or
-# McCabe complexity (`C901`) by default.
-select = ["E4", "E7", "E9", "F", "I", "B"]
-ignore = []
+select = ["E", "W", "F", "I", "B"]
+ignore = ["E501"]
 
-# Allow fix for all enabled rules (when `--fix`) is provided.
-fixable = ["ALL"]
-unfixable = []
-
-# Allow unused variables when underscore-prefixed.
-dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
+[tool.ruff.lint.isort]
+known-first-party = ["src"]
 
 [tool.ruff.format]
-# Like Black, use double quotes for strings.
 quote-style = "double"
-
-# Like Black, indent with spaces, rather than tabs.
 indent-style = "space"
-
-# Like Black, respect magic trailing commas.
-skip-magic-trailing-comma = false
-
-# Like Black, automatically detect the appropriate line ending.
 line-ending = "auto"
 
 [tool.pytest.ini_options]

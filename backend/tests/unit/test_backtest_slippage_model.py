@@ -1,6 +1,6 @@
 import pytest
-from src.backtest.engine import BacktestEngine
-from src.strategy.base import BaseStrategy
+from src.application.backtest.engine import BacktestEngine
+from src.domain.strategy.base import BaseStrategy
 from src.config import Config
 from unittest.mock import MagicMock
 

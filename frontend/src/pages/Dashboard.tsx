@@ -4,13 +4,15 @@ import { fetchBots, startBot, stopBot, restartBot, manualOpenTrade, manualCloseT
 import { fetchSentiment } from '@/domains/market/api';
 import { fetchEquitySnapshots, fetchTradeHistory } from '@/domains/trade/api';
 import type { EquitySnapshot, Trade } from '@/domains/trade/types';
-import { Panel } from '@/shared/components/Panel';
-import { StatCard } from '@/shared/components/StatCard';
-import { StatusBadge } from '@/shared/components/StatusBadge';
+import { Panel } from '@/shared/ui/molecules/Panel';
+import { StatCard } from '@/shared/ui/molecules/StatCard';
+import { StatusBadge } from '@/shared/ui/molecules/StatusBadge';
 import { ArrowRight, ArrowUpDown, Pause, Play, Square, TrendingUp, Zap } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Area, AreaChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
+import { BotControlCard } from '@/features/bot/components/BotControlCard';
+import { AIOverviewCard } from '@/features/intelligence/AIOverview';
 
 const regimeIcons: Record<string, React.ReactNode> = {
   trending: <TrendingUp className="h-3 w-3" />,
@@ -25,18 +27,17 @@ const regimeColors: Record<string, string> = {
 };
 
 export default function Dashboard() {
-  const storeBots = useAppStore(s => s.bots);
+  const bots = useAppStore(s => s.bots);
   const setBots = useAppStore(s => s.setBots);
-  const prices = useAppStore(s => s.livePrices);
-  const bots = storeBots;
-  const liveAlerts = useAppStore(s => s.alerts);
-  const alerts = liveAlerts;
+  const livePrices = useAppStore(s => s.livePrices);
+  const alerts = useAppStore(s => s.alerts);
+  const wsStatus = useAppStore(s => s.wsStatus);
+
+  const refreshBots = () => fetchBots().then(setBots).catch(console.error);
 
   const [trades, setTrades] = useState<Trade[]>([]);
   const [equityDataAll, setEquityDataAll] = useState<EquitySnapshot[]>([]);
   const [sentimentScore, setSentimentScore] = useState<number>(0);
-
-  const refreshBots = () => fetchBots().then(setBots).catch(console.error);
 
   useEffect(() => {
     fetchBots().then(setBots).catch(console.error);
@@ -61,6 +62,7 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-4 animate-fade-in">
+      <AIOverviewCard />
       {/* Global Stats */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
         <StatCard label="Portfolio Value" value={`$${totalValue.toLocaleString()}`} />
@@ -83,107 +85,7 @@ export default function Dashboard() {
           <Panel title="Active Bots" subtitle={`${activeBots.length} bots running`}>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               {bots.filter(b => b.status !== 'stopped').map(bot => (
-                <div key={bot.id} className="rounded-lg border border-border bg-secondary/30 p-3 hover:bg-secondary/50 transition-colors">
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="flex items-center gap-2">
-                      <span className="font-semibold text-sm">{bot.symbol}</span>
-                      <StatusBadge
-                        variant={bot.status === 'running' ? 'success' : bot.status === 'paused' ? 'warning' : 'danger'}
-                        pulse={bot.status === 'running'}
-                        size="sm"
-                      >
-                        {bot.status}
-                      </StatusBadge>
-                    </div>
-                    <span className="font-mono text-sm">
-                      {prices[bot.symbol] !== undefined
-                        ? `$${prices[bot.symbol].toLocaleString(undefined, { maximumFractionDigits: 2 })}`
-                        : '—'}
-                    </span>
-                  </div>
-
-                  <div className="flex items-center gap-2 mb-2 flex-wrap">
-                    <StatusBadge variant="info" size="sm">{bot.active_strategy || '—'}</StatusBadge>
-                    <StatusBadge variant={bot.mode === 'auto' ? 'info' : 'neutral'} size="sm">{bot.mode}</StatusBadge>
-                    {bot.regime && (
-                      <StatusBadge variant={regimeColors[bot.regime] as "success" | "danger" | "warning" | "info" | "neutral"} size="sm">
-                        {regimeIcons[bot.regime]} {bot.regime.toUpperCase()}
-                      </StatusBadge>
-                    )}
-                  </div>
-
-                  <div className="flex items-center justify-between text-xs mb-2">
-                    <div>
-                      {bot.position ? (
-                        <StatusBadge variant={bot.position.side === 'long' ? 'success' : 'danger'} size="sm">
-                          {bot.position.side.toUpperCase()} {(bot.position.unrealized_pnl ?? 0) >= 0 ? '+' : ''}{(bot.position.unrealized_pnl ?? 0).toFixed(2)}
-                        </StatusBadge>
-                      ) : (
-                        <span className="text-muted-foreground">FLAT</span>
-                      )}
-                    </div>
-                    <span className={cn('font-mono font-medium', (bot.daily_pnl ?? 0) >= 0 ? 'text-success' : 'text-danger')}>
-                      {(bot.daily_pnl ?? 0) >= 0 ? '+' : ''}${(bot.daily_pnl ?? 0).toFixed(2)} ({(bot.daily_pnl_pct ?? 0).toFixed(2)}%)
-                    </span>
-                  </div>
-
-                  <div className="flex items-center gap-1.5 pt-2 border-t border-border/50">
-                    {bot.status === 'running' && (
-                      <button
-                        onClick={() => stopBot(bot.id).then(refreshBots).catch(console.error)}
-                        className="px-2 py-1 rounded text-[11px] bg-warning/15 text-warning hover:bg-warning/25 transition-colors"
-                        title="Pause (mapped to stop)"
-                      >
-                        <Pause className="h-3 w-3" />
-                      </button>
-                    )}
-                    {(bot.status === 'paused' || bot.status === 'stopped') && (
-                      <button onClick={() => startBot(bot.id).then(refreshBots).catch(console.error)} className="px-2 py-1 rounded text-[11px] bg-success/15 text-success hover:bg-success/25 transition-colors" title="Start">
-                        <Play className="h-3 w-3" />
-                      </button>
-                    )}
-                    <button
-                      onClick={() => restartBot(bot.id).then(refreshBots).catch(console.error)}
-                      className="px-2 py-1 rounded text-[11px] bg-secondary/50 text-muted-foreground hover:bg-secondary transition-colors"
-                      title="Restart"
-                    >
-                      <Zap className="h-3 w-3" />
-                    </button>
-                    {bot.status === 'running' && !bot.position && (
-                      <div className="flex gap-1">
-                        <button
-                          onClick={() => manualOpenTrade(bot.id, 'long').then(refreshBots).catch(console.error)}
-                          className="px-1.5 py-1 rounded text-[10px] bg-success/10 text-success hover:bg-success/20 transition-colors"
-                          title="Manual Long"
-                        >
-                          L
-                        </button>
-                        <button
-                          onClick={() => manualOpenTrade(bot.id, 'short').then(refreshBots).catch(console.error)}
-                          className="px-1.5 py-1 rounded text-[10px] bg-danger/10 text-danger hover:bg-danger/20 transition-colors"
-                          title="Manual Short"
-                        >
-                          S
-                        </button>
-                      </div>
-                    )}
-                    {bot.position && (
-                      <button
-                        onClick={() => manualCloseTrade(bot.id).then(refreshBots).catch(console.error)}
-                        className="px-1.5 py-1 rounded text-[10px] bg-warning/10 text-warning hover:bg-warning/20 transition-colors"
-                        title="Manual Close"
-                      >
-                        CLOSE
-                      </button>
-                    )}
-                    <button onClick={() => stopBot(bot.id).then(refreshBots).catch(console.error)} className="ml-auto px-2 py-1 rounded text-[11px] bg-danger/15 text-danger hover:bg-danger/25 transition-colors" title="Force Stop">
-                      <Square className="h-3 w-3" />
-                    </button>
-                    <Link to="/bots" className="px-2 py-1 rounded text-[11px] text-accent hover:bg-accent/10 transition-colors flex items-center gap-1">
-                      <ArrowRight className="h-3 w-3" />
-                    </Link>
-                  </div>
-                </div>
+                <BotControlCard key={bot.id} bot={bot} livePrice={livePrices[bot.symbol]} />
               ))}
             </div>
           </Panel>

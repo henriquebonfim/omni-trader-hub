@@ -4,7 +4,7 @@ import pandas as pd
 import pytest
 from fastapi.testclient import TestClient
 
-from src.api import create_api
+from src.interfaces.api import create_api
 
 
 def _df_from_prices(prices: list[float]) -> pd.DataFrame:
@@ -86,7 +86,7 @@ def test_graph_news_feed_endpoint_returns_list(client: TestClient):
 def test_graph_crisis_update_accepts_json_body(client: TestClient, monkeypatch):
     monkeypatch.setenv("OMNITRADER_API_KEY", "test-secret")
 
-    import src.api.auth as auth
+    import src.interfaces.api.auth as auth
 
     auth._API_KEY = None
     auth._AUTH_DEV_MODE = False
@@ -112,7 +112,7 @@ def test_graph_crisis_update_accepts_json_body(client: TestClient, monkeypatch):
 def test_graph_asset_news_uses_impacts_relationship(monkeypatch):
     monkeypatch.setenv("OMNITRADER_API_KEY", "test-secret")
 
-    import src.api.auth as auth
+    import src.interfaces.api.auth as auth
 
     auth._API_KEY = None
     auth._AUTH_DEV_MODE = False

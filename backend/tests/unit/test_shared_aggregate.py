@@ -1,5 +1,5 @@
-from src.shared.domain.aggregate import AggregateRoot
-from src.shared.domain.events import DomainEvent
+from src.domain.shared.aggregate import AggregateRoot
+from src.domain.shared.events import DomainEvent
 
 
 class DummyAggregate(AggregateRoot):

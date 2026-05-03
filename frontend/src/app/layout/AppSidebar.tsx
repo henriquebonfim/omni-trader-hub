@@ -16,6 +16,7 @@ const navItems = [
   { to: '/backtesting', icon: Target, label: 'Backtesting' },
   { to: '/risk', icon: Shield, label: 'Risk Monitor' },
   { to: '/history', icon: ClipboardList, label: 'Trade History' },
+  { to: '/analytics', icon: TrendingUp, label: 'Analytics' },
   { to: '/strategy-lab', icon: FlaskConical, label: 'Strategy Lab' },
   { to: '/settings', icon: Settings, label: 'Settings' },
 ];

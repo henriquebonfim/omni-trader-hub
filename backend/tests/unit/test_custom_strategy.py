@@ -1,9 +1,9 @@
 import pytest
 from fastapi.testclient import TestClient
 
-from src.api import create_api
+from src.interfaces.api import create_api
 from src.config import Config
-from src.strategy.custom_executor import CustomStrategyExecutor
+from src.domain.strategy.custom_executor import CustomStrategyExecutor
 
 
 class MockDatabase:
@@ -99,9 +99,9 @@ async def test_custom_strategy_crud():
     }
 
     # Bypass API Key for tests by overriding _API_KEY
-    import src.api.auth
+    import src.interfaces.api.auth
 
-    src.api.auth._API_KEY = "test_api_key"
+    src.interfaces.api.auth._API_KEY = "test_api_key"
     headers = {"Authorization": "Bearer test_api_key"}
 
     res = client.post("/api/strategies", json=payload, headers=headers)

@@ -42,7 +42,7 @@ This is the first stable release of OmniTrader following a comprehensive institu
 
 - **T22**: Fixed auth fail-open - now requires API key even in development ([#64](https://github.com/henriquebonfim/omnitrader/pull/64))
 - **T23**: Removed hardcoded Postgres password - now requires POSTGRES_PASSWORD env var ([#64](https://github.com/henriquebonfim/omnitrader/pull/64))
-- **T24**: Separated dev/prod dependencies (requirements.txt / requirements-dev.txt)
+- **T24**: Separated dev/prod dependencies (originally requirements.txt, now in pyproject.toml)
 - **T25**: Added dependency lockfile for reproducible builds
 - **T26**: Added circuit breaker to Celery dispatcher for worker health
 - **T27**: Fetch minimum order size dynamically from exchange (multi-asset support)
@@ -88,7 +88,7 @@ cp .env.example .env
 # Start full stack
 docker compose up -d --build
 
-# Access dashboard: http://localhost:3000
+# Access dashboard: http://localhost:3333
 # Access API: http://localhost:8000/docs
 ```
 

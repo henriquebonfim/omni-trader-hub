@@ -2,7 +2,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from src.intelligence.ingestor import NewsIngestor
+from src.domain.intelligence.ingestor import NewsIngestor
 
 
 @pytest.fixture

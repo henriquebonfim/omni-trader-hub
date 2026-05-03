@@ -1,8 +1,10 @@
+x-backend-build: &backend-build
+  context: ./backend
+  dockerfile: Dockerfile
+
 services:
   omnitrader:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
+    build: *backend-build
     container_name: omnitrader
     ports:
       - "8000:8000"
@@ -17,9 +19,7 @@ services:
         condition: service_started
 
   watchdog:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
+    build: *backend-build
     container_name: omnitrader-watchdog
     command: python -m src.watchdog
     environment:
@@ -32,11 +32,9 @@ services:
     restart: unless-stopped
 
   celery-worker:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
+    build: *backend-build
     container_name: omnitrader-celery
-    command: celery -A src.workers worker --loglevel=info --concurrency=2 --queues=celery
+    command: celery -A src.interfaces.workers worker --loglevel=info --concurrency=2 --queues=celery
     env_file:
       - .env
     depends_on:
@@ -44,18 +42,16 @@ services:
         condition: service_healthy
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "celery", "-A", "src.workers", "inspect", "ping", "-t", "5"]
+      test: ["CMD", "celery", "-A", "src.interfaces.workers", "inspect", "ping", "-t", "5"]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 20s
 
   celery-beat:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
+    build: *backend-build
     container_name: omnitrader-celery-beat
-    command: celery -A src.workers beat --loglevel=info
+    command: celery -A src.interfaces.workers beat --loglevel=info
     env_file:
       - .env
     depends_on:
@@ -69,7 +65,7 @@ services:
       dockerfile: Dockerfile
     container_name: omnitrader-frontend
     ports:
-      - "3000:80"
+      - "8888:80"
     depends_on:
       omnitrader:
         condition: service_started

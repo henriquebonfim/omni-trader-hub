@@ -3,14 +3,14 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import aiohttp
 import pytest
 
-from src.exchanges.base import ExchangeError, NetworkError
-from src.exchanges.binance_direct import BinanceDirectExchange
-from src.exchanges.ccxt_adapter import CCXTExchange
-from src.exchanges.factory import ExchangeFactory
+from src.infrastructure.exchanges.base import ExchangeError, NetworkError
+from src.infrastructure.exchanges.binance_direct import BinanceDirectExchange
+from src.infrastructure.exchanges.ccxt_adapter import CCXTExchange
+from src.infrastructure.exchanges.factory import ExchangeFactory
 
 
 def test_factory_returns_ccxt_by_default():
-    with patch("src.exchanges.factory.get_config") as mock_get_config:
+    with patch("src.infrastructure.exchanges.factory.get_config") as mock_get_config:
         mock_config = MagicMock()
         mock_config.exchange.adapter = "ccxt"
         mock_get_config.return_value = mock_config
@@ -20,25 +20,25 @@ def test_factory_returns_ccxt_by_default():
 
 
 def test_factory_returns_binance_direct_when_configured():
-    with patch("src.exchanges.factory.get_config") as mock_get_config:
+    with patch("src.infrastructure.exchanges.factory.get_config") as mock_get_config:
         mock_config = MagicMock()
         mock_config.exchange.adapter = "binance_direct"
         mock_get_config.return_value = mock_config
 
-        with patch("src.exchanges.factory.BinanceDirectExchange") as MockBinanceDirect:
+        with patch("src.infrastructure.exchanges.factory.BinanceDirectExchange") as MockBinanceDirect:
             MockBinanceDirect.return_value = MagicMock(spec=BinanceDirectExchange)
             ExchangeFactory.create_exchange()
             assert MockBinanceDirect.called
 
 
 def test_factory_fallbacks_to_ccxt_on_error():
-    with patch("src.exchanges.factory.get_config") as mock_get_config:
+    with patch("src.infrastructure.exchanges.factory.get_config") as mock_get_config:
         mock_config = MagicMock()
         mock_config.exchange.adapter = "binance_direct"
         mock_get_config.return_value = mock_config
 
         with patch(
-            "src.exchanges.factory.BinanceDirectExchange",
+            "src.infrastructure.exchanges.factory.BinanceDirectExchange",
             side_effect=Exception("Init failed"),
         ):
             adapter = ExchangeFactory.create_exchange()
@@ -60,7 +60,7 @@ def mock_config():
 @pytest.fixture
 def binance_direct(mock_config):
     with (
-        patch("src.exchanges.binance_direct.get_config", return_value=mock_config),
+        patch("src.infrastructure.exchanges.binance_direct.get_config", return_value=mock_config),
         patch.dict(
             "os.environ",
             {"BINANCE_API_KEY": "test_key", "BINANCE_SECRET": "test_secret"},

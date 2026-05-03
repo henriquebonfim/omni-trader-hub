@@ -4,9 +4,9 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from src.shared.domain.events import EventBus
-from src.trading.application.close_position import ClosePositionUseCase
-from src.trading.application.open_position import OpenPositionUseCase
+from src.domain.shared.events import EventBus
+from src.application.trading.close_position import ClosePositionUseCase
+from src.application.trading.open_position import OpenPositionUseCase
 
 
 @pytest.fixture
@@ -55,8 +55,8 @@ async def test_open_position_emits_event_on_success(
     )
 
     # Mock validate_trade to return approval
-    from src.shared.domain.value_objects import Price, Size
-    from src.trading.domain.services.risk_validator import RiskCheck
+    from src.domain.shared.value_objects import Price, Size
+    from src.domain.trading.services.risk_validator import RiskCheck
 
     risk_check = RiskCheck(
         approved=True,

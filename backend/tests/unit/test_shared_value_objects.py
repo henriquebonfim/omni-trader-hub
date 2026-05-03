@@ -1,6 +1,6 @@
 import pytest
 
-from src.shared.domain.value_objects import Leverage, Percentage, PnL, Price, Side, Size
+from src.domain.shared.value_objects import Leverage, Percentage, PnL, Price, Side, Size
 
 
 def test_side_enum_values() -> None:

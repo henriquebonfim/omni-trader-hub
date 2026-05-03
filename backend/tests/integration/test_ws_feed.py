@@ -11,7 +11,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pandas as pd
 import pytest
 
-from src.ws_feed import _MAX_OHLCV_ROWS, WsFeed, _raw_to_df
+from src.infrastructure.ws_feed import _MAX_OHLCV_ROWS, WsFeed, _raw_to_df
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -51,7 +51,7 @@ def _make_raw(n: int, start_ts: int = 1_700_000_000_000, freq_ms: int = 60_000) 
 
 def _make_feed(**kwargs) -> WsFeed:
     """Build a WsFeed with a mocked ccxt.pro client."""
-    with patch("src.ws_feed.ccxtpro") as mock_ccxtpro:
+    with patch("src.infrastructure.ws_feed.ccxtpro") as mock_ccxtpro:
         mock_client = MagicMock()
         mock_ccxtpro.binanceusdm.return_value = mock_client
         feed = WsFeed(
@@ -218,7 +218,7 @@ def test_ticker_age_inf_initially():
     assert feed.ticker_age() == float("inf")
 
 
-@patch("src.ws_feed.time.time")
+@patch("src.infrastructure.ws_feed.time.time")
 def test_ticker_age_returns_correct_age(mock_time):
     feed = _make_feed()
     feed._last_ticker_update_time = 1000.0

@@ -7,13 +7,13 @@ import pytest
 
 sys.path.append(os.path.join(os.path.dirname(__file__), "../"))
 
-from src.risk import RiskManager
+from src.domain.risk import RiskManager
 
 
 @pytest.mark.asyncio
 async def test_risk_manager_state_persistence():
     """RiskManager saves and restores state through database state API."""
-    with patch("src.database.factory.DatabaseFactory.get_database") as mock_get_db:
+    with patch("src.infrastructure.database.factory.DatabaseFactory.get_database") as mock_get_db:
         mock_db = AsyncMock()
         mock_get_db.return_value = mock_db
 
@@ -59,7 +59,7 @@ async def test_risk_manager_state_persistence():
 @pytest.mark.asyncio
 async def test_risk_manager_state_persistence_critical_failure():
     """RiskManager load_state/save_state fail fast when database persistence fails."""
-    with patch("src.database.factory.DatabaseFactory.get_database") as mock_get_db:
+    with patch("src.infrastructure.database.factory.DatabaseFactory.get_database") as mock_get_db:
         mock_db = AsyncMock()
         mock_get_db.return_value = mock_db
         mock_db.get_state.side_effect = Exception("Database down")
@@ -77,7 +77,7 @@ async def test_risk_manager_state_persistence_critical_failure():
 @pytest.mark.asyncio
 async def test_weekly_circuit_breaker_persistence():
     """Weekly circuit breaker state is persisted via database state API."""
-    with patch("src.database.factory.DatabaseFactory.get_database") as mock_get_db:
+    with patch("src.infrastructure.database.factory.DatabaseFactory.get_database") as mock_get_db:
         mock_db = AsyncMock()
         mock_get_db.return_value = mock_db
 
